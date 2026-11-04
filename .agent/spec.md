@@ -16,7 +16,7 @@ Provably secure dependencies. This repo is a library and automated system for bu
 
 - Prototype stack (speed pick, reopened at IMPLEMENT): specs + proven impls = Lean 4.35.0 core (no Mathlib); CLI = Python/uv stdlib; example impls = Python + Rust + Lean.
 - Spec = executable Lean model + named obligations (theorems) per version; obligation status derived from `#print axioms` (std axioms only = proven, `sorryAx` = open, other = trusts X), never hand-written. (MAIN, unruled by user)
-- Conformance tiers: `proven` = Lean impl + refinement theorem (axioms audited; statement-shape match = stub); `tested` = differential run vs the oracle compiled from the spec (seeded random + standard vectors, adapter protocol over stdin). (MAIN, unruled by user)
+- Conformance tiers: `axioms-audited` = Lean impl + theorem naming the spec module, std axioms only (statement-shape match = stub ⇒ never labelled `proven` yet); `tested` = differential run vs the oracle compiled from the spec (seeded random + standard vectors, adapter protocol over stdin). (MAIN, unruled by user)
 - Spec versions = semver: minor = additive + proven `std_unchanged` compatibility obligations; major = breaking. Consumer pins in `fvdep.toml`, evidence in `fvdep.lock` (spec sha256, trust, cases, seed); `upgrade` re-checks before moving the pin. (MAIN, unruled by user)
 - Related projects: fvapi = verification API on host `vflab`, whose ruling has vflab serve fvapi alone; user suggests vflab for fvdep work → open question at showing. fva + fvtrace deps → `.agent/deferred.md`. Prototype runs locally only.
 - Commercial surface = `fvdep request` stub (local log); self-verification of the fvdep system = open.
