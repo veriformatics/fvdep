@@ -1,0 +1,3 @@
+#!/bin/sh
+# Prototype entry point: runs the fvdep CLI from its uv project.
+exec uv run -q --project "$(dirname "$(readlink -f "$0")")/cli" fvdep "$@"

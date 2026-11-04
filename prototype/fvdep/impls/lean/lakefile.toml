@@ -1,0 +1,9 @@
+name = "base64acc"
+defaultTargets = ["Base64Acc"]
+
+[[require]]
+name = "fvdep"
+path = "../../library"
+
+[[lean_lib]]
+name = "Base64Acc"

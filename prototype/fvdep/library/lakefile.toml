@@ -1,0 +1,9 @@
+name = "fvdep"
+defaultTargets = ["Fvdep", "fvdep-oracle"]
+
+[[lean_lib]]
+name = "Fvdep"
+
+[[lean_exe]]
+name = "fvdep-oracle"
+root = "Oracle"

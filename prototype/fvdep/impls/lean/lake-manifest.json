@@ -1,0 +1,14 @@
+{"version": "1.3.0",
+ "packagesDir": ".lake/packages",
+ "packages":
+ [{"type": "path",
+   "scope": "",
+   "name": "fvdep",
+   "manifestFile": "lake-manifest.json",
+   "inherited": false,
+   "dir": "../../library",
+   "copy": false,
+   "configFile": "lakefile.toml"}],
+ "name": "base64acc",
+ "lakeDir": ".lake",
+ "fixedToolchain": false}

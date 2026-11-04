@@ -1,0 +1,34 @@
+dep = "base64"
+version = "1.0.0"
+title = "Base64, standard alphabet, strict (RFC 4648 §4)"
+standard = "RFC 4648 §4"
+module = "Fvdep.Base64.V1_0_0"
+source = "Fvdep/Base64/V1_0_0.lean"
+models = ["npm:base64-js", "pypi:pybase64", "crates:base64"]
+summary = "Encode bytes to base64 and decode strictly: alphabet chars only, padding required, unused bits zero."
+
+[[ops]]
+name = "encode"
+args = ["bytes (hex)"]
+result = "base64 text"
+
+[[ops]]
+name = "decode"
+args = ["text"]
+result = "bytes (hex) | err"
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.decode_encode"
+says = "Decoding an encoding returns the original bytes."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.encode_decode"
+says = "Every accepted string is exactly the encoding of its bytes (canonical)."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.decode_injective"
+says = "Two different strings never decode to the same bytes (no malleability)."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.encode_length"
+says = "Output length = 4 chars per started 3-byte group."

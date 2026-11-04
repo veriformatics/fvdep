@@ -22,3 +22,5 @@ target/
 *~
 .idea/
 .vscode/
+# fvdep prototype state (audit cache, request log)
+.state/
