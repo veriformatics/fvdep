@@ -1,0 +1,9 @@
+# Example consumer project: each dependency names the spec version it implements
+# and the command that runs its implementation behind the adapter protocol.
+[deps.base64]
+spec = "1.0.0"
+impl = "python3 -I ../impls/python/base64_strict.py"
+
+[deps.semver]
+spec = "1.0.0"
+impl = "python3 -I ../impls/python/semver_impl.py"

@@ -1,0 +1,60 @@
+dep = "base64"
+version = "1.1.0"
+title = "Base64, standard alphabet, strict, + URL-safe (RFC 4648 §4, §5)"
+standard = "RFC 4648 §4, §5"
+module = "Fvdep.Base64.V1_1_0"
+source = "Fvdep/Base64/V1_1_0.lean"
+models = ["npm:base64-js", "pypi:pybase64", "crates:base64"]
+summary = "Adds the URL-safe alphabet (- and _). Encode bytes to base64 and decode strictly: alphabet chars only, padding required, unused bits zero."
+
+[[ops]]
+name = "encode"
+args = ["bytes (hex)"]
+result = "base64 text"
+
+[[ops]]
+name = "decode"
+args = ["text"]
+result = "bytes (hex) | err"
+
+[[ops]]
+name = "encode_url"
+args = ["bytes (hex)"]
+result = "base64url text"
+
+[[ops]]
+name = "decode_url"
+args = ["text"]
+result = "bytes (hex) | err"
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_1_0.std_unchanged_encode"
+says = "Compatibility: standard encode is unchanged from 1.0.0."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_1_0.std_unchanged_decode"
+says = "Compatibility: standard decode is unchanged from 1.0.0."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_1_0.decodeUrl_encodeUrl"
+says = "URL-safe round trip: decoding an encoding returns the original bytes."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_1_0.encodeUrl_decodeUrl"
+says = "URL-safe decoding is canonical."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.decode_encode"
+says = "Decoding an encoding returns the original bytes."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.encode_decode"
+says = "Every accepted string is exactly the encoding of its bytes (canonical)."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.decode_injective"
+says = "Two different strings never decode to the same bytes (no malleability)."
+
+[[obligations]]
+theorem = "Fvdep.Base64.V1_0_0.encode_length"
+says = "Output length = 4 chars per started 3-byte group."
