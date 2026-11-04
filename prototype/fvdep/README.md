@@ -37,7 +37,9 @@ The first run builds the Lean library and the oracle. This takes about two minut
 
 - `fvdep request` only saves the request in `.state/requests.jsonl`. No order
   service exists.
-- A Lean implementation check audits the axioms of the theorem that you name.
-  It does not yet confirm that the theorem states conformance to the spec.
+- A Lean implementation check audits the axioms of the theorem that you name,
+  and it confirms that the theorem mentions the spec. It does not yet confirm
+  that the theorem covers every spec operation. The result is labeled
+  `axioms-audited`, not `proven`. The example `Base64Acc` covers `encode` only.
 - Two semver obligations are open (not proven). `fvdep show semver` marks them.
 - The `fvdep` tool itself is Python and is not formally verified.

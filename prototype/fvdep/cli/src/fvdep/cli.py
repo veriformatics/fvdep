@@ -252,7 +252,7 @@ def run_adapter(cmd: list[str], cases: list[list[str]], cwd: Path) -> list[str]:
 @dataclass
 class Result:
     spec: Spec
-    trust: str  # "tested" | "proven" | "failed"
+    trust: str  # "tested" | "axioms-audited" | "failed"
     cases: int
     seed: int | None
     mismatches: list[tuple[list[str], str, str]]
@@ -276,18 +276,29 @@ def differential(spec: Spec, cmd: list[str], n: int, seed: int, cwd: Path) -> Re
     return Result(spec, "tested" if ok else "failed", len(cases), seed, bad, unsupported)
 
 
+def lean_statement(project: Path, module: str, theorem: str) -> str:
+    probe = project / ".lake/fvdep-stmt.lean"
+    probe.write_text(f"import {module}\nset_option pp.fullNames true\n#check @{theorem}\n")
+    return lake(["env", "lean", str(probe)], project).stdout
+
+
 def lean_conformance(spec: Spec, project: Path, module: str, theorem: str) -> Result:
     ax = print_axioms(project, [module], [theorem])[theorem]
-    st = status(ax)
-    note = (f"`{theorem}` axioms: {', '.join(sorted(ax)) or 'none'}\n"
-            "      PROTOTYPE SHORTCUT: the theorem's statement is not yet matched against the spec's "
-            "conformance shape; only its axioms are audited.")
-    return Result(spec, "proven" if st == "proven" else "failed", 0, None, [], [], note)
+    stmt = lean_statement(project, module, theorem)
+    note = f"`{theorem}` axioms: {', '.join(sorted(ax)) or 'none'}"
+    if status(ax) != "proven":
+        return Result(spec, "failed", 0, None, [], [], note + " (not fully proven)")
+    if spec.meta["module"] + "." not in stmt:
+        return Result(spec, "failed", 0, None, [], [],
+                      f"`{theorem}` does not mention spec module {spec.meta['module']}:\n      {stmt.strip()}")
+    note += ("\n      PROTOTYPE SHORTCUT: the statement mentions the spec module, but its shape "
+             "(impl = spec, for every operation) is not checked yet.")
+    return Result(spec, "axioms-audited", 0, None, [], [], note)
 
 
 def report(r: Result) -> None:
-    if r.trust == "proven":
-        print(f"PASS  {r.spec.id}  trust=proven (Lean refinement theorem, kernel-checked)\n      {r.note}")
+    if r.trust == "axioms-audited":
+        print(f"PASS  {r.spec.id}  trust=axioms-audited (Lean theorem kernel-checked; conformance shape unverified)\n      {r.note}")
         return
     if r.passed:
         print(f"PASS  {r.spec.id}  trust=tested ({r.cases} cases, seed {r.seed}, all replies equal the oracle)")
