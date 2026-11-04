@@ -14,23 +14,31 @@ Provably secure dependencies. This repo is a library and automated system for bu
 
 ## Decisions
 
-- Prototype stack (speed pick, reopened at IMPLEMENT): specs + proven impls = Lean 4.35.0 core (no Mathlib); CLI = Python/uv stdlib; example impls = Python + Rust + Lean.
-- Spec = executable Lean model + named obligations (theorems) per version; obligation status derived from `#print axioms` (std axioms only = proven, `sorryAx` = open, other = trusts X), never hand-written. (MAIN, unruled by user)
-- Conformance tiers: `axioms-audited` = Lean impl + theorem naming the spec module, std axioms only (statement-shape match = stub ⇒ never labelled `proven` yet); `tested` = differential run vs the oracle compiled from the spec (seeded random + standard vectors, adapter protocol over stdin). (MAIN, unruled by user)
-- Spec versions = semver: minor = additive + proven `std_unchanged` compatibility obligations; major = breaking. Consumer pins in `fvdep.toml`, evidence in `fvdep.lock` (spec sha256, trust, cases, seed); `upgrade` re-checks before moving the pin. (MAIN, unruled by user)
-- Related projects: fvapi = verification API on host `vflab`, whose ruling has vflab serve fvapi alone; user suggests vflab for fvdep work → open question at showing. fva + fvtrace deps → `.agent/deferred.md`. Prototype runs locally only.
-- Commercial surface = `fvdep request` stub (local log); self-verification of the fvdep system = open.
+- Guarantee (user ruling): proof only — an implementation counts as delivered only with a machine-checked proof against its spec. Differential checks vs the spec oracle = development evidence, never a delivery label. Foreign languages need a proof route (e.g. Verus/Aeneas for Rust) or a Lean implementation compiled/linked into them.
+- Library entry (user ruling): both, mapped — a spec = the secure behaviour contract (e.g. strict RFC 4648 base64) + per-package profiles stating where each real package (npm `base64-js`, Python stdlib, …) deviates. A package without deviations matches the contract; deviations are named, never hidden.
+- Spec modularity (user ruling): modular specs — each operation (e.g. `base64.encode`, `base64.decodeUrl`) = its own versioned spec module; consumers pin the modules they use; no shared per-dependency version line.
+- Automation (user ruling): agent drafts, kernel admits — agents pick popular packages, draft spec + proofs from the standard + upstream tests; admission = Lean kernel build + axiom audit, fully proven entries alone; human spec review optional. Runs on vflab.
+- Host (user ruling): vflab runs fvdep's builds, checks + library growth as its own workload beside fvapi (fvapi's `Host` ruling amended; fvapi session `fvapi-5d` notified, its reply rules the shape: slice, priority, paths). Until that reply: local only.
+- Openness (user ruling): open core — popular specs public (repo licence Apache-2.0); paid = update feed/alerts, requested specs, built implementations.
+- fva + fvtrace dependencies → fvdep (user: "eventually") → `.agent/deferred.md`.
+- Prototype stack (speed pick, reopened at IMPLEMENT): specs + Lean impls = Lean 4.35.0 core (no Mathlib); CLI = Python/uv stdlib; example impls = Python + Rust + Lean.
+- Obligation status derived from `#print axioms` (std axioms only = proven, `sorryAx` = open, other = trusts X), never hand-written; spec completeness (open obligations) + implementation evidence stay separate labels.
+- Self-verification of the fvdep system (Intent): open; prototype CLI = unverified Python.
 
 ## Tasks
 
 - [x] b38c444 Standup: repo, `.gitignore`, spec skeleton
-- [ ] Lean spec library: base64 v1.0.0 + v1.1.0, semver v1.0.0; oracle exe; Lean refinement impl
-- [ ] Example impls: Python + Rust, adapter protocol
-- [ ] `fvdep` CLI: list, show, check, lock, outdated, diff, upgrade, scan, request; `tour.sh`
-- [ ] Navigator pass + user showing
-- [ ] Review (fixed lenses) + close → `Phase: ITERATE`
+- [x] 9fdd332 Prototype build: Lean spec library + oracle, Python/Rust/Lean impls, CLI, tour
+- [x] 9ebb36b Review + navigator-1 fixes: Lean check bound to spec module, `axioms-audited` label, scan/obligation wording
+- [ ] ITERATE r1: `tested` → development-evidence label; delivery = proof (Guarantee)
+- [ ] ITERATE r1: modular specs — split base64/semver into per-operation versioned modules; pins per module; `upgrade`/`diff` per module
+- [ ] ITERATE r1: per-package profiles — base64 contract + profiles (Python stdlib deviation: accepts non-zero unused bits; npm `base64-js`)
+- [ ] ITERATE r1: Lean conformance check = statement shape (impl = spec per operation), so a Lean impl earns `proven`
+- [ ] ITERATE: foreign-language proof route (research: Verus, Aeneas, Lean-compiled libs) for one Rust impl
+- [ ] ITERATE: automation sketch — agent draft → kernel admit loop for one new package; vflab placement once fvapi-5d rules
+- [ ] ITERATE: self-verification plan for the fvdep system
 - Deferred → `.agent/deferred.md`
 
 ## Phase
 
-PROTOTYPE — whole product
+ITERATE — whole product

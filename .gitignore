@@ -32,6 +32,16 @@ coverage.xml
 .envrc
 .pypirc
 venv/
+env/
+ENV/
+env.bak/
+venv.bak/
+.cache/
+.dmypy.json
+dmypy.json
+.pyre/
+.pytype/
+*.pyz
 # Rust
 target/
 **/*.rs.bk
@@ -43,6 +53,10 @@ rustc-ice-*.txt
 *.db
 # OS / editor
 .DS_Store
+.localized
+__MACOSX/
+.AppleDouble
+.LSOverride
 ._*
 Thumbs.db
 [Dd]esktop.ini
@@ -53,9 +67,17 @@ Thumbs.db
 nohup.out
 *.swp
 *.swo
+[._]*.s[a-v][a-z]
+!*.svg
+[._]*.sw[a-p]
+[._]s[a-rt-v][a-z]
+[._]ss[a-gi-z]
+[._]sw[a-p]
+.netrwhist
 [._]*.un~
 *~
 .idea/
 .vscode/
+http-client.private.env.json
 # fvdep prototype state (audit cache, request log)
 .state/
