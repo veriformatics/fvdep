@@ -11,14 +11,49 @@ __pycache__/
 .venv/
 .pytest_cache/
 *.egg-info/
+.eggs/
+*.egg
+build/
+dist/
+.mypy_cache/
+.ruff_cache/
+.hypothesis/
+.tox/
+.nox/
+.coverage
+.coverage.*
+htmlcov/
+coverage.xml
+# Local environment; keep shareable examples
+.env
+.env.*
+!.env.example
+!.env.sample
+.envrc
+.pypirc
+venv/
 # Rust
 target/
+**/*.rs.bk
+*.pdb
+**/mutants.out*/
+rustc-ice-*.txt
 # prototype runtime state
 *.sqlite
 *.db
 # OS / editor
 .DS_Store
+._*
+Thumbs.db
+[Dd]esktop.ini
+.directory
+.Trash-*/
+.nfs*
+.fuse_hidden*
+nohup.out
 *.swp
+*.swo
+[._]*.un~
 *~
 .idea/
 .vscode/
