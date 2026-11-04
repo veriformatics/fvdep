@@ -1,8 +1,8 @@
 /-!
 # base64 spec v1.0.0 — RFC 4648 §4, standard alphabet, strict
 
-Models: npm `base64-js`, PyPI stdlib `base64.b64encode`/`b64decode(validate=True)`,
-crates.io `base64` (STANDARD engine).
+Models: npm `base64-js`, PyPI `pybase64`, crates.io `base64` (STANDARD engine). Python's stdlib
+`b64decode(validate=True)` is more permissive (accepts non-zero unused bits) ⇒ fails the check.
 
 Bytes = `List Nat`, each `< 256` (obligations take that as hypothesis).
 Strict decoding: alphabet chars only, padding mandatory, unused trailing bits zero.

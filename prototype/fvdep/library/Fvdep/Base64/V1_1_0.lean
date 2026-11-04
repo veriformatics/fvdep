@@ -4,7 +4,8 @@ import Fvdep.Base64.V1_0_0
 
 Minor bump: v1.0.0 surface unchanged (`std_unchanged` obligations), `encodeUrl`/`decodeUrl`
 added with the same round-trip + canonical obligations.
-Models: Python `base64.urlsafe_b64encode`, JS `Buffer.toString('base64url')` (padded form).
+Models: Python `base64.urlsafe_b64encode` (padded). Not modeled: unpadded base64url
+(JS `Buffer.toString('base64url')`, RFC 7515 JWS).
 -/
 namespace Fvdep.Base64.V1_1_0
 open Fvdep.Base64

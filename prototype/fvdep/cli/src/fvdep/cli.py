@@ -103,9 +103,9 @@ def lake(args: list[str], cwd: Path) -> subprocess.CompletedProcess:
 
 
 def ensure_built() -> None:
-    if ORACLE.exists():
-        return
-    print("Building the spec library and oracle (first run, about 2 minutes)…", file=sys.stderr)
+    """Incremental `lake build` every call (no-op ≈ 0.2 s) ⇒ the oracle never lags a spec edit."""
+    if not ORACLE.exists():
+        print("Building the spec library and oracle (first run, about 2 minutes)…", file=sys.stderr)
     r = lake(["build"], LIB)
     if r.returncode:
         die(f"lake build failed:\n{r.stdout[-2000:]}{r.stderr[-2000:]}")
@@ -399,8 +399,13 @@ def cmd_lock(a) -> None:
 def classify(old: Spec, new: Spec) -> str:
     if vkey(new.version)[0] != vkey(old.version)[0]:
         return "major (breaking: re-implement)"
-    compat = [o for o in new.obligations if ".std_unchanged" in o["theorem"]]
-    return "minor (additive; old surface unchanged, proven)" if compat else "minor (additive)"
+    # Compat obligations are found by naming convention (`std_unchanged*`); their status is audited.
+    compat = [o["theorem"] for o in new.obligations if ".std_unchanged" in o["theorem"]]
+    if not compat:
+        return "minor (additive; compatibility not stated)"
+    st = audit()
+    proven = all(st[t] == "proven" for t in compat)
+    return f"minor (additive; old surface unchanged: {'proven' if proven else 'NOT proven'})"
 
 
 def cmd_outdated(a) -> None:
