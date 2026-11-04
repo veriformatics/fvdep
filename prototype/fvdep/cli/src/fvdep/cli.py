@@ -297,6 +297,15 @@ def lean_conformance(spec: Spec, project: Path, module: str, theorem: str) -> Re
 
 
 def report(r: Result) -> None:
+    st = audit()
+    sts = [st[o["theorem"]] for o in r.spec.obligations]
+    spec_note = f"      spec obligations: {sts.count('proven')} proven, {len(sts) - sts.count('proven')} open"
+    _report(r)
+    if r.passed:
+        print(spec_note)
+
+
+def _report(r: Result) -> None:
     if r.trust == "axioms-audited":
         print(f"PASS  {r.spec.id}  trust=axioms-audited (Lean theorem kernel-checked; conformance shape unverified)\n      {r.note}")
         return
@@ -511,9 +520,9 @@ def cmd_scan(a) -> None:
     for name, ver, src in deps:
         s = models.get(name)
         covered += bool(s)
-        mark = f"spec {s.id}" if s else "no spec yet"
+        mark = f"spec {s.id} (models its behavior; this package is not checked)" if s else "no spec yet"
         print(f"  {name:<34} {ver:<12} {mark}")
-    print(f"\n{covered} of {len(deps)} covered by a spec.")
+    print(f"\n{covered} of {len(deps)} have a spec. To check a package's own behavior, run it through `fvdep check`.")
     if covered < len(deps):
         print("To ask for a spec (and optionally an implementation): fvdep request <ecosystem:name> [--lang <language>]")
 
