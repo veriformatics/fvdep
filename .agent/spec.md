@@ -18,7 +18,7 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - Library entry (user ruling): both, mapped — a spec = the secure behaviour contract (e.g. strict RFC 4648 base64) + per-package profiles stating where each real package (npm `base64-js`, Python stdlib, …) deviates. A package without deviations matches the contract; deviations are named, never hidden.
 - Spec modularity (user ruling): modular specs — each operation (e.g. `base64.encode`, `base64.decodeUrl`) = its own versioned spec module; consumers pin the modules they use; no shared per-dependency version line.
 - Automation (user ruling): agent drafts, kernel admits — agents pick popular packages, draft spec + proofs from the standard + upstream tests; admission = Lean kernel build + axiom audit, fully proven entries alone; human spec review optional. Runs on vflab.
-- Host (user ruling): vflab runs fvdep's builds, checks + library growth as its own workload beside fvapi (fvapi's `Host` ruling amended; fvapi session `fvapi-5d` notified, its reply rules the shape: slice, priority, paths). Until that reply: local only.
+- Host (user ruling, fvapi commit 42c5b62): fvdep shares vflab with fvapi at equal priority — same `eturkes` account + `fvapi_gate.slice` for builds, checks + library growth; live services run outside the slice + outrank dev work; host maintenance announced to the fvapi session first. Conventions + paths = `CLAUDE.local.md`.
 - Openness (user ruling): open core — popular specs public (repo licence Apache-2.0); paid = update feed/alerts, requested specs, built implementations.
 - fva + fvtrace dependencies → fvdep (user: "eventually") → `.agent/deferred.md`.
 - Prototype stack (speed pick, reopened at IMPLEMENT): specs + Lean impls = Lean 4.35.0 core (no Mathlib); CLI = Python/uv stdlib; example impls = Python + Rust + Lean.
@@ -35,7 +35,7 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [ ] ITERATE r1: per-package profiles — base64 contract + profiles (Python stdlib deviation: accepts non-zero unused bits; npm `base64-js`)
 - [ ] ITERATE r1: Lean conformance check = statement shape (impl = spec per operation), so a Lean impl earns `proven`
 - [ ] ITERATE: foreign-language proof route (research: Verus, Aeneas, Lean-compiled libs) for one Rust impl
-- [ ] ITERATE: automation sketch — agent draft → kernel admit loop for one new package; vflab placement once fvapi-5d rules
+- [ ] ITERATE: automation sketch — agent draft → kernel admit loop for one new package; runs on vflab per `Host`
 - [ ] ITERATE: self-verification plan for the fvdep system
 - Deferred → `.agent/deferred.md`
 
