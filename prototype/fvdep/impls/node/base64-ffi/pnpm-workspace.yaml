@@ -1,0 +1,2 @@
+allowBuilds:
+  koffi: false  # prebuilt binaries ship in the package; its install script is not needed

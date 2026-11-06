@@ -6,7 +6,7 @@ The tool checks an implementation against a spec and follows spec updates.
 
 ## Run it
 
-You need `lean` 4.35.0 with `lake`, `bwrap`, `rsync`, `uv`, `python3`, `cargo`, `node`
+You need `lean` 4.35.0 with `lake`, `bwrap`, `rsync`, a C compiler (`cc`), `uv`, `python3`, `cargo`, `node`
 and `pnpm`.
 
 To see every command on a throwaway copy of the demo project, run:
