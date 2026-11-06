@@ -46,6 +46,19 @@ def semverCompare : Handler := fun _ args => match args with
     some (match Semver.Compare.V1_0_0.compare x y with | .lt => "lt" | .eq => "eq" | .gt => "gt")
   | _ => "unsupported"
 
+def semverParseWith (p : List Char → Option Semver.Parse.V1_0_0.Version) : Handler := fun _ args =>
+  match args with
+  | [s] => okOr ((p s.toList).map Semver.Parse.V1_0_0.renderStr)
+  | _ => "unsupported"
+
+def semverCompareWith (p : List Char → Option Semver.Parse.V1_0_0.Version)
+    (c : Semver.Parse.V1_0_0.Version → Semver.Parse.V1_0_0.Version → Ordering) : Handler := fun _ args =>
+  match args with
+  | [a, b] => okOr do
+    let x ← p a.toList; let y ← p b.toList
+    some (match c x y with | .lt => "lt" | .eq => "eq" | .gt => "gt")
+  | _ => "unsupported"
+
 def handler : String → Option Handler
   | "base64.encode@1.0.0" => some (ops [("encode", enc Base64.Encode.V1_0_0.encode)])
   | "base64.decode@1.0.0" => some (ops [("decode", dec Base64.Decode.V1_0_0.decode)])
@@ -62,6 +75,11 @@ def handler : String → Option Handler
       ("decode", dec Profiles.CratesBase64.V0_22_1.decode),
       ("encode_url", enc Profiles.CratesBase64.V0_22_1.encodeUrl),
       ("decode_url", dec Profiles.CratesBase64.V0_22_1.decodeUrl)])
+  | "semver.parse@1.1.0" => some (ops [("parse", semverParseWith Semver.Parse.V1_1_0.parse)])
+  | "semver.compare@1.1.0" => some (ops [("compare",
+      semverCompareWith Semver.Parse.V1_1_0.parse Semver.Compare.V1_1_0.compare)])
+  | "npm:semver@7.7.3" => some (ops [("parse", semverParseWith Profiles.NpmSemver.V7_7_3.parse),
+      ("compare", semverCompareWith Profiles.NpmSemver.V7_7_3.parse Profiles.NpmSemver.V7_7_3.compare)])
   | _ => none
 
 partial def loop (h : Handler) (i : IO.FS.Stream) (o : IO.FS.Stream) : IO Unit := do

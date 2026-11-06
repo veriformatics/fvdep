@@ -54,6 +54,13 @@ The first run builds the Lean library and the oracle. This takes about two minut
   package. A profile is `published` only when every one of its theorems is proven,
   including the theorem that its list of deviations is complete. Otherwise it is a
   `preview`.
+- **Growth.** `fvdep grow <package> --version <v>` copies the library, gives a coding
+  agent a brief (`cli/src/fvdep/grow-brief.md`) and runs the admission gate on its
+  work. `fvdep admit` admits only new entries: published versions must stay unchanged,
+  new spec modules must have every obligation proven, and a new profile must pass the
+  kernel replay and match its real package. `growth/npm-semver-7.7.3/` records the
+  first run: the agent found 6 deviations in npm `semver`, proved the list complete
+  and closed the two open semver proofs.
 - **Updates.** A new module version can prove that its behaviour is unchanged. Then a
   proof against the old version carries over, and `fvdep upgrade` shows this.
 
@@ -71,6 +78,8 @@ The first run builds the Lean library and the oracle. This takes about two minut
 - `packages/` holds adapters for the real packages that the profiles describe:
   CPython `base64`, npm `base64-js` and the Rust `base64` crate.
 - `demo/` is an example consumer project with `fvdep.toml`.
+- `growth/` records each run of the growth loop.
+- `SELF-VERIFICATION.md` is the plan to verify fvdep itself.
 - `PROTOCOL.md` describes how an adapter talks to the checker.
 
 ## What is not real yet
@@ -87,7 +96,11 @@ The first run builds the Lean library and the oracle. This takes about two minut
   (`libleanshared.so`), and the C API cannot carry text that contains a NUL character.
 - The `base64-js` profile does not yet prove that it agrees with the contract on
   valid input, and no theorem states that its list of deviations is complete.
-- Two semver obligations are open (not proven). `fvdep list` shows them.
+- `semver.parse@1.0.0` and `semver.compare@1.0.0` keep their open obligations, because
+  a published version does not change. Version 1.1.0 of each closes them.
+- The drafting agent runs with full permissions on this computer, outside a sandbox.
+- The gate checks that the theorems of a profile are proven. It does not check that
+  the theorem marked "complete" really describes every deviation.
 - The model of a package is checked against the package by tests only. A profile is
   measured on one package version.
 - The `fvdep` tool itself is Python and is not formally verified.

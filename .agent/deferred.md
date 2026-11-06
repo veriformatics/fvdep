@@ -1,4 +1,6 @@
 # Deferred
 
 - fva + fvtrace dependencies → fvdep specs (user: "eventually"). Accept: `fvdep scan` over each repo's manifests lists ≥1 dependency with a spec, + a documented path for each repo to adopt fvdep checks in its own gate.
-- semver open obligations `semver.compare.compare_trans`, `semver.parse.parse_render` (`sorry`). Accept: `prototype/fvdep/fvdep list` shows 0 open for `semver.parse` + `semver.compare`.
+- Comparator on vflab: bwrap needs unprivileged user namespaces (`kernel.apparmor_restrict_unprivileged_userns = 1` blocks them) → host maintenance via the fvapi session (apparmor profile for bwrap). Accept: `tools/vflab-run sh -c 'cd prototype/fvdep && PYTHONPATH=cli/src python3 -m fvdep.cli check base64.encode@1.0.0 --lean impls/lean:Base64Acc --impl Base64Acc.encode --proof Base64Acc.conforms'` → PROVEN.
+- Profile `complete` relation statement shape unchecked: admission checks the theorem is proven, not that it characterizes the model (an agent could mark a trivial theorem `complete = true`). Accept: `fvdep admit` rejects a planted profile whose complete theorem is `True`; fvdep writes the completeness statement shape (`∀ x, model x = F x` with F built from the contract fn).
+- Drafting agent unsandboxed (`claude -p --dangerously-skip-permissions`; grow-1 wrote to /tmp outside staging against the brief). Accept: `fvdep grow` runs the agent in a sandbox whose writes are confined to the staging dir (planted write outside → denied).
