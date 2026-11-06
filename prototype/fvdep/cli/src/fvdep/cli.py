@@ -162,6 +162,11 @@ def audit() -> dict[str, str]:
         if c.get("key") == key:
             return c["status"]
     ensure_built()
+    # `#print axioms` trusts the environment the elaborator built; a metaprogram can add a theorem
+    # the kernel never checked (`debug.skipKernelTC`). leanchecker replays every declaration first.
+    rc = lake(["env", "leanchecker", "Fvdep"], LIB)
+    if rc.returncode:
+        die(f"the library failed the kernel replay (leanchecker):\n{rc.stdout[-1500:]}{rc.stderr[-1500:]}")
     names = sorted({t for e in entries for t in theorems(e)})
     r = lean_run(LIB, "fvdep-audit.lean", "import Fvdep\n" + "".join(f"#print axioms {n}\n" for n in names))
     ax = axioms_of(r.stdout)
@@ -335,18 +340,94 @@ class Result:
         return self.verdict == "PROVEN"
 
 
+# `leanexport` names = the challenge decls + the kernel builtins `lake comparator` exports with them.
+EXPORT_BUILTINS = ("Quot Quot.mk Quot.lift Quot.ind propext Quot.sound Classical.choice Nat.add Nat.sub "
+                   "Nat.mul Nat.pow Nat.gcd Nat.div Nat.mod Nat.beq Nat.ble Nat.land Nat.lor Nat.xor "
+                   "Nat.shiftLeft Nat.shiftRight String.ofList Char.ofNat List eagerReduce Nat String "
+                   "String.mk Char optParam autoParam semiOutParam outParam").split()
+
+
+def challenge_text(spec: Entry) -> str:
+    fn = spec.meta["fn"]
+    return (f"import {spec.meta['lean']}\ndef fvdep_impl : type_of% @{fn} := sorry\n"
+            f"theorem fvdep_conformance : fvdep_impl = @{fn} := sorry\n")
+
+
+def trusted_challenge(spec: Entry) -> Path:
+    """Challenge built + exported against fvdep's own library, outside the implementation's project."""
+    d = STATE / "challenges" / spec.id
+    out = d / f"{spec.sha256()[:16]}.ndjson"
+    if out.exists():
+        return out
+    ensure_built()
+    d.mkdir(parents=True, exist_ok=True)
+    (d / "lakefile.toml").write_text(f'name = "fvdepchallenge"\n[[require]]\nname = "fvdep"\npath = "{LIB}"\n'
+                                     '[[lean_lib]]\nname = "FvdepChallenge"\n')
+    (d / "lean-toolchain").write_text((LIB / "lean-toolchain").read_text())
+    (d / "FvdepChallenge.lean").write_text(challenge_text(spec))
+    r = lake(["build", "FvdepChallenge"], d)
+    if r.returncode:
+        die(f"challenge build failed:\n{r.stdout[-2000:]}{r.stderr[-1000:]}")
+    names = ["fvdep_conformance", "fvdep_impl", *EXPORT_BUILTINS]
+    ex = subprocess.run(["lake", "env", "leanexport", "FvdepChallenge", "--", *names],
+                        cwd=d, capture_output=True, text=True)
+    if ex.returncode:
+        die(f"leanexport failed:\n{ex.stderr[-1500:]}")
+    out.write_text(ex.stdout)
+    return out
+
+
+def comparator(spec: Entry, project: Path, mod: str, impl: str, tactic: str) -> tuple[int, str]:
+    """`lake comparator` (bwrap sandbox) judges an fvdep-written solution module in a copy of the
+    project against the trusted challenge export. The sandbox hides $HOME ⇒ the copy vendors the
+    library (`fvdep-library/`, prebuilt oleans reused: a tampered constant fails the comparison)."""
+    challenge = trusted_challenge(spec)
+    work = STATE / "comparator" / hashlib.sha256(f"{project}|{spec.id}|{impl}".encode()).hexdigest()[:16]
+    subprocess.run(["rm", "-rf", str(work)], check=True)
+    work.parent.mkdir(parents=True, exist_ok=True)
+    subprocess.run(["rsync", "-a", "--exclude", ".lake", "--exclude", "lake-manifest.json",
+                    f"{project}/", f"{work}/"], check=True)
+    subprocess.run(["rsync", "-a", "--exclude", ".lake/fvdep-*", f"{LIB}/", f"{work}/fvdep-library/"], check=True)
+    lf = work / "lakefile.toml"
+    if not lf.exists():
+        die(f"{project}: the prototype Lean check needs a lakefile.toml")
+    text, n = re.subn(r'(name = "fvdep"\npath = )"[^"]*"', r'\1"fvdep-library"', lf.read_text())
+    if not n:
+        die(f"{project}/lakefile.toml must require the fvdep library by path")
+    lf.write_text(text + '\n[[lean_lib]]\nname = "FvdepChallenge"\n\n[[lean_lib]]\nname = "FvdepSolution"\n')
+    fn = spec.meta["fn"]
+    (work / "FvdepChallenge.lean").write_text(challenge_text(spec))
+    (work / "FvdepSolution.lean").write_text(
+        f"import {spec.meta['lean']}\nimport {mod}\ndef fvdep_impl : type_of% @{fn} := @{impl}\n"
+        f"theorem fvdep_conformance : fvdep_impl = @{fn} := by\n  show (@{impl}) = (@{fn})\n  {tactic}\n")
+    (work / "comparator.json").write_text(json.dumps({
+        "challenge_module": "FvdepChallenge", "solution_module": "FvdepSolution",
+        "theorem_names": ["fvdep_conformance"], "definition_names": ["fvdep_impl"],
+        "permitted_axioms": sorted(STD_AXIOMS)}))
+    u = lake(["update"], work)  # writes lake-manifest.json; lakefile.toml = declarative, no code runs
+    if u.returncode:
+        die(f"lake update failed in {work}:\n{u.stderr[-1500:]}")
+    r = lake(["comparator", "--challenge-from-export", str(challenge)], work)
+    if r.returncode == 2:
+        die(f"lake comparator could not start:\n{r.stdout[-1500:]}{r.stderr[-1500:]}")
+    lines = (r.stdout + r.stderr).splitlines()
+    why = [ln for ln in lines if "rejected" in ln or "does not match" in ln or "not found" in ln or "axiom" in ln]
+    return r.returncode, (why or [ln for ln in lines if ln.startswith("error")] or lines[-1:] or ["no output"])[0]
+
+
 def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str) -> Result:
-    """fvdep writes the statement `impl = <spec fn>`; the named proof has to close it."""
+    """fvdep writes the statement `impl = <spec fn>`; the named proof has to close it. A local probe
+    gives readable errors; `lake comparator` against a trusted challenge decides."""
     r = lake(["build"], project)
     if r.returncode:
         die(f"lake build failed in {project}:\n{r.stdout[-2000:]}{r.stderr[-2000:]}")
     fn = spec.meta["fn"]
     compat = spec.meta.get("compat", {}).get("theorem")
     close = f"first | exact {proof} | (funext; exact {proof} ..)"
-    via = f" | (rw [{compat}]; {close})" if compat else ""
+    tactic = f"first | ({close})" + (f" | (rw [{compat}]; {close})" if compat else "")
     stmt = f"(@{impl}) = (@{fn})"
     text = (f"import {spec.meta['lean']}\nimport {mod}\n"
-            f"theorem fvdep_conformance : {stmt} := by\n  first | ({close}){via}\n"
+            f"theorem fvdep_conformance : {stmt} := by\n  {tactic}\n"
             "#print axioms fvdep_conformance\n")
     out = lean_run(project, "fvdep-conformance.lean", text)
     ax = axioms_of(out.stdout).get("fvdep_conformance")
@@ -358,8 +439,13 @@ def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str
     if s != "proven":
         return Result(spec, "NOT PROVEN", f"the proof of {impl} = {fn} is {s}", "proof",
                       lines=[f"axioms: {', '.join(sorted(ax))}"])
+    rc, msg = comparator(spec, project, mod, impl, tactic)
+    if rc:
+        return Result(spec, "NOT PROVEN", "lake comparator rejected the proof against the trusted spec",
+                      "proof", lines=[f"comparator: {msg}"])
     return Result(spec, "PROVEN", f"{impl} = {fn} (kernel-checked)", "proof",
-                  lines=[f"statement written by fvdep; axioms: {', '.join(sorted(ax)) or 'none'}"])
+                  lines=["statement written by fvdep; judged by lake comparator against the trusted library",
+                         f"axioms: {', '.join(sorted(ax)) or 'none'}"])
 
 
 def run_check(spec: Entry, cfg: dict, n: int, seed: int, cwd: Path) -> Result:
@@ -405,11 +491,17 @@ def cmd_list(a) -> None:
         e = entries[-1]
         p, o = tally(e, st)
         print(f"{name:<18} {e.version:<7} {p:>6} {o:>4}  {e.meta['title']}")
-    print(f"\n{'package profile':<26} {'deviations':<12} modules")
+    print(f"\n{'package profile':<26} {'deviations':<11} {'list':<9} modules")
     for name, entries in profiles().items():
         e = entries[-1]
         devs = sum(len(op["deviations"]) for op in e.meta["ops"])
-        print(f"{e.id:<26} {devs:<12} {', '.join(op['contract'] for op in e.meta['ops'])}")
+        done = "complete" if all(complete(op, st) for op in e.meta["ops"]) else "partial"
+        print(f"{e.id:<26} {devs:<11} {done:<9} {', '.join(op['contract'] for op in e.meta['ops'])}")
+
+
+def complete(op: dict, st: dict[str, str]) -> bool:
+    """A proven relation marked `complete` = the deviation list of this op is exhaustive."""
+    return any(r.get("complete") and st[r["theorem"]] == "proven" for r in op["relations"])
 
 
 def cmd_show(a) -> None:
@@ -428,7 +520,7 @@ def cmd_show(a) -> None:
     if "compat" in m:
         c = m["compat"]
         print(f"\n  compatibility with {c['from']}\n    [{st[c['theorem']]:<6}] {c['says']}\n             {c['theorem']}")
-    print("\n  obligations (status read from `#print axioms` on the kernel-checked library)")
+    print("\n  obligations (status = `#print axioms` after a leanchecker kernel replay of the library)")
     for o in m["obligations"]:
         print(f"    [{st[o['theorem']]:<6}] {o['says']}\n             {o['theorem']}")
 
@@ -452,7 +544,7 @@ def cmd_profile(a) -> None:
         print(f"\n  {op['op']}  {op['api']}  vs contract {op['contract']}")
         for r in op["relations"]:
             print(f"    [{st[r['theorem']]:<6}] {r['says']}")
-        if not any(r.get("complete") and st[r["theorem"]] == "proven" for r in op["relations"]):
+        if not complete(op, st):
             print("    completeness: not proven, so deviations beyond the list below may exist")
         if not op["deviations"]:
             print("    deviations: none")
@@ -649,6 +741,7 @@ def cmd_scan(a) -> None:
     if not deps:
         die(f"no package.json, lake-manifest.json, Cargo.toml or pyproject.toml in {root}")
     profs = profiles()
+    st = audit()
     found = 0
     print(f"{root}: {len(deps)} dependencies\n")
     for name, ver, _src in deps:
@@ -662,8 +755,10 @@ def cmd_scan(a) -> None:
         print(f"  {name:<24} {ver:<10} profile {e.id}{same}")
         for op in e.meta["ops"]:
             n = len(op["deviations"])
+            what = f"{n} deviations" if n else "no deviations"
+            what += "" if complete(op, st) else " listed; list not proven complete"
             names = f": {', '.join(d['name'] for d in op['deviations'])}" if n else ""
-            print(f"  {'':<35} {op['contract']:<22} {f'{n} deviations' if n else 'no deviations'}{names}")
+            print(f"  {'':<35} {op['contract']:<22} {what}{names}")
     print(f"\n{found} of {len(deps)} have a package profile. For details, run: fvdep profile <package>")
     print("A profile describes the package. To use a contract instead, implement its modules and prove them.")
     if found < len(deps):
