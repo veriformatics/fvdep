@@ -8,6 +8,7 @@ fn = "Fvdep.Base64.Encode.V1_0_0.encode"
 op = "encode"
 args = ["bytes (hex)"]
 result = "base64 text"
+abi = "encoder"
 uses = []
 summary = "4 alphabet chars per 3-byte group; a short last group is padded with =."
 

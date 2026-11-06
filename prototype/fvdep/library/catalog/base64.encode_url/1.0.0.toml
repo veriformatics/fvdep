@@ -8,6 +8,7 @@ fn = "Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl"
 op = "encode_url"
 args = ["bytes (hex)"]
 result = "base64url text"
+abi = "encoder"
 uses = ["base64.encode@1.0.0"]
 summary = "base64.encode with + → - and / → _. Unpadded base64url is not in this module."
 

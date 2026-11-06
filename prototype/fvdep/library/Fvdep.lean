@@ -8,3 +8,4 @@ import Fvdep.Semver.Compare.V1_0_0
 import Fvdep.Profiles.CpythonBase64.V3_14
 import Fvdep.Profiles.NpmBase64Js.V1_5_1
 import Fvdep.Profiles.CratesBase64.V0_22_1
+import Fvdep.Abi

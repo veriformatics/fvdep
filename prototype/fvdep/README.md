@@ -20,6 +20,7 @@ To run one command, use the `fvdep` wrapper in this folder:
     ./fvdep profile npm:base64-js --check
     ./fvdep check base64.encode@1.0.0 --lean impls/lean:Base64Acc --impl Base64Acc.encode --proof Base64Acc.conforms
     ./fvdep check base64.decode@1.0.0 -- python3 -I impls/python/base64_strict.py
+    ./fvdep check base64.decode@1.0.0 --ffi impls/lean:Base64Ffi --impl Base64Ffi.decode --proof Base64Ffi.decode_abi -- python3 -I impls/python/base64_ffi.py
 
 The first run builds the Lean library and the oracle. This takes about two minutes.
 
@@ -36,6 +37,12 @@ The first run builds the Lean library and the oracle. This takes about two minut
 - **Kernel replay.** Before fvdep reports the status of an obligation, `leanchecker`
   replays the whole library through the Lean kernel. A metaprogram can add a theorem
   that the kernel never checked, and `#print axioms` alone does not show this.
+- **Other languages.** A Lean implementation is compiled to a C library, and Rust,
+  Python or Node call it through a small binding. The proof covers the exported
+  function: fvdep states that it equals the spec with fixed conversions for bytes and
+  text (`library/Fvdep/Abi.lean`). The Lean compiler and runtime, the C shim and the
+  binding are trusted, not proven. A differential run of the binding shows that the
+  glue passes values intact.
 - **Development evidence.** A differential check sends the same requests to the
   implementation and to an oracle compiled from the spec. A match is useful while you
   build, but it does not deliver the implementation. `fvdep lock --require-proof`
@@ -44,7 +51,9 @@ The first run builds the Lean library and the oracle. This takes about two minut
   contract. It contains a Lean model of the package, a named deviation with a
   kernel-checked example for each difference, and theorems that relate the model to
   the contract. `fvdep profile <package> --check` compares the model with the real
-  package.
+  package. A profile is `published` only when every one of its theorems is proven,
+  including the theorem that its list of deviations is complete. Otherwise it is a
+  `preview`.
 - **Updates.** A new module version can prove that its behaviour is unchanged. Then a
   proof against the old version carries over, and `fvdep upgrade` shows this.
 
@@ -54,7 +63,9 @@ The first run builds the Lean library and the oracle. This takes about two minut
   `library/profiles/` lists each package profile. `library/Oracle.lean` compiles the
   specs and the profile models into a reference program.
 - `impls/` holds example implementations. `impls/lean/Base64Acc.lean` is proven
-  against `base64.encode` and `base64.decode`. The Python and Rust implementations
+  against `base64.encode` and `base64.decode`. `impls/lean/Base64Ffi.lean` exports it
+  to C (`impls/lean/ffi/`), and `impls/rust/base64-ffi/`, `impls/python/base64_ffi.py`
+  and `impls/node/base64-ffi/` are its bindings. The Python and Rust implementations
   have development evidence only. `impls/lean-forged/` fails on purpose: its proof
   passes `#print axioms` but not the kernel replay.
 - `packages/` holds adapters for the real packages that the profiles describe:
@@ -70,8 +81,10 @@ The first run builds the Lean library and the oracle. This takes about two minut
   it, because the sandbox of `lake comparator` hides your home directory. A real
   project gets the library from a pinned Git revision. The project must use
   `lakefile.toml`, and `bwrap` must be installed.
-- A proof covers equality of Lean functions on `List Nat` and `List Char`. Python,
-  Rust and other languages have no proof route yet.
+- A proof covers equality of Lean functions on `List Nat` and `List Char`. A native
+  Python or Rust implementation cannot be delivered. Only the Lean code that is shipped
+  as a C library can. The C library needs the Lean runtime from the Lean installation
+  (`libleanshared.so`), and the C API cannot carry text that contains a NUL character.
 - The `base64-js` profile does not yet prove that it agrees with the contract on
   valid input, and no theorem states that its list of deviations is complete.
 - Two semver obligations are open (not proven). `fvdep list` shows them.
