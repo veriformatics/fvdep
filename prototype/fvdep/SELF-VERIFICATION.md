@@ -32,7 +32,8 @@ part 4 is Python.
    - `delivered` is true only when comparator accepted the proof with the standard
      axioms.
    - `upgrade` changes the lock only after a passing check.
-   - A profile is `published` exactly when all of its theorems are proven.
+   - A profile is `published` exactly when each of its operations has a proven
+     completeness theorem and all of its theorems are proven.
    - Admission never changes a published version.
 
    The Python command-line tool then only reads files, runs tools and prints text.

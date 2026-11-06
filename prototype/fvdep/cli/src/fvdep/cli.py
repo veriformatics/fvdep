@@ -911,7 +911,10 @@ def cmd_admit(a) -> None:
                              "published (complete)" if pub else f"preview; open: {', '.join(bad) or 'completeness'}"))
             o = subprocess.run([str(ORACLE), k], input="", capture_output=True, text=True)
             rows.append((f"{k}: oracle serves it", o.returncode == 0, "ok" if not o.returncode else o.stderr.strip()))
-            if "package" in e.meta and not a.skip_package:
+            if "package" in e.meta and a.skip_package:
+                rows.append((f"{k}: model matches the real package", False,
+                             "skipped (--skip-package); admission needs this check"))
+            elif "package" in e.meta:
                 setup_package(e)
                 ops = [op["op"] for op in e.meta["ops"]]
                 d = differential(e.id, [op["contract"] for op in e.meta["ops"]], ops,
@@ -1015,13 +1018,13 @@ def main() -> None:
     x.add_argument("staging", help="fvdep tree with a changed library/ (e.g. from `fvdep grow`)")
     x.add_argument("--apply", action="store_true", help="copy the admitted entries into this library")
     x.add_argument("--base-rev", help="admit against this tree at a git revision (e.g. HEAD)")
-    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check")
+    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check (admission then REJECTS)")
     checkopts(x)
     x.set_defaults(f=cmd_admit)
     x = sub.add_parser("grow", help="let a coding agent draft a profile or spec, then run admission")
     x.add_argument("package", help="<ecosystem>:<name>, e.g. npm:semver")
     x.add_argument("--version", required=True, help="package version to profile")
-    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check")
+    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check (admission then REJECTS)")
     checkopts(x)
     x.set_defaults(f=cmd_grow)
     x = sub.add_parser("request", help="ask for a new profile, spec or implementation (stub)")

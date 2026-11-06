@@ -1,18 +1,20 @@
 #!/bin/sh
 # Guided run of every fvdep command on a throwaway copy of demo/ + its own state dir.
 # Tracked files stay unchanged; the Lean, Cargo and pnpm build caches in the repo are reused.
+# A failing step prints its exit code; the tour goes on (some steps fail on purpose).
 set -e
 HERE=$(dirname "$(readlink -f "$0")")
 F="$HERE/fvdep"
 T=$(mktemp -d)
 trap 'rm -rf "$T"' EXIT
 export FVDEP_STATE="$T/state"
+(cd "$HERE/impls/node/base64-ffi" && pnpm install --frozen-lockfile --silent)  # koffi for the Node binding
 cp -r "$HERE/demo" "$HERE/impls" "$T/"
 ln -s "$HERE/library" "$T/library"  # impls/lean requires ../../library
 rm -rf "$T/impls/rust/base64/target" "$T/impls/rust/base64-ffi/target" "$T/impls/lean/.lake" "$T/impls/lean-forged/.lake"
 cd "$T/demo"
 note() { printf '\n# %s\n' "$*"; }
-step() { printf '\n\033[1m$ fvdep %s\033[0m\n' "$*"; "$F" "$@" || true; }
+step() { printf '\n\033[1m$ fvdep %s\033[0m\n' "$*"; "$F" "$@" || echo "(exit $?)"; }
 note "The library: one spec module per operation, plus profiles of real packages."
 step list
 step show base64.decode
