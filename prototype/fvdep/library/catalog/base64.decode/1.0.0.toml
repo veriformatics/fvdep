@@ -8,6 +8,7 @@ fn = "Fvdep.Base64.Decode.V1_0_0.decode"
 op = "decode"
 args = ["text"]
 result = "bytes (hex) | err"
+abi = "decoder"
 uses = ["base64.encode@1.0.0"]
 summary = "Exact inverse of base64.encode: alphabet chars only, padding required, unused bits zero."
 

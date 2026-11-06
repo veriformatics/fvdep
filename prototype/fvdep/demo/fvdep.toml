@@ -1,12 +1,14 @@
 # Example consumer project: each module it uses is pinned to a spec version with its implementation.
-# A Lean implementation with a proof = delivered; an adapter command = development evidence only.
+# A Lean implementation with a proof = delivered (also when shipped as a C library to another
+# language); an adapter command = development evidence only.
 [modules."base64.encode"]
 spec = "1.0.0"
 lean = { project = "../impls/lean", module = "Base64Acc", impl = "Base64Acc.encode", proof = "Base64Acc.conforms" }
 
+# Used from Rust: the proven Lean decoder, shipped as a C library, called through the Rust binding.
 [modules."base64.decode"]
 spec = "1.0.0"
-lean = { project = "../impls/lean", module = "Base64Acc", impl = "Base64Acc.decode", proof = "Base64Acc.decode_conforms" }
+ffi = { project = "../impls/lean", module = "Base64Ffi", impl = "Base64Ffi.decode", proof = "Base64Ffi.decode_abi", binding = "cargo run --release -q --manifest-path ../impls/rust/base64-ffi/Cargo.toml" }
 
 [modules."semver.compare"]
 spec = "1.0.0"

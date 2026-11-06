@@ -1,0 +1,7 @@
+{
+  "name": "fvdep-base64-ffi",
+  "private": true,
+  "description": "Node binding of the proven Lean base64 (impls/lean C library) + fvdep adapter.",
+  "type": "module",
+  "dependencies": { "koffi": "2.15.1" }
+}

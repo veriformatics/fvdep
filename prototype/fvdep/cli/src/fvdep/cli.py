@@ -347,15 +347,24 @@ EXPORT_BUILTINS = ("Quot Quot.mk Quot.lift Quot.ind propext Quot.sound Classical
                    "String.mk Char optParam autoParam semiOutParam outParam").split()
 
 
-def challenge_text(spec: Entry) -> str:
-    fn = spec.meta["fn"]
-    return (f"import {spec.meta['lean']}\ndef fvdep_impl : type_of% @{fn} := sorry\n"
-            f"theorem fvdep_conformance : fvdep_impl = @{fn} := sorry\n")
+def target_of(spec: Entry, abi: bool) -> tuple[str, str]:
+    """(imports, Lean term the implementation must equal): the spec fn, or its C-ABI shape."""
+    fn, imp = f"(@{spec.meta['fn']})", f"import {spec.meta['lean']}\n"
+    if not abi:
+        return imp, fn
+    shape = spec.meta.get("abi") or die(f"{spec.id} has no C ABI shape")
+    return imp + "import Fvdep.Abi\n", f"(Fvdep.Abi.{shape} {fn})"
 
 
-def trusted_challenge(spec: Entry) -> Path:
+def challenge_text(spec: Entry, abi: bool) -> str:
+    imp, tgt = target_of(spec, abi)
+    return (f"{imp}def fvdep_impl : type_of% {tgt} := sorry\n"
+            f"theorem fvdep_conformance : fvdep_impl = {tgt} := sorry\n")
+
+
+def trusted_challenge(spec: Entry, abi: bool) -> Path:
     """Challenge built + exported against fvdep's own library, outside the implementation's project."""
-    d = STATE / "challenges" / spec.id
+    d = STATE / "challenges" / (spec.id + ("+abi" if abi else ""))
     out = d / f"{spec.sha256()[:16]}.ndjson"
     if out.exists():
         return out
@@ -364,7 +373,7 @@ def trusted_challenge(spec: Entry) -> Path:
     (d / "lakefile.toml").write_text(f'name = "fvdepchallenge"\n[[require]]\nname = "fvdep"\npath = "{LIB}"\n'
                                      '[[lean_lib]]\nname = "FvdepChallenge"\n')
     (d / "lean-toolchain").write_text((LIB / "lean-toolchain").read_text())
-    (d / "FvdepChallenge.lean").write_text(challenge_text(spec))
+    (d / "FvdepChallenge.lean").write_text(challenge_text(spec, abi))
     r = lake(["build", "FvdepChallenge"], d)
     if r.returncode:
         die(f"challenge build failed:\n{r.stdout[-2000:]}{r.stderr[-1000:]}")
@@ -377,11 +386,11 @@ def trusted_challenge(spec: Entry) -> Path:
     return out
 
 
-def comparator(spec: Entry, project: Path, mod: str, impl: str, tactic: str) -> tuple[int, str]:
+def comparator(spec: Entry, project: Path, mod: str, impl: str, tactic: str, abi: bool) -> tuple[int, str]:
     """`lake comparator` (bwrap sandbox) judges an fvdep-written solution module in a copy of the
     project against the trusted challenge export. The sandbox hides $HOME ⇒ the copy vendors the
     library (`fvdep-library/`, prebuilt oleans reused: a tampered constant fails the comparison)."""
-    challenge = trusted_challenge(spec)
+    challenge = trusted_challenge(spec, abi)
     work = STATE / "comparator" / hashlib.sha256(f"{project}|{spec.id}|{impl}".encode()).hexdigest()[:16]
     subprocess.run(["rm", "-rf", str(work)], check=True)
     work.parent.mkdir(parents=True, exist_ok=True)
@@ -395,11 +404,11 @@ def comparator(spec: Entry, project: Path, mod: str, impl: str, tactic: str) -> 
     if not n:
         die(f"{project}/lakefile.toml must require the fvdep library by path")
     lf.write_text(text + '\n[[lean_lib]]\nname = "FvdepChallenge"\n\n[[lean_lib]]\nname = "FvdepSolution"\n')
-    fn = spec.meta["fn"]
-    (work / "FvdepChallenge.lean").write_text(challenge_text(spec))
+    imp, tgt = target_of(spec, abi)
+    (work / "FvdepChallenge.lean").write_text(challenge_text(spec, abi))
     (work / "FvdepSolution.lean").write_text(
-        f"import {spec.meta['lean']}\nimport {mod}\ndef fvdep_impl : type_of% @{fn} := @{impl}\n"
-        f"theorem fvdep_conformance : fvdep_impl = @{fn} := by\n  show (@{impl}) = (@{fn})\n  {tactic}\n")
+        f"{imp}import {mod}\ndef fvdep_impl : type_of% {tgt} := @{impl}\n"
+        f"theorem fvdep_conformance : fvdep_impl = {tgt} := by\n  show (@{impl}) = {tgt}\n  {tactic}\n")
     (work / "comparator.json").write_text(json.dumps({
         "challenge_module": "FvdepChallenge", "solution_module": "FvdepSolution",
         "theorem_names": ["fvdep_conformance"], "definition_names": ["fvdep_impl"],
@@ -415,18 +424,18 @@ def comparator(spec: Entry, project: Path, mod: str, impl: str, tactic: str) -> 
     return r.returncode, (why or [ln for ln in lines if ln.startswith("error")] or lines[-1:] or ["no output"])[0]
 
 
-def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str) -> Result:
+def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str, abi: bool = False) -> Result:
     """fvdep writes the statement `impl = <spec fn>`; the named proof has to close it. A local probe
     gives readable errors; `lake comparator` against a trusted challenge decides."""
     r = lake(["build"], project)
     if r.returncode:
         die(f"lake build failed in {project}:\n{r.stdout[-2000:]}{r.stderr[-2000:]}")
-    fn = spec.meta["fn"]
+    imp, fn = target_of(spec, abi)
     compat = spec.meta.get("compat", {}).get("theorem")
     close = f"first | exact {proof} | (funext; exact {proof} ..)"
     tactic = f"first | ({close})" + (f" | (rw [{compat}]; {close})" if compat else "")
-    stmt = f"(@{impl}) = (@{fn})"
-    text = (f"import {spec.meta['lean']}\nimport {mod}\n"
+    stmt = f"(@{impl}) = {fn}"
+    text = (f"{imp}import {mod}\n"
             f"theorem fvdep_conformance : {stmt} := by\n  {tactic}\n"
             "#print axioms fvdep_conformance\n")
     out = lean_run(project, "fvdep-conformance.lean", text)
@@ -439,7 +448,7 @@ def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str
     if s != "proven":
         return Result(spec, "NOT PROVEN", f"the proof of {impl} = {fn} is {s}", "proof",
                       lines=[f"axioms: {', '.join(sorted(ax))}"])
-    rc, msg = comparator(spec, project, mod, impl, tactic)
+    rc, msg = comparator(spec, project, mod, impl, tactic, abi)
     if rc:
         return Result(spec, "NOT PROVEN", "lake comparator rejected the proof against the trusted spec",
                       "proof", lines=[f"comparator: {msg}"])
@@ -448,7 +457,30 @@ def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str
                          f"axioms: {', '.join(sorted(ax)) or 'none'}"])
 
 
+def ffi_check(spec: Entry, fc: dict, n: int, seed: int, cwd: Path) -> Result:
+    """Lean implementation shipped as a C library: the export is proven equal to the spec in fvdep's
+    ABI shape; the binding's differential run = evidence that the trusted glue passes values intact."""
+    project = (cwd / fc["project"]).resolve()
+    r = lean_conformance(spec, project, fc["module"], fc["impl"], fc["proof"], abi=True)
+    if not r.delivered:
+        return r
+    b = subprocess.run([str(project / "ffi/build.sh")], cwd=project, capture_output=True, text=True)
+    if b.returncode:
+        die(f"{project}/ffi/build.sh failed:\n{b.stdout[-1500:]}{b.stderr[-1500:]}")
+    d = differential(spec.id, [spec.name], [spec.meta["op"]], shlex.split(fc["binding"]), n, seed, cwd)
+    if not d.ok:
+        return Result(spec, "MISMATCH", f"the binding differs from the spec on {len(d.mismatches)} of {d.cases} cases "
+                      "(glue defect: the Lean code is proven)", "differential", d)
+    r.detail = f"{fc['impl']} = spec, shipped as a C library"
+    r.lines += [f"binding `{fc['binding']}`: {d.cases} cases agree with the spec oracle (seed {d.seed}), "
+                "evidence that the glue passes values intact",
+                "trusted beyond the kernel: Lean compiler + runtime, C shim, binding glue"]
+    return r
+
+
 def run_check(spec: Entry, cfg: dict, n: int, seed: int, cwd: Path) -> Result:
+    if "ffi" in cfg:
+        return ffi_check(spec, cfg["ffi"], n, seed, cwd)
     if "lean" in cfg:
         lc = cfg["lean"]
         return lean_conformance(spec, (cwd / lc["project"]).resolve(), lc["module"], lc["impl"], lc["proof"])
@@ -475,6 +507,9 @@ def report(r: Result) -> None:
 
 
 def impl_ref(cfg: dict) -> str:
+    if "ffi" in cfg:
+        fc = cfg["ffi"]
+        return f"lean C library {fc['project']}:{fc['module']} {fc['impl']} by {fc['proof']}, binding {fc['binding']}"
     if "lean" in cfg:
         lc = cfg["lean"]
         return f"lean {lc['project']}:{lc['module']} {lc['impl']} by {lc['proof']}"
@@ -491,17 +526,22 @@ def cmd_list(a) -> None:
         e = entries[-1]
         p, o = tally(e, st)
         print(f"{name:<18} {e.version:<7} {p:>6} {o:>4}  {e.meta['title']}")
-    print(f"\n{'package profile':<26} {'deviations':<11} {'list':<9} modules")
+    print(f"\n{'package profile':<26} {'status':<10} {'deviations':<11} modules")
     for name, entries in profiles().items():
         e = entries[-1]
         devs = sum(len(op["deviations"]) for op in e.meta["ops"])
-        done = "complete" if all(complete(op, st) for op in e.meta["ops"]) else "partial"
-        print(f"{e.id:<26} {devs:<11} {done:<9} {', '.join(op['contract'] for op in e.meta['ops'])}")
+        print(f"{e.id:<26} {'published' if published(e, st) else 'preview':<10} {devs:<11} "
+              f"{', '.join(op['contract'] for op in e.meta['ops'])}")
 
 
 def complete(op: dict, st: dict[str, str]) -> bool:
     """A proven relation marked `complete` = the deviation list of this op is exhaustive."""
     return any(r.get("complete") and st[r["theorem"]] == "proven" for r in op["relations"])
+
+
+def published(e: Entry, st: dict[str, str]) -> bool:
+    """Publish rule (user ruling): every relation, witness + completeness proven; else preview."""
+    return all(complete(op, st) for op in e.meta["ops"]) and all(st[t] == "proven" for t in theorems(e))
 
 
 def cmd_show(a) -> None:
@@ -537,6 +577,7 @@ def cmd_profile(a) -> None:
     st = audit()
     m = e.meta
     print(f"{e.id}  {m['title']}\n")
+    print(f"  status     {'published' if published(e, st) else 'preview (a proof is open; a published profile needs all of them)'}")
     print(f"  measured   {m['measured']}")
     print(f"  model      {e.source.relative_to(HOME)}")
     print(f"  adapter    {m['adapter']}")
@@ -569,6 +610,11 @@ def cmd_profile(a) -> None:
 
 
 def check_cfg(a) -> dict:
+    if a.ffi:
+        proj, _, mod = a.ffi.partition(":")
+        if not (mod and a.impl_fn and a.proof and a.impl):
+            die("a C-library check needs --ffi <project dir>:<Module> --impl <export> --proof <theorem> -- <binding adapter>")
+        return {"ffi": {"project": proj, "module": mod, "impl": a.impl_fn, "proof": a.proof, "binding": shlex.join(a.impl)}}
     if a.lean:
         proj, _, mod = a.lean.partition(":")
         if not (mod and a.impl_fn and a.proof):
@@ -752,7 +798,7 @@ def cmd_scan(a) -> None:
         found += 1
         e = next((x for x in entries if x.version == ver.lstrip("^~=")), entries[-1])
         same = "" if e.version == ver.lstrip("^~=") else f" (measured on {e.version}, yours is {ver})"
-        print(f"  {name:<24} {ver:<10} profile {e.id}{same}")
+        print(f"  {name:<24} {ver:<10} profile {e.id} ({'published' if published(e, st) else 'preview'}){same}")
         for op in e.meta["ops"]:
             n = len(op["deviations"])
             what = f"{n} deviations" if n else "no deviations"
@@ -774,6 +820,109 @@ def cmd_request(a) -> None:
     print(f"  package: {a.package}   implementation language: {a.lang or 'spec only'}")
 
 
+# ── growth: agent drafts in a staging copy, kernel admits ────────────────
+
+GROW_COPY = ["library", "packages", "cli", "fvdep", "PROTOCOL.md"]
+GROW_EXCLUDES = ["--exclude", "node_modules", "--exclude", "target", "--exclude", ".state",
+                 "--exclude", ".lake/fvdep-*", "--exclude", "__pycache__", "--exclude", ".venv"]
+
+
+def use_home(home: Path) -> None:
+    """Point every path global at another fvdep tree (a staging copy)."""
+    global HOME, LIB, STATE, ORACLE
+    HOME, LIB = home, home / "library"
+    STATE, ORACLE = home / ".state", home / "library/.lake/build/bin/fvdep-oracle"
+
+
+def entry_files(home: Path) -> dict[str, Entry]:
+    lib = home / "library"
+    out = {}
+    for glob, key in (("catalog/*/*.toml", "module"), ("profiles/*/*/*.toml", "package")):
+        for f in sorted(lib.glob(glob)):
+            m = tomllib.loads(f.read_text())
+            out[f"{m[key]}@{m['version']}"] = Entry(m[key], m["version"], m, f)
+    return out
+
+
+def cmd_admit(a) -> None:
+    """Kernel admission of a staging tree against the base library: versions immutable; new contract
+    modules fully proven; new profiles kernel-checked (published iff complete) + model ↔ package."""
+    staging = Path(a.staging).resolve()
+    marker = staging / ".fvdep-base"  # written by `grow`: the library this staging copy grows
+    base = Path(marker.read_text().strip()) if marker.exists() else HOME
+    old = {k: e.sha256() for k, e in entry_files(base).items()}
+    use_home(staging)
+    rows: list[tuple[str, bool, str]] = []
+    new = entry_files(staging)
+    changed = [k for k, e in new.items() if k in old and e.sha256() != old[k]]
+    rows.append(("published versions unchanged", not changed,
+                 f"changed: {', '.join(changed)}; publish a new version instead" if changed else f"{len(old)} checked"))
+    added = [k for k in new if k not in old]
+    rows.append(("new entries", bool(added), ", ".join(added) or "nothing to admit"))
+    r = lake(["build"], LIB)
+    rows.append(("lake build", r.returncode == 0, "ok" if not r.returncode else (r.stdout + r.stderr)[-300:]))
+    if r.returncode == 0:
+        rc = lake(["env", "leanchecker", "Fvdep"], LIB)
+        rows.append(("kernel replay (leanchecker)", rc.returncode == 0, "ok" if not rc.returncode else rc.stdout[-300:]))
+        st = audit() if rc.returncode == 0 else {}
+        for k in added:
+            e = new[k]
+            ths = theorems(e)
+            bad = [t for t in ths if st.get(t) != "proven"]
+            if "module" in e.meta:
+                rows.append((f"{k}: every obligation proven", bool(ths) and not bad,
+                             f"{len(ths)} theorems" + (f"; not proven: {', '.join(bad)}" if bad else "")))
+            else:
+                pub = published(e, st)
+                rows.append((f"{k}: kernel-checked profile", True,
+                             "published (complete)" if pub else f"preview; open: {', '.join(bad) or 'completeness'}"))
+            o = subprocess.run([str(ORACLE), k], input="", capture_output=True, text=True)
+            rows.append((f"{k}: oracle serves it", o.returncode == 0, "ok" if not o.returncode else o.stderr.strip()))
+            if "package" in e.meta and not a.skip_package:
+                setup_package(e)
+                ops = [op["op"] for op in e.meta["ops"]]
+                d = differential(e.id, [op["contract"] for op in e.meta["ops"]], ops,
+                                 shlex.split(e.meta["adapter"]), a.cases, a.seed, HOME)
+                rows.append((f"{k}: model matches the real package", d.ok,
+                             f"{d.cases} cases" + (f"; {len(d.mismatches)} differ, e.g. {d.mismatches[0][0]}" if d.mismatches else "")
+                             + (f"; package lacks {', '.join(d.unsupported)}" if d.unsupported else "")))
+    ok = all(v for _, v, _ in rows)
+    for name, v, note in rows:
+        print(f"  {'PASS' if v else 'FAIL'}  {name:<48} {note}")
+    print(f"\n{'ADMITTED' if ok else 'REJECTED'}  {staging}")
+    if ok and a.apply:
+        for d in ("library", "packages"):
+            subprocess.run(["rsync", "-a", *GROW_EXCLUDES, "--exclude", ".lake", f"{staging}/{d}/", f"{base}/{d}/"], check=True)
+        print(f"Applied to {base}: {', '.join(added)}")
+    sys.exit(0 if ok else 1)
+
+
+def cmd_grow(a) -> None:
+    """Stage a copy of the library, brief a coding agent to draft `package`, then run the gate."""
+    eco, _, name = a.package.partition(":")
+    staging = STATE / "grow" / f"{eco}-{name}-{a.version}"
+    staging.mkdir(parents=True, exist_ok=True)
+    for f in GROW_COPY:
+        src = HOME / f
+        subprocess.run(["rsync", "-a", *GROW_EXCLUDES, f"{src}/" if src.is_dir() else str(src),
+                        str(staging / f) + ("/" if src.is_dir() else "")], check=True)
+    st = audit()
+    mods = "\n".join(f"- {e.id}: {e.meta['title']}; open: "
+                     + (", ".join(o["theorem"] for o in e.meta["obligations"] if st[o["theorem"]] != "proven") or "none")
+                     for v in modules().values() for e in v)
+    brief = (Path(__file__).with_name("grow-brief.md").read_text()
+             .replace("{package}", a.package).replace("{version}", a.version).replace("{modules}", mods))
+    (staging / "BRIEF.md").write_text(brief)
+    (staging / ".fvdep-base").write_text(f"{HOME}\n")
+    agent = shlex.split(os.environ.get("FVDEP_AGENT", "claude -p --dangerously-skip-permissions"))
+    print(f"Staging {staging}\nDrafting agent: {shlex.join(agent)} (log: {staging / 'agent.log'})")
+    with open(staging / "agent.log", "w") as log:
+        r = subprocess.run([*agent, brief], cwd=staging, stdout=log, stderr=subprocess.STDOUT)
+    print(f"agent exited {r.returncode}. Admission gate:")
+    a.staging, a.apply = str(staging), False
+    cmd_admit(a)
+
+
 def main() -> None:
     p = argparse.ArgumentParser(prog="fvdep", description="Formally specified dependencies (prototype).")
     sub = p.add_subparsers(dest="cmd", required=True)
@@ -792,9 +941,12 @@ def main() -> None:
     checkopts(x)
     x.set_defaults(f=cmd_profile)
     x = sub.add_parser("check", help="check an implementation against a spec module",
-                       usage="fvdep check <module>@<version> (--lean DIR:Module --impl FN --proof THM | -- <adapter command>)")
+                       usage="fvdep check <module>@<version> (--lean DIR:Module --impl FN --proof THM | "
+                             "--ffi DIR:Module --impl EXPORT --proof THM -- <binding adapter> | -- <adapter command>)")
     x.add_argument("module", help="<module>@<version>")
     x.add_argument("--lean", help="Lean implementation: <lake project dir>:<Module>")
+    x.add_argument("--ffi", help="Lean implementation shipped as a C library: <lake project dir>:<Module>; "
+                   "the binding's adapter follows `--`")
     x.add_argument("--impl", dest="impl_fn", help="Lean function that implements the module")
     x.add_argument("--proof", help="Lean theorem that proves the function equal to the spec")
     checkopts(x)
@@ -822,6 +974,18 @@ def main() -> None:
     x = sub.add_parser("scan", help="map a project's packages to package profiles")
     x.add_argument("path", nargs="?", default=".")
     x.set_defaults(f=cmd_scan)
+    x = sub.add_parser("admit", help="kernel admission of a staging library (new entries only)")
+    x.add_argument("staging", help="fvdep tree with a changed library/ (e.g. from `fvdep grow`)")
+    x.add_argument("--apply", action="store_true", help="copy the admitted entries into this library")
+    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check")
+    checkopts(x)
+    x.set_defaults(f=cmd_admit)
+    x = sub.add_parser("grow", help="let a coding agent draft a profile or spec, then run admission")
+    x.add_argument("package", help="<ecosystem>:<name>, e.g. npm:semver")
+    x.add_argument("--version", required=True, help="package version to profile")
+    x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check")
+    checkopts(x)
+    x.set_defaults(f=cmd_grow)
     x = sub.add_parser("request", help="ask for a new profile, spec or implementation (stub)")
     x.add_argument("package", help="<ecosystem>:<name>, e.g. npm:ajv")
     x.add_argument("--lang", help="implementation language wanted")

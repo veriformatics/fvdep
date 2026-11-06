@@ -8,6 +8,7 @@ fn = "Fvdep.Base64.DecodeUrl.V1_0_0.decodeUrl"
 op = "decode_url"
 args = ["text"]
 result = "bytes (hex) | err"
+abi = "decoder"
 uses = ["base64.decode@1.0.0", "base64.encode_url@1.0.0"]
 summary = "Exact inverse of base64.encode_url: rejects + and /, then decodes strictly."
 
