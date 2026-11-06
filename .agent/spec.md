@@ -6,12 +6,15 @@ Provably secure dependencies. This repo is a library and automated system for bu
 
 - `prototype/fvdep/` = whole-product prototype (`README.md` = human tour). Needs lean 4.35.0 + lake, uv, python3, cargo, node + pnpm.
   - Run: `prototype/fvdep/tour.sh` (every command on a temp copy of `demo/`, own state dir); single command: `prototype/fvdep/fvdep <cmd>`.
-  - Smoke: `tour.sh` rc 0; 10 lines `^(PROVEN|MATCHED)` (incl. `Base64Ffi … shipped as a C library` for the Rust-bound decode + Node-bound encode); exactly 1 `^NOT PROVEN` (`impls/lean-forged`, comparator: kernel rejected); exactly 2 `^MISMATCH` (CPython stdlib decode vs `base64.decode`; Python impl lacks `decode_url`); `MODEL MATCHES  npm:base64-js`; `Upgraded base64.decode to 1.1.0`; `--require-proof` names `semver.compare`. `fvdep list`: 6 modules, `semver.compare` 3/1, `semver.parse` 0/1, 3 profiles (cpython published 1, crates published 0, npm preview 5). `fvdep profile <pkg> --check` → `MODEL MATCHES` for all 3.
+  - Smoke: `tour.sh` rc 0; 10 lines `^(PROVEN|MATCHED)` (incl. `Base64Ffi … shipped as a C library` for the Rust-bound decode + Node-bound encode); exactly 1 `^NOT PROVEN` (`impls/lean-forged`, comparator: kernel rejected); exactly 2 `^MISMATCH` (CPython stdlib decode vs `base64.decode`; Python impl lacks `decode_url`); `MODEL MATCHES  npm:base64-js`; `Upgraded base64.decode to 1.1.0`; `--require-proof` names `semver.compare`. `fvdep list`: 6 modules, `semver.compare` 3/1, `semver.parse` 0/1, 8 modules (`semver.parse` 1.1.0 + `semver.compare` 1.1.0 0 open), 4 profiles (cpython published 1, crates published 0, npm:base64-js preview 5, npm:semver published 6). `fvdep profile <pkg> --check` → `MODEL MATCHES` for all 3.
   - `library/` = Lean lake pkg: contract modules `Fvdep/<Dep>/<Op>/V<x_y_z>.lean` + catalog `catalog/<dep>.<op>/<ver>.toml` (fn, op, uses, obligations, compat); profiles `Fvdep/Profiles/<Pkg>/V<ver>.lean` + `profiles/<eco>/<pkg>/<ver>.toml` (ops → contract, relations, deviations + witness); oracle exe `Oracle.lean` (`lake build` → `.lake/build/bin/fvdep-oracle <module@ver | eco:pkg@ver>`).
   - `impls/` = example impls: lean `Base64Acc` (encode + decode, proven) + `Base64Ffi` (C exports, proven in `Fvdep.Abi` shape; `ffi/build.sh` → `.lake/build/ffi/libfvdep_base64.so`); bindings `rust/base64-ffi`, `python/base64_ffi.py`, `node/base64-ffi` (koffi); `lean-forged` (skipKernelTC forgery, rejected on purpose); python (`base64_strict.py`, `semver_impl.py`), rust (`base64`, 4 base64 modules) = development evidence.
   - `packages/` = real-package adapters for profiles: `cpython-base64.py`, `npm-base64-js/` (pnpm), `crates-base64/` (cargo, base64 0.22.1).
   - `cli/` = uv pkg `fvdep` (stdlib only), wrapper `prototype/fvdep/fvdep`; state `prototype/fvdep/.state/` (gitignored, `FVDEP_STATE` overrides).
   - `demo/` = consumer project (`fvdep.toml` per-module pins, `package.json`). Protocol = `PROTOCOL.md`.
+  - Growth: `fvdep grow <eco:pkg> --version V` (staging copy + `cli/src/fvdep/grow-brief.md` → `FVDEP_AGENT`, default `claude -p --dangerously-skip-permissions`) → `fvdep admit <staging> [--apply]`; `fvdep admit . --base-rev HEAD` = working tree vs a revision; vflab: `tools/vflab-run sh -c '… cd prototype/fvdep && PYTHONPATH=cli/src python3 -m fvdep.cli admit . --base-rev HEAD'`. Records `growth/<eco>-<pkg>-<ver>/` (brief, agent report, admission).
+  - `SELF-VERIFICATION.md` = plan for verifying fvdep itself (user review pending).
+  - `tools/vflab-run` (repo root) = fvapi runner adapted: bare repo `~/gate/fvdep-repo.git`, workspace `~/gate/ws/fvdep-…`, `fvapi_gate.slice`.
 
 ## Decisions
 
@@ -47,8 +50,8 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] 31f2ab5 ITERATE r1: Lean conformance check = statement shape (impl = spec per operation), so a Lean impl earns `proven`
 - [x] de60fa0 ITERATE r2: profile publish status — `published` iff agreement + completeness proven per op, else `preview` (list, scan, profile)
 - [x] de60fa0 ITERATE r2: Lean via C library — export proven Base64Acc through a C ABI + proven wrapper theorem; Rust, Python, Node bindings; `fvdep check` reports the Lean proof + trusted base for a binding; binding vs oracle = integration evidence
-- [ ] ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
-- [ ] ITERATE: self-verification plan for the fvdep system
+- [x] SHA_R2B ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
+- [x] SHA_R2B ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`; user review pending)
 - Deferred → `.agent/deferred.md`
 
 ## Phase

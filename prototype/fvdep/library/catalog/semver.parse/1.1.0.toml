@@ -1,0 +1,25 @@
+module = "semver.parse"
+version = "1.1.0"
+title = "Semantic Versioning 2.0.0: strict version grammar"
+standard = "semver.org 2.0.0 §2, §9, §10"
+lean = "Fvdep.Semver.Parse.V1_1_0"
+source = "Fvdep/Semver/Parse/V1_1_0.lean"
+fn = "Fvdep.Semver.Parse.V1_1_0.parse"
+op = "parse"
+args = ["text"]
+result = "normalized version text | err"
+uses = []
+summary = "MAJOR.MINOR.PATCH[-pre][+build], no leading zeros, no v prefix. Same grammar as 1.0.0; the round-trip obligation is corrected to valid versions and proven."
+
+[compat]
+from = "1.0.0"
+theorem = "Fvdep.Semver.Parse.V1_1_0.unchanged"
+says = "Behaviour is identical to 1.0.0."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Parse.V1_1_0.parse_render_valid"
+says = "Every valid version (one whose identifiers some version text could contain) renders to text that parses back to it."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Parse.V1_1_0.parse_render_counterexample"
+says = "The 1.0.0 round-trip statement is false for versions no text can produce: an all-digit word identifier 1 renders as 0.0.0-1, which parses back as the number 1."

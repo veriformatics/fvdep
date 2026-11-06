@@ -1,0 +1,7 @@
+{
+  "name": "fvdep-adapter-npm-semver",
+  "private": true,
+  "description": "Adapter: the real npm semver package behind the fvdep adapter protocol.",
+  "type": "module",
+  "dependencies": { "semver": "7.7.3" }
+}

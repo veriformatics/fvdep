@@ -46,6 +46,7 @@ class Entry:
     version: str
     meta: dict
     path: Path
+    lib: Path  # library root the entry belongs to (`source` is relative to it)
 
     @property
     def id(self) -> str:
@@ -53,7 +54,7 @@ class Entry:
 
     @property
     def source(self) -> Path:
-        return LIB / self.meta["source"]
+        return self.lib / self.meta["source"]
 
     def sha256(self) -> str:
         h = hashlib.sha256(self.path.read_bytes())
@@ -65,7 +66,7 @@ def load(glob: str, key: str) -> dict[str, list[Entry]]:
     out: dict[str, list[Entry]] = {}
     for f in sorted(LIB.glob(glob)):
         m = tomllib.loads(f.read_text())
-        out.setdefault(m[key], []).append(Entry(m[key], m["version"], m, f))
+        out.setdefault(m[key], []).append(Entry(m[key], m["version"], m, f, LIB))
     for v in out.values():
         v.sort(key=lambda e: vkey(e.version))
     return out
@@ -801,7 +802,7 @@ def cmd_scan(a) -> None:
         print(f"  {name:<24} {ver:<10} profile {e.id} ({'published' if published(e, st) else 'preview'}){same}")
         for op in e.meta["ops"]:
             n = len(op["deviations"])
-            what = f"{n} deviations" if n else "no deviations"
+            what = f"{n} deviation{'s' * (n != 1)}" if n else "no deviations"
             what += "" if complete(op, st) else " listed; list not proven complete"
             names = f": {', '.join(d['name'] for d in op['deviations'])}" if n else ""
             print(f"  {'':<35} {op['contract']:<22} {what}{names}")
@@ -840,7 +841,28 @@ def entry_files(home: Path) -> dict[str, Entry]:
     for glob, key in (("catalog/*/*.toml", "module"), ("profiles/*/*/*.toml", "package")):
         for f in sorted(lib.glob(glob)):
             m = tomllib.loads(f.read_text())
-            out[f"{m[key]}@{m['version']}"] = Entry(m[key], m["version"], m, f)
+            out[f"{m[key]}@{m['version']}"] = Entry(m[key], m["version"], m, f, lib)
+    return out
+
+
+SHARED = {"library/Fvdep.lean", "library/Oracle.lean"}  # staging may only add lines to these
+
+
+def apply_drift(base: Path, staging: Path) -> list[str]:
+    """Base files that `--apply` would overwrite or lose: changed outside SHARED, or SHARED lines dropped."""
+    out = []
+    for d in ("library", "packages"):
+        for f in (base / d).rglob("*"):
+            rel = str(f.relative_to(base))
+            if not f.is_file() or any(p in f.parts for p in (".lake", "node_modules", "target", ".state")):
+                continue
+            g = staging / rel
+            if rel in SHARED:
+                if g.exists() and set(f.read_text().splitlines()) <= set(g.read_text().splitlines()):
+                    continue
+            elif g.exists() and g.read_bytes() == f.read_bytes():
+                continue
+            out.append(rel)
     return out
 
 
@@ -850,6 +872,17 @@ def cmd_admit(a) -> None:
     staging = Path(a.staging).resolve()
     marker = staging / ".fvdep-base"  # written by `grow`: the library this staging copy grows
     base = Path(marker.read_text().strip()) if marker.exists() else HOME
+    if a.base_rev:  # base = this tree at a git revision (admit uncommitted entries, e.g. on vflab)
+        top = Path(subprocess.run(["git", "-C", str(staging), "rev-parse", "--show-toplevel"],
+                                  capture_output=True, text=True, check=True).stdout.strip())
+        rel = staging.relative_to(top)
+        tmp = STATE / "admit-base"
+        subprocess.run(["rm", "-rf", str(tmp)], check=True)
+        tmp.mkdir(parents=True)
+        arc = subprocess.run(["git", "-C", str(top), "archive", a.base_rev, str(rel / "library")],
+                             capture_output=True, check=True).stdout
+        subprocess.run(["tar", "-x", "-C", str(tmp)], input=arc, check=True)
+        base = tmp / rel
     old = {k: e.sha256() for k, e in entry_files(base).items()}
     use_home(staging)
     rows: list[tuple[str, bool, str]] = []
@@ -891,6 +924,10 @@ def cmd_admit(a) -> None:
         print(f"  {'PASS' if v else 'FAIL'}  {name:<48} {note}")
     print(f"\n{'ADMITTED' if ok else 'REJECTED'}  {staging}")
     if ok and a.apply:
+        drift = apply_drift(base, staging)
+        if drift:
+            print(f"Not applied: the base changed since staging ({', '.join(drift[:5])}). Run grow again.")
+            sys.exit(1)
         for d in ("library", "packages"):
             subprocess.run(["rsync", "-a", *GROW_EXCLUDES, "--exclude", ".lake", f"{staging}/{d}/", f"{base}/{d}/"], check=True)
         print(f"Applied to {base}: {', '.join(added)}")
@@ -977,6 +1014,7 @@ def main() -> None:
     x = sub.add_parser("admit", help="kernel admission of a staging library (new entries only)")
     x.add_argument("staging", help="fvdep tree with a changed library/ (e.g. from `fvdep grow`)")
     x.add_argument("--apply", action="store_true", help="copy the admitted entries into this library")
+    x.add_argument("--base-rev", help="admit against this tree at a git revision (e.g. HEAD)")
     x.add_argument("--skip-package", action="store_true", help="skip the model ↔ real package check")
     checkopts(x)
     x.set_defaults(f=cmd_admit)

@@ -1,0 +1,37 @@
+module = "semver.compare"
+version = "1.1.0"
+title = "Semantic Versioning 2.0.0: precedence"
+standard = "semver.org 2.0.0 §11"
+lean = "Fvdep.Semver.Compare.V1_1_0"
+source = "Fvdep/Semver/Compare/V1_1_0.lean"
+fn = "Fvdep.Semver.Compare.V1_1_0.compare"
+op = "compare"
+args = ["text", "text"]
+result = "lt | eq | gt | err"
+uses = ["semver.parse@1.1.0"]
+summary = "Release > pre-release; ids compared left to right; build metadata ignored. Both texts are parsed with semver.parse. Same precedence as 1.0.0; transitivity proven."
+
+[compat]
+from = "1.0.0"
+theorem = "Fvdep.Semver.Compare.V1_1_0.unchanged"
+says = "Behaviour is identical to 1.0.0."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Compare.V1_1_0.compare_refl"
+says = "Every version equals itself in precedence."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Compare.V1_1_0.compare_swap"
+says = "a < b exactly when b > a."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Compare.V1_1_0.compare_ignores_build"
+says = "Build metadata never changes precedence."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Compare.V1_1_0.compare_trans"
+says = "Precedence is transitive."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Compare.V1_1_0.compare_eq"
+says = "Two versions of equal precedence differ at most in build metadata."

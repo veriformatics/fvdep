@@ -19,6 +19,8 @@ step show base64.decode
 note "How real packages differ from the contract. The model of each package is checked against the package."
 step profile npm:base64-js --check
 step profile cpython:base64
+note "npm semver was drafted by a coding agent and admitted by the kernel gate (growth/npm-semver-7.7.3/)."
+step profile npm:semver
 note "Delivery = a proof. fvdep writes the statement (impl = spec) and audits the axioms of the proof."
 step check base64.encode@1.0.0 --lean ../impls/lean:Base64Acc --impl Base64Acc.encode --proof Base64Acc.conforms
 note "Other languages call the proven Lean code as a C library. The export is proven; the binding is tested."
