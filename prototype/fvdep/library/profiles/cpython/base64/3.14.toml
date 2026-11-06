@@ -1,0 +1,29 @@
+package = "cpython:base64"
+version = "3.14"
+title = "CPython standard library base64 module"
+measured = "CPython 3.14.9"
+lean = "Fvdep.Profiles.CpythonBase64.V3_14"
+source = "Fvdep/Profiles/CpythonBase64/V3_14.lean"
+adapter = "python3 -I packages/cpython-base64.py"
+
+[[ops]]
+op = "encode"
+api = "base64.b64encode(data)"
+contract = "base64.encode@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.CpythonBase64.V3_14.encode_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []
+
+[[ops]]
+op = "decode"
+api = "base64.b64decode(text, validate=True)"
+contract = "base64.decode@1.0.0"
+relations = [
+  { theorem = "Fvdep.Profiles.CpythonBase64.V3_14.agrees", says = "Where the contract accepts, the package returns the same bytes." },
+  { theorem = "Fvdep.Profiles.CpythonBase64.V3_14.deviation_exact", says = "Complete: the package decodes as the contract does after zeroing the unused bits.", complete = true },
+]
+
+[[ops.deviations]]
+name = "unused-bits-ignored"
+says = "Accepts a padded last group whose unused bits are set, so QR== decodes like QQ==. Decoding is no longer canonical (malleable)."
+witness = "QR=="
+theorem = "Fvdep.Profiles.CpythonBase64.V3_14.dev_unused_bits"

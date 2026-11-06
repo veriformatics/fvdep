@@ -59,6 +59,15 @@ __MACOSX/
 .LSOverride
 ._*
 Thumbs.db
+Thumbs.db:encryptable
+ehthumbs.db
+ehthumbs_vista.db
+$RECYCLE.BIN/
+.Spotlight-V100/
+.Trashes/
+.fseventsd/
+.TemporaryItems/
+.apdisk
 [Dd]esktop.ini
 .directory
 .Trash-*/
@@ -81,3 +90,5 @@ nohup.out
 http-client.private.env.json
 # fvdep prototype state (audit cache, request log)
 .state/
+# Node
+node_modules/

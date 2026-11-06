@@ -1,0 +1,7 @@
+{
+  "name": "fvdep-adapter-npm-base64-js",
+  "private": true,
+  "description": "Adapter: the real npm base64-js package behind the fvdep adapter protocol.",
+  "type": "module",
+  "dependencies": { "base64-js": "1.5.1" }
+}

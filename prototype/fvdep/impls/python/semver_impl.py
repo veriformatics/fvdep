@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""semver adapter for spec semver@1.0.0 (SemVer 2.0.0 parse + precedence)."""
+"""semver adapter: modules semver.parse@1.0.0 + semver.compare@1.0.0 (SemVer 2.0.0)."""
 import re
 import sys
 

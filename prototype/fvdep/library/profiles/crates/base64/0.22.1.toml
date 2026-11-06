@@ -1,0 +1,35 @@
+package = "crates:base64"
+version = "0.22.1"
+title = "crates.io base64 (STANDARD and URL_SAFE engines)"
+measured = "base64 0.22.1, rustc stable"
+lean = "Fvdep.Profiles.CratesBase64.V0_22_1"
+source = "Fvdep/Profiles/CratesBase64/V0_22_1.lean"
+adapter = "cargo run --release -q --manifest-path packages/crates-base64/Cargo.toml"
+
+[[ops]]
+op = "encode"
+api = "STANDARD.encode(bytes)"
+contract = "base64.encode@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.CratesBase64.V0_22_1.encode_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []
+
+[[ops]]
+op = "decode"
+api = "STANDARD.decode(text)"
+contract = "base64.decode@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.CratesBase64.V0_22_1.decode_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []
+
+[[ops]]
+op = "encode_url"
+api = "URL_SAFE.encode(bytes)"
+contract = "base64.encode_url@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.CratesBase64.V0_22_1.encodeUrl_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []
+
+[[ops]]
+op = "decode_url"
+api = "URL_SAFE.decode(text)"
+contract = "base64.decode_url@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.CratesBase64.V0_22_1.decodeUrl_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []

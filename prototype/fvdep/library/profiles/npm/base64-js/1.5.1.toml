@@ -1,0 +1,53 @@
+package = "npm:base64-js"
+version = "1.5.1"
+title = "npm base64-js"
+measured = "base64-js 1.5.1 on Node 26.13.0"
+lean = "Fvdep.Profiles.NpmBase64Js.V1_5_1"
+source = "Fvdep/Profiles/NpmBase64Js/V1_5_1.lean"
+adapter = "node packages/npm-base64-js/adapter.mjs"
+setup = "pnpm install --silent --dir packages/npm-base64-js"
+
+[[ops]]
+op = "encode"
+api = "fromByteArray(bytes)"
+contract = "base64.encode@1.0.0"
+relations = [{ theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.encode_eq_contract", says = "Same as the contract.", complete = true }]
+deviations = []
+
+[[ops]]
+op = "decode"
+api = "toByteArray(text)"
+contract = "base64.decode@1.0.0"
+relations = [
+  { theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.agrees", says = "Where the contract accepts, the package returns the same bytes." },
+]
+
+[[ops.deviations]]
+name = "unused-bits-ignored"
+says = "Accepts a padded last group whose unused bits are set (QR== decodes like QQ==)."
+witness = "QR=="
+theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.dev_unused_bits"
+
+[[ops.deviations]]
+name = "url-chars-accepted"
+says = "Accepts the URL-safe characters - and _ in standard text (-_8= decodes like +/8=)."
+witness = "-_8="
+theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.dev_url_chars"
+
+[[ops.deviations]]
+name = "invalid-chars-as-zero"
+says = "Reads any other non-alphabet character as zero bits instead of rejecting it (!!!! decodes to three zero bytes)."
+witness = "!!!!"
+theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.dev_invalid_chars"
+
+[[ops.deviations]]
+name = "data-after-padding-dropped"
+says = "Ignores everything after the first = (QQ==QUJD decodes to one byte)."
+witness = "QQ==QUJD"
+theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.dev_after_padding"
+
+[[ops.deviations]]
+name = "excess-padding-zero-bytes"
+says = "Turns a group of padding alone into zero bytes (QUJD==== decodes to two zero bytes)."
+witness = "QUJD===="
+theorem = "Fvdep.Profiles.NpmBase64Js.V1_5_1.dev_excess_padding"
