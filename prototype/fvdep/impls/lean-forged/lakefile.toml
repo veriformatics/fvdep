@@ -1,0 +1,9 @@
+name = "forged"
+defaultTargets = ["Forged"]
+
+[[require]]
+name = "fvdep"
+path = "../../library"
+
+[[lean_lib]]
+name = "Forged"

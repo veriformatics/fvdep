@@ -9,7 +9,7 @@ trap 'rm -rf "$T"' EXIT
 export FVDEP_STATE="$T/state"
 cp -r "$HERE/demo" "$HERE/impls" "$T/"
 ln -s "$HERE/library" "$T/library"  # impls/lean requires ../../library
-rm -rf "$T/impls/rust/base64/target" "$T/impls/lean/.lake"
+rm -rf "$T/impls/rust/base64/target" "$T/impls/lean/.lake" "$T/impls/lean-forged/.lake"
 cd "$T/demo"
 note() { printf '\n# %s\n' "$*"; }
 step() { printf '\n\033[1m$ fvdep %s\033[0m\n' "$*"; "$F" "$@" || true; }
@@ -21,6 +21,8 @@ step profile npm:base64-js --check
 step profile cpython:base64
 note "Delivery = a proof. fvdep writes the statement (impl = spec) and audits the axioms of the proof."
 step check base64.encode@1.0.0 --lean ../impls/lean:Base64Acc --impl Base64Acc.encode --proof Base64Acc.conforms
+note "A forged proof: #print axioms looks clean, but the kernel replay in lake comparator rejects it."
+step check base64.encode@1.0.0 --lean ../impls/lean-forged:Forged --impl Forged.encode --proof Forged.conforms
 note "A differential run against the spec oracle is development evidence. It finds the Python stdlib deviation."
 step check base64.decode@1.0.0 -- python3 -I "$HERE/packages/cpython-base64.py"
 step lock
