@@ -50,8 +50,8 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] 31f2ab5 ITERATE r1: Lean conformance check = statement shape (impl = spec per operation), so a Lean impl earns `proven`
 - [x] de60fa0 ITERATE r2: profile publish status — `published` iff agreement + completeness proven per op, else `preview` (list, scan, profile)
 - [x] de60fa0 ITERATE r2: Lean via C library — export proven Base64Acc through a C ABI + proven wrapper theorem; Rust, Python, Node bindings; `fvdep check` reports the Lean proof + trusted base for a binding; binding vs oracle = integration evidence
-- [x] SHA_R2B ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
-- [x] SHA_R2B ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`; user review pending)
+- [x] b72d2cb ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
+- [x] b72d2cb ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`; user review pending)
 - Deferred → `.agent/deferred.md`
 
 ## Phase
