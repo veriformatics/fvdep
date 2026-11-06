@@ -15,10 +15,13 @@ Provably secure dependencies. This repo is a library and automated system for bu
 
 ## Decisions
 
-- Guarantee (user ruling): proof only — an implementation counts as delivered only with a machine-checked proof against its spec. Differential checks vs the spec oracle = development evidence, never a delivery label. Foreign languages need a proof route (e.g. Verus/Aeneas for Rust) or a Lean implementation compiled/linked into them.
+- Guarantee (user ruling): proof only — an implementation counts as delivered only with a machine-checked proof against its spec. Differential checks vs the spec oracle = development evidence, never a delivery label.
+- Foreign-language route (user ruling, r1): Lean via C library only — the proven Lean implementation, compiled to a C-ABI library, linked into Rust, Python, Node, …; no per-language proof tools (Aeneas, Verus). Trusted base beyond the kernel = Lean compiler + runtime + the binding glue, stated wherever delivery is claimed.
+- Security bar (user ruling, r1): a spec for a popular dependency that passes formal verification = the bar; no per-family threat model or extra security property set is in scope.
 - Library entry (user ruling): both, mapped — a spec = the secure behaviour contract (e.g. strict RFC 4648 base64) + per-package profiles stating where each real package (npm `base64-js`, Python stdlib, …) deviates. A package without deviations matches the contract; deviations are named, never hidden.
+- Profile publishing (user ruling, r1): complete to publish — a profile is published only with every op's agreement + deviation-list completeness proven; otherwise it shows as `preview`.
 - Spec modularity (user ruling): modular specs — each operation (e.g. `base64.encode`, `base64.decodeUrl`) = its own versioned spec module; consumers pin the modules they use; no shared per-dependency version line.
-- Automation (user ruling): agent drafts, kernel admits — agents pick popular packages, draft spec + proofs from the standard + upstream tests; admission = Lean kernel build + axiom audit, fully proven entries alone; human spec review optional. Runs on vflab.
+- Automation (user ruling): agent drafts, kernel admits — agents pick popular packages, draft spec + proofs from the standard + upstream tests; admission = Lean kernel build + axiom audit, fully proven entries alone; human spec review optional. Runs on vflab. First growth target (user ruling, r1): npm `semver` profile + closing the open semver obligations.
 - Host (user ruling, fvapi commit 42c5b62): fvdep shares vflab with fvapi at equal priority — same `eturkes` account + `fvapi_gate.slice` for builds, checks + library growth; live services run outside the slice + outrank dev work; host maintenance announced to the fvapi session first. Conventions + paths = `CLAUDE.local.md`.
 - Openness (user ruling): open core — popular specs public (repo licence Apache-2.0); paid = update feed/alerts, requested specs, built implementations.
 - fva + fvtrace dependencies → fvdep (user: "eventually") → `.agent/deferred.md`.
@@ -40,8 +43,9 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] 31f2ab5 ITERATE r1: modular specs — split base64/semver into per-operation versioned modules; pins per module; `upgrade`/`diff` per module
 - [x] 31f2ab5 ITERATE r1: per-package profiles — base64 contract + profiles (Python stdlib deviation: accepts non-zero unused bits; npm `base64-js`)
 - [x] 31f2ab5 ITERATE r1: Lean conformance check = statement shape (impl = spec per operation), so a Lean impl earns `proven`
-- [ ] ITERATE: foreign-language proof route (research: Verus, Aeneas, Lean-compiled libs) for one Rust impl
-- [ ] ITERATE: automation sketch — agent draft → kernel admit loop for one new package; runs on vflab per `Host`
+- [ ] ITERATE r2: profile publish status — `published` iff agreement + completeness proven per op, else `preview` (list, scan, profile)
+- [ ] ITERATE r2: Lean via C library — export proven Base64Acc through a C ABI + proven wrapper theorem; Rust, Python, Node bindings; `fvdep check` reports the Lean proof + trusted base for a binding; binding vs oracle = integration evidence
+- [ ] ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
 - [ ] ITERATE: self-verification plan for the fvdep system
 - Deferred → `.agent/deferred.md`
 
