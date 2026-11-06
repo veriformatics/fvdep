@@ -1,34 +1,14 @@
+import Fvdep.Base64.Encode.V1_0_0
 /-!
-# base64 spec v1.0.0 — RFC 4648 §4, standard alphabet, strict
+# base64.decode 1.0.0 — RFC 4648 §4, standard alphabet, strict
 
-Models: npm `base64-js`, PyPI `pybase64`, crates.io `base64` (STANDARD engine). Python's stdlib
-`b64decode(validate=True)` is more permissive (accepts non-zero unused bits) ⇒ fails the check.
-
-Bytes = `List Nat`, each `< 256` (obligations take that as hypothesis).
 Strict decoding: alphabet chars only, padding mandatory, unused trailing bits zero.
-Strictness makes the encoding canonical ⇒ every accepted string is the encoding of
-what it decodes to (`encode_decode`); permissive decoders break this (malleability:
-several strings → same bytes).
+Strictness makes the encoding canonical ⇒ the decoder is the exact inverse of
+`base64.encode@1.0.0`: every accepted string is the encoding of what it decodes to
+(`encode_decode`). Permissive decoders break this (malleability: several strings → same bytes).
 -/
-namespace Fvdep.Base64.V1_0_0
-
-def chars : List Char :=
-  "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/".toList
-
-def sym (i : Nat) : Char := chars.getD i '='
-def val (c : Char) : Option Nat := chars.idxOf? c
-
-def encode : List Nat → List Char
-  | a :: b :: c :: rest =>
-    let n := a * 65536 + b * 256 + c
-    sym (n / 262144) :: sym (n / 4096 % 64) :: sym (n / 64 % 64) :: sym (n % 64) :: encode rest
-  | [a, b] =>
-    let n := a * 65536 + b * 256
-    [sym (n / 262144), sym (n / 4096 % 64), sym (n / 64 % 64), '=']
-  | [a] =>
-    let n := a * 65536
-    [sym (n / 262144), sym (n / 4096 % 64), '=', '=']
-  | [] => []
+namespace Fvdep.Base64.Decode.V1_0_0
+open Fvdep.Base64.Encode.V1_0_0
 
 /-- Four alphabet chars → three bytes. -/
 def quad (c0 c1 c2 c3 : Char) : Option (List Nat) := do
@@ -60,30 +40,10 @@ def decode : List Char → Option (List Nat)
       some (q ++ t)
   | _ => none
 
-/-- String entry points (what adapters and the oracle call). -/
-def encodeStr (bs : List Nat) : String := String.ofList (encode bs)
+/-- String entry point (what adapters and the oracle call). -/
 def decodeStr (s : String) : Option (List Nat) := decode s.toList
 
 /-! ## Obligations -/
-
-theorem chars_length : chars.length = 64 := by decide
-
-set_option maxRecDepth 8000 in
-theorem val_sym : ∀ i, i < 64 → val (sym i) = some i := by decide
-
-set_option maxRecDepth 8000 in
-theorem sym_ne_pad : ∀ i, i < 64 → sym i ≠ '=' := by decide
-
-theorem val_spec {c : Char} {i : Nat} (h : val c = some i) : i < 64 ∧ sym i = c := by
-  obtain ⟨hi, hc, -⟩ := List.idxOf?_eq_some_iff.mp h
-  refine ⟨chars_length ▸ hi, ?_⟩
-  simp [sym, List.getD, hi, hc]
-
-theorem encode_eq_nil {bs : List Nat} : encode bs = [] ↔ bs = [] := by
-  constructor
-  · intro h
-    rcases bs with _ | ⟨a, _ | ⟨b, _ | ⟨c, r⟩⟩⟩ <;> simp [encode] at h ⊢
-  · rintro rfl; rfl
 
 /-- Round trip: decoding an encoding returns the original bytes. -/
 theorem decode_encode (bs : List Nat) (h : ∀ b ∈ bs, b < 256) :
@@ -188,10 +148,4 @@ theorem decode_injective (s₁ s₂ : List Char) (bs : List Nat)
     (h₁ : decode s₁ = some bs) (h₂ : decode s₂ = some bs) : s₁ = s₂ := by
   rw [← encode_decode s₁ bs h₁, ← encode_decode s₂ bs h₂]
 
-/-- Output length: 4 chars per started 3-byte group. -/
-theorem encode_length (bs : List Nat) : (encode bs).length = 4 * ((bs.length + 2) / 3) := by
-  induction bs using encode.induct with
-  | case1 a b c rest ih => simp only [encode, List.length_cons, ih]; omega
-  | case2 | case3 | case4 => simp [encode]
-
-end Fvdep.Base64.V1_0_0
+end Fvdep.Base64.Decode.V1_0_0

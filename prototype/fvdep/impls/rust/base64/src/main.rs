@@ -1,4 +1,4 @@
-//! Strict base64 adapter for spec base64@1.1.0 (standard + URL-safe alphabets).
+//! Strict base64 adapter: modules base64.{encode,decode,encode_url,decode_url}@1.0.0.
 use std::io::{self, BufRead, Write};
 
 const STD: &[u8; 64] = b"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/";

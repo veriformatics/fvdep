@@ -1,9 +1,13 @@
-# Example consumer project: each dependency names the spec version it implements
-# and the command that runs its implementation behind the adapter protocol.
-[deps.base64]
+# Example consumer project: each module it uses is pinned to a spec version with its implementation.
+# A Lean implementation with a proof = delivered; an adapter command = development evidence only.
+[modules."base64.encode"]
 spec = "1.0.0"
-impl = "python3 -I ../impls/python/base64_strict.py"
+lean = { project = "../impls/lean", module = "Base64Acc", impl = "Base64Acc.encode", proof = "Base64Acc.conforms" }
 
-[deps.semver]
+[modules."base64.decode"]
+spec = "1.0.0"
+lean = { project = "../impls/lean", module = "Base64Acc", impl = "Base64Acc.decode", proof = "Base64Acc.decode_conforms" }
+
+[modules."semver.compare"]
 spec = "1.0.0"
 impl = "python3 -I ../impls/python/semver_impl.py"

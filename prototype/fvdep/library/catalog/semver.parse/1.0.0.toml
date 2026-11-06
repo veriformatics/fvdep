@@ -1,0 +1,16 @@
+module = "semver.parse"
+version = "1.0.0"
+title = "Semantic Versioning 2.0.0: strict version grammar"
+standard = "semver.org 2.0.0 §2, §9, §10"
+lean = "Fvdep.Semver.Parse.V1_0_0"
+source = "Fvdep/Semver/Parse/V1_0_0.lean"
+fn = "Fvdep.Semver.Parse.V1_0_0.parse"
+op = "parse"
+args = ["text"]
+result = "normalized version text | err"
+uses = []
+summary = "MAJOR.MINOR.PATCH[-pre][+build], no leading zeros, no v prefix. Ranges (^1.2, ~1.2) are not in this module."
+
+[[obligations]]
+theorem = "Fvdep.Semver.Parse.V1_0_0.parse_render"
+says = "Every valid version renders to text that parses back to it."

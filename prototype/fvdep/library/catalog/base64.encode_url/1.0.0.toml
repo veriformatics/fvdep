@@ -1,0 +1,20 @@
+module = "base64.encode_url"
+version = "1.0.0"
+title = "Base64url encode, URL-safe alphabet, padded"
+standard = "RFC 4648 §5"
+lean = "Fvdep.Base64.EncodeUrl.V1_0_0"
+source = "Fvdep/Base64/EncodeUrl/V1_0_0.lean"
+fn = "Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl"
+op = "encode_url"
+args = ["bytes (hex)"]
+result = "base64url text"
+uses = ["base64.encode@1.0.0"]
+summary = "base64.encode with + → - and / → _. Unpadded base64url is not in this module."
+
+[[obligations]]
+theorem = "Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl_url_safe"
+says = "Output never contains + or /."
+
+[[obligations]]
+theorem = "Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl_length"
+says = "Output length equals that of the standard encoding."

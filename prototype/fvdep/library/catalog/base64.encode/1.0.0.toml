@@ -1,0 +1,20 @@
+module = "base64.encode"
+version = "1.0.0"
+title = "Base64 encode, standard alphabet, padded"
+standard = "RFC 4648 §4"
+lean = "Fvdep.Base64.Encode.V1_0_0"
+source = "Fvdep/Base64/Encode/V1_0_0.lean"
+fn = "Fvdep.Base64.Encode.V1_0_0.encode"
+op = "encode"
+args = ["bytes (hex)"]
+result = "base64 text"
+uses = []
+summary = "4 alphabet chars per 3-byte group; a short last group is padded with =."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Encode.V1_0_0.encode_length"
+says = "Output length = 4 chars per started 3-byte group."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Encode.V1_0_0.encode_alphabet"
+says = "Output uses the standard alphabet and = alone."

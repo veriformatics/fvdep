@@ -1,0 +1,9 @@
+[package]
+name = "fvdep-adapter-crates-base64"
+version = "0.0.0"
+edition = "2021"
+publish = false
+description = "Adapter: the real crates.io base64 crate (STANDARD / URL_SAFE engines) behind the fvdep adapter protocol."
+
+[dependencies]
+base64 = "=0.22.1"

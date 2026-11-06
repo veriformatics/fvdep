@@ -1,0 +1,20 @@
+module = "base64.decode_url"
+version = "1.0.0"
+title = "Base64url decode, URL-safe alphabet, strict"
+standard = "RFC 4648 §5"
+lean = "Fvdep.Base64.DecodeUrl.V1_0_0"
+source = "Fvdep/Base64/DecodeUrl/V1_0_0.lean"
+fn = "Fvdep.Base64.DecodeUrl.V1_0_0.decodeUrl"
+op = "decode_url"
+args = ["text"]
+result = "bytes (hex) | err"
+uses = ["base64.decode@1.0.0", "base64.encode_url@1.0.0"]
+summary = "Exact inverse of base64.encode_url: rejects + and /, then decodes strictly."
+
+[[obligations]]
+theorem = "Fvdep.Base64.DecodeUrl.V1_0_0.decodeUrl_encodeUrl"
+says = "Decoding a URL-safe encoding returns the original bytes."
+
+[[obligations]]
+theorem = "Fvdep.Base64.DecodeUrl.V1_0_0.encodeUrl_decodeUrl"
+says = "Every accepted string is exactly the URL-safe encoding of its bytes (canonical)."

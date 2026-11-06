@@ -1,3 +1,10 @@
-import Fvdep.Base64.V1_0_0
-import Fvdep.Base64.V1_1_0
-import Fvdep.Semver.V1_0_0
+import Fvdep.Base64.Encode.V1_0_0
+import Fvdep.Base64.Decode.V1_0_0
+import Fvdep.Base64.Decode.V1_1_0
+import Fvdep.Base64.EncodeUrl.V1_0_0
+import Fvdep.Base64.DecodeUrl.V1_0_0
+import Fvdep.Semver.Parse.V1_0_0
+import Fvdep.Semver.Compare.V1_0_0
+import Fvdep.Profiles.CpythonBase64.V3_14
+import Fvdep.Profiles.NpmBase64Js.V1_5_1
+import Fvdep.Profiles.CratesBase64.V0_22_1

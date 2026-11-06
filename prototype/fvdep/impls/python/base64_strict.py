@@ -1,5 +1,5 @@
 #!/usr/bin/env python3
-"""Strict base64 adapter for spec base64@1.0.0 (standard alphabet only)."""
+"""Strict base64 adapter: modules base64.encode@1.0.0 + base64.decode@1.0.0 (standard alphabet only)."""
 import sys
 
 ALPHA = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"

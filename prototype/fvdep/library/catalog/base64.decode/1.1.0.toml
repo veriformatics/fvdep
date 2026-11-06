@@ -1,0 +1,33 @@
+module = "base64.decode"
+version = "1.1.0"
+title = "Base64 decode, standard alphabet, strict"
+standard = "RFC 4648 §4"
+lean = "Fvdep.Base64.Decode.V1_1_0"
+source = "Fvdep/Base64/Decode/V1_1_0.lean"
+fn = "Fvdep.Base64.Decode.V1_1_0.decode"
+op = "decode"
+args = ["text"]
+result = "bytes (hex) | err"
+uses = ["base64.encode@1.0.0"]
+summary = "Exact inverse of base64.encode: alphabet chars only, padding required, unused bits zero."
+
+[compat]
+from = "1.0.0"
+theorem = "Fvdep.Base64.Decode.V1_1_0.unchanged"
+says = "Behaviour is identical to 1.0.0."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Decode.V1_1_0.decode_length"
+says = "An accepted string has 4 chars per started 3-byte group of its output."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Decode.V1_0_0.decode_encode"
+says = "Decoding an encoding returns the original bytes."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Decode.V1_0_0.encode_decode"
+says = "Every accepted string is exactly the encoding of its bytes (canonical)."
+
+[[obligations]]
+theorem = "Fvdep.Base64.Decode.V1_0_0.decode_injective"
+says = "Two different strings never decode to the same bytes (no malleability)."

@@ -1,8 +1,8 @@
 #!/usr/bin/env python3
-"""base64 adapter wrapping Python's stdlib (`b64decode(validate=True)`).
+"""Adapter: CPython's stdlib `base64` (`b64encode`, `b64decode(validate=True)`).
 
-Kept as the example of a real-world gap: the stdlib accepts non-canonical
-input such as `QR==` (unused bits set), which the spec rejects.
+Profile `cpython:base64@3.14`: deviates from base64.decode@1.0.0 by accepting
+non-canonical input such as `QR==` (unused bits set).
 """
 import base64
 import binascii

@@ -1,9 +1,10 @@
 """fvdep prototype CLI.
 
-Catalog + audit read the Lean spec library; `check` runs a differential test of an
-implementation against the oracle compiled from the spec (or audits a Lean refinement
-theorem); `lock`/`outdated`/`diff`/`upgrade` follow spec updates; `scan` maps a project's
-dependencies to specs; `request` = STUB for the commercial order flow.
+Library = contract modules (one per operation, versioned alone) + package profiles (where a real
+package deviates from a contract). Delivery = a machine-checked proof: `check --lean` writes the
+conformance statement itself and audits the axioms of its proof; a differential run against the
+oracle compiled from the spec = development evidence, never a delivery. `lock`/`outdated`/`diff`/
+`upgrade` follow module updates; `scan` maps a project's packages to profiles; `request` = STUB.
 """
 
 from __future__ import annotations
@@ -20,42 +21,39 @@ import shlex
 import subprocess
 import sys
 import tomllib
-from dataclasses import dataclass
+from dataclasses import dataclass, field
 from pathlib import Path
 from typing import NoReturn
 
 HOME = Path(os.environ.get("FVDEP_HOME", Path(__file__).resolve().parents[3]))
 LIB = HOME / "library"
-CATALOG = LIB / "catalog"
-STATE = HOME / ".state"
+STATE = Path(os.environ.get("FVDEP_STATE", HOME / ".state"))
 ORACLE = LIB / ".lake/build/bin/fvdep-oracle"
 STD_AXIOMS = {"propext", "Classical.choice", "Quot.sound"}
 
-# ── catalog ──────────────────────────────────────────────────────────────
+# ── library: contract modules + package profiles ────────────────────────
+
+
+def vkey(v: str) -> tuple[int, ...]:
+    return tuple(int(x) for x in v.split("."))
 
 
 @dataclass
-class Spec:
-    dep: str
+class Entry:
+    """A catalog file: contract module version or package profile version."""
+
+    name: str  # `base64.decode` | `npm:base64-js`
     version: str
     meta: dict
     path: Path
 
     @property
     def id(self) -> str:
-        return f"{self.dep}@{self.version}"
+        return f"{self.name}@{self.version}"
 
     @property
     def source(self) -> Path:
         return LIB / self.meta["source"]
-
-    @property
-    def ops(self) -> list[str]:
-        return [o["name"] for o in self.meta["ops"]]
-
-    @property
-    def obligations(self) -> list[dict]:
-        return self.meta["obligations"]
 
     def sha256(self) -> str:
         h = hashlib.sha256(self.path.read_bytes())
@@ -63,36 +61,58 @@ class Spec:
         return h.hexdigest()
 
 
-def vkey(v: str) -> tuple[int, ...]:
-    return tuple(int(x) for x in v.split("."))
-
-
-def catalog() -> dict[str, list[Spec]]:
-    out: dict[str, list[Spec]] = {}
-    for f in sorted(CATALOG.glob("*/*.toml")):
+def load(glob: str, key: str) -> dict[str, list[Entry]]:
+    out: dict[str, list[Entry]] = {}
+    for f in sorted(LIB.glob(glob)):
         m = tomllib.loads(f.read_text())
-        out.setdefault(m["dep"], []).append(Spec(m["dep"], m["version"], m, f))
+        out.setdefault(m[key], []).append(Entry(m[key], m["version"], m, f))
     for v in out.values():
-        v.sort(key=lambda s: vkey(s.version))
+        v.sort(key=lambda e: vkey(e.version))
     return out
 
 
-def resolve(ref: str) -> Spec:
-    dep, _, ver = ref.partition("@")
-    specs = catalog().get(dep)
-    if not specs:
-        die(f"no spec for `{dep}`. To ask for one, run: fvdep request <ecosystem>:{dep}")
+def modules() -> dict[str, list[Entry]]:
+    return load("catalog/*/*.toml", "module")
+
+
+def profiles() -> dict[str, list[Entry]]:
+    return load("profiles/*/*/*.toml", "package")
+
+
+def pick(table: dict[str, list[Entry]], ref: str, kind: str, hint: str) -> Entry:
+    name, _, ver = ref.rpartition("@") if "@" in ref else (ref, "", "")
+    entries = table.get(name)
+    if not entries:
+        die(f"no {kind} `{name}`. {hint}")
     if not ver:
-        return specs[-1]
-    for s in specs:
-        if s.version == ver:
-            return s
-    die(f"`{dep}` has no spec version {ver}. Versions: {', '.join(s.version for s in specs)}")
+        return entries[-1]
+    for e in entries:
+        if e.version == ver:
+            return e
+    die(f"`{name}` has no version {ver}. Versions: {', '.join(e.version for e in entries)}")
+
+
+def module(ref: str) -> Entry:
+    return pick(modules(), ref, "spec module", "Run `fvdep list` to see the modules. To ask for one, run: fvdep request <ecosystem>:<package>")
+
+
+def profile(ref: str) -> Entry:
+    return pick(profiles(), ref, "package profile", "Run `fvdep list` to see the profiles.")
 
 
 def die(msg: str, rc: int = 2) -> NoReturn:
     print(f"fvdep: {msg}", file=sys.stderr)
     sys.exit(rc)
+
+
+def theorems(e: Entry) -> list[str]:
+    """Every theorem a catalog entry cites (obligations, compat, profile relations + witnesses)."""
+    m = e.meta
+    out = [o["theorem"] for o in m.get("obligations", [])]
+    out += [m["compat"]["theorem"]] if "compat" in m else []
+    for op in m.get("ops", []):
+        out += [r["theorem"] for r in op["relations"]] + [d["theorem"] for d in op["deviations"]]
+    return out
 
 
 # ── lean: build + axiom audit ────────────────────────────────────────────
@@ -114,19 +134,15 @@ def ensure_built() -> None:
 AX_RE = re.compile(r"'([^']+)' (?:depends on axioms: \[([^\]]*)\]|does not depend on any axioms)")
 
 
-def print_axioms(project: Path, imports: list[str], names: list[str]) -> dict[str, set[str]]:
-    """`#print axioms` per declaration, after a build of `project` (axioms are the evidence)."""
-    r = lake(["build"], project)
-    if r.returncode:
-        die(f"lake build failed in {project}:\n{r.stdout[-2000:]}")
-    probe = project / ".lake/fvdep-audit.lean"
-    probe.write_text("".join(f"import {i}\n" for i in imports) + "".join(f"#print axioms {n}\n" for n in names))
-    r = lake(["env", "lean", str(probe)], project)
-    found = {m[1]: {a.strip() for a in (m[2] or "").split(",") if a.strip()} for m in AX_RE.finditer(r.stdout)}
-    missing = [n for n in names if n not in found]
-    if missing:
-        die(f"audit could not read axioms for {missing}:\n{r.stdout[-1500:]}{r.stderr[-1500:]}")
-    return found
+def lean_run(project: Path, name: str, text: str) -> subprocess.CompletedProcess:
+    probe = project / ".lake" / name
+    probe.parent.mkdir(exist_ok=True)
+    probe.write_text(text)
+    return lake(["env", "lean", str(probe)], project)
+
+
+def axioms_of(out: str) -> dict[str, set[str]]:
+    return {m[1]: {a.strip() for a in (m[2] or "").split(",") if a.strip()} for m in AX_RE.finditer(out)}
 
 
 def status(axioms: set[str]) -> str:
@@ -137,42 +153,53 @@ def status(axioms: set[str]) -> str:
 
 
 def audit() -> dict[str, str]:
-    """Obligation → status, cached on the hash of every spec source + manifest."""
-    specs = [s for v in catalog().values() for s in v]
-    key = hashlib.sha256("".join(s.sha256() for s in specs).encode()).hexdigest()
+    """Theorem → status for every theorem the library cites, cached on the hash of every entry."""
+    entries = [e for t in (modules(), profiles()) for v in t.values() for e in v]
+    key = hashlib.sha256("".join(e.sha256() for e in entries).encode()).hexdigest()
     cache = STATE / "audit.json"
     if cache.exists():
         c = json.loads(cache.read_text())
         if c.get("key") == key:
             return c["status"]
     ensure_built()
-    names = [o["theorem"] for s in specs for o in s.obligations]
-    ax = print_axioms(LIB, ["Fvdep"], names)
+    names = sorted({t for e in entries for t in theorems(e)})
+    r = lean_run(LIB, "fvdep-audit.lean", "import Fvdep\n" + "".join(f"#print axioms {n}\n" for n in names))
+    ax = axioms_of(r.stdout)
+    missing = [n for n in names if n not in ax]
+    if missing:
+        die(f"audit could not read axioms for {missing}:\n{r.stdout[-1500:]}{r.stderr[-1500:]}")
     st = {n: status(ax[n]) for n in names}
-    STATE.mkdir(exist_ok=True)
+    STATE.mkdir(parents=True, exist_ok=True)
     cache.write_text(json.dumps({"key": key, "status": st}, indent=1))
     return st
 
 
-# ── differential check ───────────────────────────────────────────────────
+def tally(e: Entry, st: dict[str, str]) -> tuple[int, int]:
+    sts = [st[o["theorem"]] for o in e.meta["obligations"]]
+    return sts.count("proven"), len(sts) - sts.count("proven")
+
+
+# ── differential runs (development evidence) ─────────────────────────────
 
 B64 = "ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz0123456789+/"
 RFC4648 = ["", "66", "666f", "666f6f", "666f6f62", "666f6f6261", "666f6f626172"]
 
 
-def gen_base64(rng: random.Random, n: int, ops: list[str]) -> list[list[str]]:
+def gen_base64(rng: random.Random, n: int) -> list[list[str]]:
     import base64 as b
 
     cases: list[list[str]] = []
     for h in RFC4648:
-        cases += [["encode", h], ["decode", b.b64encode(bytes.fromhex(h)).decode()]]
+        raw = bytes.fromhex(h)
+        cases += [["encode", h], ["decode", b.b64encode(raw).decode()],
+                  ["encode_url", h], ["decode_url", b.urlsafe_b64encode(raw).decode()]]
     for _ in range(n):
         raw = rng.randbytes(rng.choice([0, 1, 2, 3, 4, 5, rng.randrange(6, 48)]))
-        cases.append(["encode", raw.hex()])
+        cases += [["encode", raw.hex()], ["encode_url", raw.hex()]]
         s = list(b.b64encode(raw).decode())
-        kind = rng.randrange(6)
+        kind = rng.randrange(7)
         if s and kind == 1:  # substitute any char, incl. non-alphabet + url-safe chars
-            s[rng.randrange(len(s))] = rng.choice(B64 + "=-_ .\t\x7f é")
+            s[rng.randrange(len(s))] = rng.choice(B64 + "=-_ .!\t\x7f é")
         elif s and kind == 2:  # perturb the last data char ⇒ non-canonical trailing bits
             i = max(k for k, c in enumerate(s) if c != "=") if any(c != "=" for c in s) else 0
             s[i] = B64[(B64.index(s[i]) ^ rng.randrange(1, 4)) % 64] if s[i] in B64 else s[i]
@@ -180,18 +207,18 @@ def gen_base64(rng: random.Random, n: int, ops: list[str]) -> list[list[str]]:
             del s[rng.randrange(len(s))]
         elif kind == 4:
             s = [c for c in s if c != "="]
+        elif kind == 5:  # data or padding after a padded group
+            s += list(rng.choice([b.b64encode(rng.randbytes(rng.randrange(1, 4))).decode(), "===="]))
         text = "".join(s).replace("\t", " ")
         cases.append(["decode", text])
-        if "encode_url" in ops:
-            cases.append(["encode_url", raw.hex()])
-            url = b.urlsafe_b64encode(raw).decode()
-            if url and kind == 1:
-                url = url[:-1] + rng.choice("+/=-_A")
-            cases.append(["decode_url", url])
+        url = b.urlsafe_b64encode(raw).decode()
+        if url and kind == 1:
+            url = url[:-1] + rng.choice("+/=-_A")
+        cases.append(["decode_url", url])
     return cases
 
 
-def gen_semver(rng: random.Random, n: int, ops: list[str]) -> list[list[str]]:
+def gen_semver(rng: random.Random, n: int) -> list[list[str]]:
     def num() -> str:
         return str(rng.choice([0, 0, 1, 1, 2, 10, rng.randrange(100000)]))
 
@@ -237,98 +264,135 @@ def gen_semver(rng: random.Random, n: int, ops: list[str]) -> list[list[str]]:
 GENERATORS = {"base64": gen_base64, "semver": gen_semver}
 
 
+def gen_cases(contracts: list[str], ops: list[str], n: int, seed: int) -> list[list[str]]:
+    """Cases for `ops`, from the generator of each contract module's family (`base64.decode` → base64)."""
+    out: list[list[str]] = []
+    for fam in dict.fromkeys(c.split(".")[0] for c in contracts):
+        out += [c for c in GENERATORS[fam](random.Random(seed), n) if c[0] in ops]
+    return out
+
+
 def run_adapter(cmd: list[str], cases: list[list[str]], cwd: Path) -> list[str]:
     stdin = "".join("\t".join(c) + "\n" for c in cases)
     try:
-        r = subprocess.run(cmd, input=stdin, capture_output=True, text=True, cwd=cwd, timeout=120)
+        r = subprocess.run(cmd, input=stdin, capture_output=True, text=True, cwd=cwd, timeout=300)
     except FileNotFoundError:
         die(f"cannot run implementation: {shlex.join(cmd)}")
     out = r.stdout.splitlines()
     if len(out) != len(cases):
-        die(f"implementation replied {len(out)} lines for {len(cases)} requests (rc {r.returncode}).\n{r.stderr[-1500:]}")
+        die(f"`{shlex.join(cmd)}` replied {len(out)} lines for {len(cases)} requests (rc {r.returncode}).\n{r.stderr[-1500:]}")
     return out
 
 
 @dataclass
-class Result:
-    spec: Spec
-    trust: str  # "tested" | "axioms-audited" | "failed"
+class Diff:
     cases: int
-    seed: int | None
+    seed: int
     mismatches: list[tuple[list[str], str, str]]
     unsupported: list[str]
-    note: str = ""
+
+    @property
+    def ok(self) -> bool:
+        return not self.mismatches and not self.unsupported
+
+
+def differential(handler: str, contracts: list[str], ops: list[str], cmd: list[str], n: int, seed: int, cwd: Path) -> Diff:
+    ensure_built()
+    cases = gen_cases(contracts, ops, n, seed)
+    want = run_adapter([str(ORACLE), handler], cases, cwd)
+    got = run_adapter(cmd, cases, cwd)
+    unsupported = sorted({c[0] for c, g in zip(cases, got) if g == "unsupported"})
+    bad = list({tuple(c): (c, w, g) for c, w, g in zip(cases, want, got) if w != g and g != "unsupported"}.values())
+    bad.sort(key=lambda t: sum(map(len, t[0])))  # shortest counterexample first
+    return Diff(len(cases), seed, bad, unsupported)  # mismatches = distinct cases
+
+
+def print_mismatches(d: Diff, left: str, right: str) -> None:
+    for c, w, g in d.mismatches[:5]:
+        print(f"      {' '.join(map(repr, c))}\n        {left}: {w}\n        {right}: {g}")
+    if len(d.mismatches) > 5:
+        print(f"      … {len(d.mismatches) - 5} more")
+
+
+# ── conformance: proof (delivery) or differential (development evidence) ─
+
+
+@dataclass
+class Result:
+    spec: Entry
+    verdict: str  # PROVEN | NOT PROVEN | MATCHED | MISMATCH
+    detail: str
+    evidence: str  # proof | differential
+    diff: Diff | None = None
+    lines: list[str] = field(default_factory=list)
 
     @property
     def passed(self) -> bool:
-        return self.trust != "failed"
+        return self.verdict in ("PROVEN", "MATCHED")
+
+    @property
+    def delivered(self) -> bool:
+        return self.verdict == "PROVEN"
 
 
-def differential(spec: Spec, cmd: list[str], n: int, seed: int, cwd: Path) -> Result:
-    ensure_built()
-    cases = GENERATORS[spec.dep](random.Random(seed), n, spec.ops)
-    want = run_adapter([str(ORACLE), spec.id], cases, cwd)
-    got = run_adapter(cmd, cases, cwd)
-    unsupported = sorted({c[0] for c, g in zip(cases, got) if g == "unsupported"})
-    bad = [(c, w, g) for c, w, g in zip(cases, want, got) if w != g and g != "unsupported"]
-    bad.sort(key=lambda t: sum(map(len, t[0])))  # shortest counterexample first
-    ok = not bad and not unsupported
-    return Result(spec, "tested" if ok else "failed", len(cases), seed, bad, unsupported)
+def lean_conformance(spec: Entry, project: Path, mod: str, impl: str, proof: str) -> Result:
+    """fvdep writes the statement `impl = <spec fn>`; the named proof has to close it."""
+    r = lake(["build"], project)
+    if r.returncode:
+        die(f"lake build failed in {project}:\n{r.stdout[-2000:]}{r.stderr[-2000:]}")
+    fn = spec.meta["fn"]
+    compat = spec.meta.get("compat", {}).get("theorem")
+    close = f"first | exact {proof} | (funext; exact {proof} ..)"
+    via = f" | (rw [{compat}]; {close})" if compat else ""
+    stmt = f"(@{impl}) = (@{fn})"
+    text = (f"import {spec.meta['lean']}\nimport {mod}\n"
+            f"theorem fvdep_conformance : {stmt} := by\n  first | ({close}){via}\n"
+            "#print axioms fvdep_conformance\n")
+    out = lean_run(project, "fvdep-conformance.lean", text)
+    ax = axioms_of(out.stdout).get("fvdep_conformance")
+    if out.returncode or ax is None:
+        err = next((ln for ln in out.stdout.splitlines() if "error" in ln), out.stdout.strip()[:300])
+        return Result(spec, "NOT PROVEN", f"`{proof}` does not prove {impl} = {fn}", "proof",
+                      lines=[f"statement written by fvdep: {stmt}", f"Lean: {err.split(': ', 2)[-1]}"])
+    s = status(ax)
+    if s != "proven":
+        return Result(spec, "NOT PROVEN", f"the proof of {impl} = {fn} is {s}", "proof",
+                      lines=[f"axioms: {', '.join(sorted(ax))}"])
+    return Result(spec, "PROVEN", f"{impl} = {fn} (kernel-checked)", "proof",
+                  lines=[f"statement written by fvdep; axioms: {', '.join(sorted(ax)) or 'none'}"])
 
 
-def lean_statement(project: Path, module: str, theorem: str) -> str:
-    probe = project / ".lake/fvdep-stmt.lean"
-    probe.write_text(f"import {module}\nset_option pp.fullNames true\n#check @{theorem}\n")
-    return lake(["env", "lean", str(probe)], project).stdout
-
-
-def lean_conformance(spec: Spec, project: Path, module: str, theorem: str) -> Result:
-    ax = print_axioms(project, [module], [theorem])[theorem]
-    stmt = lean_statement(project, module, theorem)
-    note = f"`{theorem}` axioms: {', '.join(sorted(ax)) or 'none'}"
-    if status(ax) != "proven":
-        return Result(spec, "failed", 0, None, [], [], note + " (not fully proven)")
-    if spec.meta["module"] + "." not in stmt:
-        return Result(spec, "failed", 0, None, [], [],
-                      f"`{theorem}` does not mention spec module {spec.meta['module']}:\n      {stmt.strip()}")
-    note += ("\n      PROTOTYPE SHORTCUT: the statement mentions the spec module, but its shape "
-             "(impl = spec, for every operation) is not checked yet.")
-    return Result(spec, "axioms-audited", 0, None, [], [], note)
+def run_check(spec: Entry, cfg: dict, n: int, seed: int, cwd: Path) -> Result:
+    if "lean" in cfg:
+        lc = cfg["lean"]
+        return lean_conformance(spec, (cwd / lc["project"]).resolve(), lc["module"], lc["impl"], lc["proof"])
+    d = differential(spec.id, [spec.name], [spec.meta["op"]], shlex.split(cfg["impl"]), n, seed, cwd)
+    if d.ok:
+        return Result(spec, "MATCHED", f"{d.cases} cases agree with the spec oracle (seed {d.seed})", "differential", d)
+    why = [f"{len(d.mismatches)} of {d.cases} replies differ from the spec oracle"] if d.mismatches else []
+    why += [f"operation not implemented: {', '.join(d.unsupported)}"] if d.unsupported else []
+    return Result(spec, "MISMATCH", "; ".join(why), "differential", d)
 
 
 def report(r: Result) -> None:
-    st = audit()
-    sts = [st[o["theorem"]] for o in r.spec.obligations]
-    spec_note = f"      spec obligations: {sts.count('proven')} proven, {len(sts) - sts.count('proven')} open"
-    _report(r)
-    if r.passed:
-        print(spec_note)
+    proven, open_ = tally(r.spec, audit())
+    print(f"{r.verdict:<10} {r.spec.id}  {r.detail}")
+    for ln in r.lines:
+        print(f"           {ln}")
+    if r.diff and r.diff.mismatches:
+        print_mismatches(r.diff, "spec", "impl")
+    if r.delivered:
+        print("           delivered: yes (machine-checked proof against the spec)")
+    elif r.passed:
+        print("           delivered: no (development evidence only; delivery needs a proof)")
+    print(f"           spec obligations: {proven} proven, {open_} open")
 
 
-def _report(r: Result) -> None:
-    if r.trust == "axioms-audited":
-        print(f"PASS  {r.spec.id}  trust=axioms-audited (Lean theorem kernel-checked; conformance shape unverified)\n      {r.note}")
-        return
-    if r.passed:
-        print(f"PASS  {r.spec.id}  trust=tested ({r.cases} cases, seed {r.seed}, all replies equal the oracle)")
-        return
-    why = [f"{len(r.mismatches)} of {r.cases} replies differ from the spec oracle"] if r.mismatches else []
-    why += [f"missing operations: {', '.join(r.unsupported)}"] if r.unsupported else []
-    print(f"FAIL  {r.spec.id}  {'; '.join(why) or 'see note'}")
-    if r.note:
-        print(f"      {r.note}")
-    for c, w, g in r.mismatches[:5]:
-        print(f"      {' '.join(map(repr, c))}\n        spec: {w}\n        impl: {g}")
-    if len(r.mismatches) > 5:
-        print(f"      … {len(r.mismatches) - 5} more")
-
-
-def do_check(spec: Spec, impl: str | None, lean: str | None, n: int, seed: int, cwd: Path) -> Result:
-    if lean:
-        proj, _, decl = lean.partition(":")
-        module, _, _thm = decl.rpartition(".")
-        return lean_conformance(spec, (cwd / proj).resolve(), module.split(".")[0], decl)
-    return differential(spec, shlex.split(impl), n, seed, cwd)
+def impl_ref(cfg: dict) -> str:
+    if "lean" in cfg:
+        lc = cfg["lean"]
+        return f"lean {lc['project']}:{lc['module']} {lc['impl']} by {lc['proof']}"
+    return cfg["impl"]
 
 
 # ── commands ─────────────────────────────────────────────────────────────
@@ -336,38 +400,95 @@ def do_check(spec: Spec, impl: str | None, lean: str | None, n: int, seed: int, 
 
 def cmd_list(a) -> None:
     st = audit()
-    print(f"{'dependency':<10} {'latest':<7} {'proven':>6} {'open':>4}  models")
-    for dep, specs in catalog().items():
-        s = specs[-1]
-        sts = [st[o["theorem"]] for o in s.obligations]
-        print(f"{dep:<10} {s.version:<7} {sts.count('proven'):>6} {sts.count('open'):>4}  {', '.join(s.meta['models'])}")
-        print(f"{'':<10} {s.meta['title']}")
+    print(f"{'module':<18} {'latest':<7} {'proven':>6} {'open':>4}  title")
+    for name, entries in modules().items():
+        e = entries[-1]
+        p, o = tally(e, st)
+        print(f"{name:<18} {e.version:<7} {p:>6} {o:>4}  {e.meta['title']}")
+    print(f"\n{'package profile':<26} {'deviations':<12} modules")
+    for name, entries in profiles().items():
+        e = entries[-1]
+        devs = sum(len(op["deviations"]) for op in e.meta["ops"])
+        print(f"{e.id:<26} {devs:<12} {', '.join(op['contract'] for op in e.meta['ops'])}")
 
 
 def cmd_show(a) -> None:
-    s = resolve(a.spec)
+    e = module(a.module)
     st = audit()
-    m = s.meta
-    others = [x.version for x in catalog()[s.dep]]
-    print(f"{s.id}  {m['title']}\n")
+    m = e.meta
+    print(f"{e.id}  {m['title']}\n")
     print(f"  standard   {m['standard']}")
-    print(f"  models     {', '.join(m['models'])}")
-    print(f"  versions   {', '.join(others)}")
-    print(f"  source     {s.source.relative_to(HOME)}  (module {m['module']})")
-    print(f"  sha256     {s.sha256()[:16]}…\n")
-    print(f"  {m['summary']}\n\n  operations (adapter protocol, see PROTOCOL.md)")
-    for o in m["ops"]:
-        print(f"    {o['name']:<11} {', '.join(o['args']):<22} → {o['result']}")
+    print(f"  versions   {', '.join(x.version for x in modules()[e.name])}")
+    print(f"  uses       {', '.join(m['uses']) or '-'}")
+    print(f"  source     {e.source.relative_to(HOME)}")
+    print(f"  implement  {m['fn']}")
+    print(f"  sha256     {e.sha256()[:16]}…\n")
+    print(f"  {m['summary']}\n")
+    print(f"  adapter operation (see PROTOCOL.md): {m['op']} {', '.join(m['args'])} → {m['result']}")
+    if "compat" in m:
+        c = m["compat"]
+        print(f"\n  compatibility with {c['from']}\n    [{st[c['theorem']]:<6}] {c['says']}\n             {c['theorem']}")
     print("\n  obligations (status read from `#print axioms` on the kernel-checked library)")
-    for o in s.obligations:
+    for o in m["obligations"]:
         print(f"    [{st[o['theorem']]:<6}] {o['says']}\n             {o['theorem']}")
 
 
+def setup_package(e: Entry) -> None:
+    if "setup" in e.meta:
+        r = subprocess.run(shlex.split(e.meta["setup"]), cwd=HOME, capture_output=True, text=True)
+        if r.returncode:
+            die(f"setup failed: {e.meta['setup']}\n{r.stderr[-1500:]}")
+
+
+def cmd_profile(a) -> None:
+    e = profile(a.package)
+    st = audit()
+    m = e.meta
+    print(f"{e.id}  {m['title']}\n")
+    print(f"  measured   {m['measured']}")
+    print(f"  model      {e.source.relative_to(HOME)}")
+    print(f"  adapter    {m['adapter']}")
+    for op in m["ops"]:
+        print(f"\n  {op['op']}  {op['api']}  vs contract {op['contract']}")
+        for r in op["relations"]:
+            print(f"    [{st[r['theorem']]:<6}] {r['says']}")
+        if not any(r.get("complete") and st[r["theorem"]] == "proven" for r in op["relations"]):
+            print("    completeness: not proven, so deviations beyond the list below may exist")
+        if not op["deviations"]:
+            print("    deviations: none")
+        for d in op["deviations"]:
+            print(f"    deviation [{st[d['theorem']]:<6}] {d['name']}  e.g. {d['witness']!r}\n      {d['says']}")
+    if not a.check:
+        print(f"\n  The theorems are about the model. To compare the model with the real package, run:\n"
+              f"  fvdep profile {e.id} --check")
+        return
+    setup_package(e)
+    ops = [op["op"] for op in m["ops"]]
+    d = differential(e.id, [op["contract"] for op in m["ops"]], ops, shlex.split(m["adapter"]), a.cases, a.seed, HOME)
+    print()
+    if d.ok:
+        print(f"MODEL MATCHES  {e.id}: the real package and its model agree on {d.cases} cases (seed {d.seed}).")
+        print("  This is evidence that the model is faithful, not a proof about the package.")
+        return
+    print(f"MODEL DIFFERS  {e.id}: {len(d.mismatches)} of {d.cases} cases differ"
+          + (f"; package lacks {', '.join(d.unsupported)}" if d.unsupported else ""))
+    print_mismatches(d, "model", "package")
+    sys.exit(1)
+
+
+def check_cfg(a) -> dict:
+    if a.lean:
+        proj, _, mod = a.lean.partition(":")
+        if not (mod and a.impl_fn and a.proof):
+            die("a Lean check needs --lean <project dir>:<Module> --impl <function> --proof <theorem>")
+        return {"lean": {"project": proj, "module": mod, "impl": a.impl_fn, "proof": a.proof}}
+    if a.impl:
+        return {"impl": shlex.join(a.impl)}
+    die("give an implementation: `-- <adapter command>` or `--lean <dir>:<Module> --impl <fn> --proof <theorem>`")
+
+
 def cmd_check(a) -> None:
-    s = resolve(a.spec)
-    if not (a.impl or a.lean):
-        die("give an implementation: `-- <command>` or `--lean <project>:<Module.theorem>`")
-    r = do_check(s, shlex.join(a.impl) if a.impl else None, a.lean, a.cases, a.seed, Path.cwd())
+    r = run_check(module(a.module), check_cfg(a), a.cases, a.seed, Path.cwd())
     report(r)
     sys.exit(0 if r.passed else 1)
 
@@ -380,9 +501,9 @@ def load_project(d: Path) -> dict:
 
 
 def write_lock(d: Path, entries: dict) -> None:
-    lines = ["# fvdep.lock — written by `fvdep lock`; spec pins + conformance evidence.\n"]
-    for dep, e in sorted(entries.items()):
-        lines.append(f"\n[{dep}]\n")
+    lines = ["# fvdep.lock — written by `fvdep lock`; module pins + conformance evidence.\n"]
+    for name, e in sorted(entries.items()):
+        lines.append(f'\n["{name}"]\n')
         for k, v in e.items():
             lines.append(f"{k} = {json.dumps(v)}\n")
     (d / "fvdep.lock").write_text("".join(lines))
@@ -395,71 +516,83 @@ def read_lock(d: Path) -> dict:
     return tomllib.loads(f.read_text())
 
 
-def lock_entry(r: Result, impl: str) -> dict:
-    return {"spec": r.spec.version, "spec_sha256": r.spec.sha256(), "impl": impl, "trust": r.trust,
-            "cases": r.cases, "seed": r.seed or 0, "checked": dt.date.today().isoformat()}
+def lock_entry(r: Result, cfg: dict) -> dict:
+    e = {"spec": r.spec.version, "spec_sha256": r.spec.sha256(), "impl": impl_ref(cfg),
+         "evidence": r.evidence, "delivered": r.delivered, "checked": dt.date.today().isoformat()}
+    if r.diff:
+        e |= {"cases": r.diff.cases, "seed": r.diff.seed}
+    return e
 
 
 def cmd_lock(a) -> None:
     d = Path(a.project).resolve()
-    proj = load_project(d)
+    mods = load_project(d)["modules"]
     entries, failed = {}, False
-    for dep, cfg in proj["deps"].items():
-        s = resolve(f"{dep}@{cfg['spec']}")
-        r = do_check(s, cfg.get("impl"), cfg.get("lean"), a.cases, a.seed, d)
+    for name, cfg in mods.items():
+        r = run_check(module(f"{name}@{cfg['spec']}"), cfg, a.cases, a.seed, d)
         report(r)
         if r.passed:
-            entries[dep] = lock_entry(r, cfg.get("impl") or cfg.get("lean"))
+            entries[name] = lock_entry(r, cfg)
         failed |= not r.passed
     write_lock(d, entries)
-    print(f"\nwrote {d / 'fvdep.lock'} ({len(entries)} of {len(proj['deps'])} dependencies locked)")
+    delivered = sum(e["delivered"] for e in entries.values())
+    print(f"\nwrote {d / 'fvdep.lock'}: {len(entries)} of {len(mods)} modules locked, "
+          f"{delivered} delivered (proven), {len(entries) - delivered} with development evidence only")
+    if a.require_proof and delivered < len(mods):
+        print("--require-proof: every module needs a proof. Not delivered: "
+              + ", ".join(n for n in mods if not entries.get(n, {}).get("delivered")))
+        sys.exit(1)
     sys.exit(1 if failed else 0)
 
 
-def classify(old: Spec, new: Spec) -> str:
+def classify(old: Entry, new: Entry, evidence: str | None = None) -> str:
     if vkey(new.version)[0] != vkey(old.version)[0]:
-        return "major (breaking: re-implement)"
-    # Compat obligations are found by naming convention (`std_unchanged*`); their status is audited.
-    compat = [o["theorem"] for o in new.obligations if ".std_unchanged" in o["theorem"]]
-    if not compat:
-        return "minor (additive; compatibility not stated)"
-    st = audit()
-    proven = all(st[t] == "proven" for t in compat)
-    return f"minor (additive; old surface unchanged: {'proven' if proven else 'NOT proven'})"
+        return "major: behaviour may change; re-implement and re-prove"
+    c = new.meta.get("compat")
+    if not c or c["from"] != old.version:
+        return "minor: compatibility with your version is not stated"
+    if audit()[c["theorem"]] != "proven":
+        return "same behaviour claimed but NOT proven"
+    then = {"proof": "your proof carries over", "differential": "rerun the differential check"}.get(
+        evidence, f"proofs against {old.version} carry over")
+    return f"same behaviour (proven); {then}"
 
 
 def cmd_outdated(a) -> None:
     d = Path(a.project).resolve()
     lk = read_lock(d)
-    cat = catalog()
-    print(f"{'dependency':<10} {'locked':<7} {'latest':<7} change")
-    for dep, e in lk.items():
-        latest = cat[dep][-1]
-        cur = resolve(f"{dep}@{e['spec']}")
+    mods = modules()
+    print(f"{'module':<18} {'locked':<7} {'latest':<7} change")
+    for name, e in lk.items():
+        latest = mods[name][-1]
+        cur = module(f"{name}@{e['spec']}")
         drift = "" if cur.sha256() == e["spec_sha256"] else "  ⚠ locked spec text changed since lock"
         if latest.version == e["spec"]:
-            print(f"{dep:<10} {e['spec']:<7} {latest.version:<7} up to date{drift}")
+            print(f"{name:<18} {e['spec']:<7} {latest.version:<7} up to date{drift}")
             continue
-        print(f"{dep:<10} {e['spec']:<7} {latest.version:<7} {classify(cur, latest)}{drift}")
-        print(f"{'':<10} see: fvdep diff {dep} {e['spec']} {latest.version}")
+        print(f"{name:<18} {e['spec']:<7} {latest.version:<7} {classify(cur, latest, e['evidence'])}{drift}")
+        print(f"{'':<18} see: fvdep diff {name} {e['spec']} {latest.version}")
 
 
 def cmd_diff(a) -> None:
-    old, new = resolve(f"{a.dep}@{a.old}"), resolve(f"{a.dep}@{a.new}")
+    old, new = module(f"{a.module}@{a.old}"), module(f"{a.module}@{a.new}")
     st = audit()
-    print(f"{a.dep} {old.version} → {new.version}: {classify(old, new)}\n")
-    for label, xs, ys in [("operations", old.ops, new.ops)]:
-        for x in ys:
-            if x not in xs:
-                print(f"  + {label[:-1]:<10} {x}")
-        for x in xs:
-            if x not in ys:
-                print(f"  - {label[:-1]:<10} {x}")
+    print(f"{a.module} {old.version} → {new.version}: {classify(old, new)}\n")
+    for u in new.meta["uses"]:
+        if u not in old.meta["uses"]:
+            print(f"  + uses       {u}")
+    for u in old.meta["uses"]:
+        if u not in new.meta["uses"]:
+            print(f"  - uses       {u}")
     short = lambda t: t.rsplit(".", 1)[1]  # noqa: E731
-    on = {short(o["theorem"]) for o in old.obligations}
-    for o in new.obligations:
+    on = {short(o["theorem"]) for o in old.meta["obligations"]}
+    nn = {short(o["theorem"]) for o in new.meta["obligations"]}
+    for o in new.meta["obligations"]:
         if short(o["theorem"]) not in on:
             print(f"  + obligation [{st[o['theorem']]}] {o['says']}")
+    for o in old.meta["obligations"]:
+        if short(o["theorem"]) not in nn:
+            print(f"  - obligation {o['says']}")
     if a.source:
         print()
         sys.stdout.writelines(difflib.unified_diff(
@@ -469,21 +602,22 @@ def cmd_diff(a) -> None:
 
 def cmd_upgrade(a) -> None:
     d = Path(a.project).resolve()
-    proj, lk = load_project(d), read_lock(d)
-    cfg = proj["deps"].get(a.dep) or die(f"`{a.dep}` is not in fvdep.toml")
-    target = resolve(f"{a.dep}@{a.to}" if a.to else a.dep)
-    print(f"Checking {a.dep} implementation against {target.id} (locked: {lk.get(a.dep, {}).get('spec', '-')})")
-    r = do_check(target, cfg.get("impl"), cfg.get("lean"), a.cases, a.seed, d)
+    mods, lk = load_project(d)["modules"], read_lock(d)
+    cfg = mods.get(a.module) or die(f"`{a.module}` is not in fvdep.toml")
+    target = module(f"{a.module}@{a.to}" if a.to else a.module)
+    locked = lk.get(a.module, {}).get("spec", "-")
+    print(f"Checking the {a.module} implementation against {target.id} (locked: {locked})")
+    r = run_check(target, cfg, a.cases, a.seed, d)
     report(r)
     if not r.passed:
-        print(f"\nNot upgraded: the lock stays at {lk.get(a.dep, {}).get('spec', '-')}. Fix the implementation, then rerun.")
+        print(f"\nNot upgraded: the lock stays at {locked}. Fix the implementation, then run the upgrade again.")
         sys.exit(1)
-    lk[a.dep] = lock_entry(r, cfg.get("impl") or cfg.get("lean"))
+    lk[a.module] = lock_entry(r, cfg)
     write_lock(d, lk)
     toml = (d / "fvdep.toml").read_text()
-    toml = re.sub(rf'(\[deps\.{re.escape(a.dep)}\]\nspec = )"[^"]*"', rf'\1"{target.version}"', toml)
+    toml = re.sub(rf'(\[modules\."{re.escape(a.module)}"\]\nspec = )"[^"]*"', rf'\1"{target.version}"', toml)
     (d / "fvdep.toml").write_text(toml)
-    print(f"\nUpgraded {a.dep} to {target.version} in fvdep.toml + fvdep.lock")
+    print(f"\nUpgraded {a.module} to {target.version} in fvdep.toml and fvdep.lock")
 
 
 def manifest_deps(root: Path) -> list[tuple[str, str, str]]:
@@ -514,21 +648,30 @@ def cmd_scan(a) -> None:
     deps = manifest_deps(root)
     if not deps:
         die(f"no package.json, lake-manifest.json, Cargo.toml or pyproject.toml in {root}")
-    models = {m: s for v in catalog().values() for s in v for m in s.meta["models"]}
-    covered = 0
+    profs = profiles()
+    found = 0
     print(f"{root}: {len(deps)} dependencies\n")
-    for name, ver, src in deps:
-        s = models.get(name)
-        covered += bool(s)
-        mark = f"spec {s.id} (models its behavior; this package is not checked)" if s else "no spec yet"
-        print(f"  {name:<34} {ver:<12} {mark}")
-    print(f"\n{covered} of {len(deps)} have a spec. To check a package's own behavior, run it through `fvdep check`.")
-    if covered < len(deps):
-        print("To ask for a spec (and optionally an implementation): fvdep request <ecosystem:name> [--lang <language>]")
+    for name, ver, _src in deps:
+        entries = profs.get(name)
+        if not entries:
+            print(f"  {name:<24} {ver:<10} no profile yet: how it differs from a contract is unknown")
+            continue
+        found += 1
+        e = next((x for x in entries if x.version == ver.lstrip("^~=")), entries[-1])
+        same = "" if e.version == ver.lstrip("^~=") else f" (measured on {e.version}, yours is {ver})"
+        print(f"  {name:<24} {ver:<10} profile {e.id}{same}")
+        for op in e.meta["ops"]:
+            n = len(op["deviations"])
+            names = f": {', '.join(d['name'] for d in op['deviations'])}" if n else ""
+            print(f"  {'':<35} {op['contract']:<22} {f'{n} deviations' if n else 'no deviations'}{names}")
+    print(f"\n{found} of {len(deps)} have a package profile. For details, run: fvdep profile <package>")
+    print("A profile describes the package. To use a contract instead, implement its modules and prove them.")
+    if found < len(deps):
+        print("To ask for a profile, a spec or an implementation: fvdep request <ecosystem:name> [--lang <language>]")
 
 
 def cmd_request(a) -> None:
-    STATE.mkdir(exist_ok=True)
+    STATE.mkdir(parents=True, exist_ok=True)
     rec = {"package": a.package, "lang": a.lang, "at": dt.datetime.now().isoformat(timespec="seconds")}
     with open(STATE / "requests.jsonl", "a") as f:
         f.write(json.dumps(rec) + "\n")
@@ -541,42 +684,50 @@ def main() -> None:
     sub = p.add_subparsers(dest="cmd", required=True)
 
     def checkopts(x):
-        x.add_argument("--cases", type=int, default=500, help="random cases per run (default 500)")
+        x.add_argument("--cases", type=int, default=500, help="random cases per differential run (default 500)")
         x.add_argument("--seed", type=int, default=1, help="generator seed (default 1)")
 
-    sub.add_parser("list", help="list specs in the library").set_defaults(f=cmd_list)
-    x = sub.add_parser("show", help="show one spec: operations + obligations")
-    x.add_argument("spec", help="<dep>[@<version>]")
+    sub.add_parser("list", help="list spec modules and package profiles").set_defaults(f=cmd_list)
+    x = sub.add_parser("show", help="show one spec module: operation + obligations")
+    x.add_argument("module", help="<module>[@<version>], e.g. base64.decode")
     x.set_defaults(f=cmd_show)
-    x = sub.add_parser("check", help="check an implementation against a spec",
-                       usage="fvdep check <dep>@<version> [--lean DIR:Module.theorem] [-- <adapter command>]")
-    x.add_argument("spec", help="<dep>@<version>")
-    x.add_argument("--lean", help="Lean implementation: <lake project dir>:<Module.theorem>")
+    x = sub.add_parser("profile", help="show how a real package deviates from the contract")
+    x.add_argument("package", help="<ecosystem>:<name>[@<version>], e.g. npm:base64-js")
+    x.add_argument("--check", action="store_true", help="compare the profile's model with the real package")
+    checkopts(x)
+    x.set_defaults(f=cmd_profile)
+    x = sub.add_parser("check", help="check an implementation against a spec module",
+                       usage="fvdep check <module>@<version> (--lean DIR:Module --impl FN --proof THM | -- <adapter command>)")
+    x.add_argument("module", help="<module>@<version>")
+    x.add_argument("--lean", help="Lean implementation: <lake project dir>:<Module>")
+    x.add_argument("--impl", dest="impl_fn", help="Lean function that implements the module")
+    x.add_argument("--proof", help="Lean theorem that proves the function equal to the spec")
     checkopts(x)
     x.set_defaults(f=cmd_check)
-    x = sub.add_parser("lock", help="check every dependency in fvdep.toml and write fvdep.lock")
+    x = sub.add_parser("lock", help="check every module in fvdep.toml and write fvdep.lock")
     x.add_argument("--project", default=".")
+    x.add_argument("--require-proof", action="store_true", help="fail unless every module is delivered (proven)")
     checkopts(x)
     x.set_defaults(f=cmd_lock)
     x = sub.add_parser("outdated", help="compare fvdep.lock with the library")
     x.add_argument("--project", default=".")
     x.set_defaults(f=cmd_outdated)
-    x = sub.add_parser("diff", help="what changed between two spec versions")
-    x.add_argument("dep")
+    x = sub.add_parser("diff", help="what changed between two versions of a module")
+    x.add_argument("module")
     x.add_argument("old")
     x.add_argument("new")
     x.add_argument("--source", action="store_true", help="also print the Lean source diff")
     x.set_defaults(f=cmd_diff)
-    x = sub.add_parser("upgrade", help="re-check a dependency against a newer spec, then update the lock")
-    x.add_argument("dep")
-    x.add_argument("--to", help="spec version (default: latest)")
+    x = sub.add_parser("upgrade", help="check a module's implementation against a newer version, then update the lock")
+    x.add_argument("module")
+    x.add_argument("--to", help="module version (default: latest)")
     x.add_argument("--project", default=".")
     checkopts(x)
     x.set_defaults(f=cmd_upgrade)
-    x = sub.add_parser("scan", help="map a project's dependencies to specs")
+    x = sub.add_parser("scan", help="map a project's packages to package profiles")
     x.add_argument("path", nargs="?", default=".")
     x.set_defaults(f=cmd_scan)
-    x = sub.add_parser("request", help="ask for a new spec or implementation (stub)")
+    x = sub.add_parser("request", help="ask for a new profile, spec or implementation (stub)")
     x.add_argument("package", help="<ecosystem>:<name>, e.g. npm:ajv")
     x.add_argument("--lang", help="implementation language wanted")
     x.set_defaults(f=cmd_request)
@@ -584,7 +735,7 @@ def main() -> None:
     argv = sys.argv[1:]
     cut = argv.index("--") if "--" in argv else len(argv)
     a = p.parse_args(argv[:cut])
-    a.impl = argv[cut + 1 :]  # `check <spec> -- <adapter command>`
+    a.impl = argv[cut + 1 :]  # `check <module> -- <adapter command>`
     a.f(a)
 
 
