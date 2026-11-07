@@ -68,7 +68,7 @@ The rounding one was a surprise. The package even says `1.0.0-9007199254740993.b
 ADMITTED  <staging>
 ```
 
-## Admission (vflab, `tools/vflab-run` in `fvapi_gate.slice`, Node 24, working tree vs HEAD)
+## Admission (vflab, `fvapi_gate.slice`, retired prototype runner; Node 24, working tree vs HEAD)
 
 ```
   PASS  published versions unchanged                     10 checked

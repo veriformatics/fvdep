@@ -872,7 +872,7 @@ def cmd_admit(a) -> None:
     staging = Path(a.staging).resolve()
     marker = staging / ".fvdep-base"  # written by `grow`: the library this staging copy grows
     base = Path(marker.read_text().strip()) if marker.exists() else HOME
-    if a.base_rev:  # base = this tree at a git revision (admit uncommitted entries, e.g. on vflab)
+    if a.base_rev:  # base = this tree at a git revision (admit uncommitted entries)
         top = Path(subprocess.run(["git", "-C", str(staging), "rev-parse", "--show-toplevel"],
                                   capture_output=True, text=True, check=True).stdout.strip())
         rel = staging.relative_to(top)
