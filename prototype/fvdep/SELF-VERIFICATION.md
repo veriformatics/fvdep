@@ -4,6 +4,9 @@ The Intent says that the whole fvdep system must be formally verified. This plan
 lists what a user relies on when fvdep says "delivered" or "published", and how each
 part becomes proven or stays trusted with a stated reason.
 
+This plan is a proposal. The steps that are built, and the parts that stay trusted,
+are decided when the product is built. The prototype builds none of these steps.
+
 ## What a user relies on
 
 A "delivered" label is correct only when all of these parts are correct:

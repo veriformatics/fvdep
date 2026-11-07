@@ -12,9 +12,8 @@ Provably secure dependencies. This repo is a library and automated system for bu
   - `packages/` = real-package adapters for profiles: `cpython-base64.py`, `npm-base64-js/` + `npm-semver/` (pnpm), `crates-base64/` (cargo, base64 0.22.1).
   - `cli/` = uv pkg `fvdep` (stdlib only), wrapper `prototype/fvdep/fvdep`; state `prototype/fvdep/.state/` (gitignored, `FVDEP_STATE` overrides).
   - `demo/` = consumer project (`fvdep.toml` per-module pins, `package.json`). Protocol = `PROTOCOL.md`.
-  - Growth: `fvdep grow <eco:pkg> --version V` (staging copy + `cli/src/fvdep/grow-brief.md` → `FVDEP_AGENT`, default `claude -p --dangerously-skip-permissions`) → `fvdep admit <staging> [--apply]`; `fvdep admit . --base-rev HEAD` = working tree vs a revision; vflab: `tools/vflab-run sh -c '… cd prototype/fvdep && PYTHONPATH=cli/src python3 -m fvdep.cli admit . --base-rev HEAD'`. Records `growth/<eco>-<pkg>-<ver>/` (brief, agent report, admission).
-  - `SELF-VERIFICATION.md` = plan for verifying fvdep itself (user review pending).
-  - `tools/vflab-run` (repo root) = fvapi runner adapted: bare repo `~/gate/fvdep-repo.git`, workspace `~/gate/ws/fvdep-…`, `fvapi_gate.slice`.
+  - Growth: `fvdep grow <eco:pkg> --version V` (staging copy + `cli/src/fvdep/grow-brief.md` → `FVDEP_AGENT`, default `claude -p --dangerously-skip-permissions`) → `fvdep admit <staging> [--apply]`; `fvdep admit . --base-rev HEAD` = working tree vs a revision; a sketch of the loop (README says so). Records `growth/<eco>-<pkg>-<ver>/` (brief, agent report, admission).
+  - `SELF-VERIFICATION.md` = proposal for verifying fvdep itself (decided at IMPLEMENT).
 
 ## Decisions
 
@@ -37,7 +36,8 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - Admission reading (MAIN, r2): contract modules enter only fully proven; profiles enter kernel-checked + model ↔ package matched, status `published` iff all their theorems (completeness included) are proven, else `preview`.
 - Lock (MAIN, at r1 showing): `lock` records each module's evidence (`proof` | `differential`) + `delivered`; `--require-proof` fails unless every module is delivered.
 - Obligation status derived from `#print axioms` (std axioms only = proven, `sorryAx` = open, other = trusts X), never hand-written; spec completeness (open obligations) + implementation evidence stay separate labels.
-- Self-verification of the fvdep system (Intent): open; prototype CLI = unverified Python.
+- Scope of ITERATE (user ruling, r3): "I want to answer business rules and things in IMPLEMENT" — prototype parts past illustration trimmed or labeled as sketch (vflab runner retired; `grow`/`admit` + `SELF-VERIFICATION.md` = sketch + proposal).
+- Open for IMPLEMENT orientation (user, r3): (1) preview profiles in the admitted library vs Automation "fully proven entries alone" (prototype admits them); (2) self-verification steps (`SELF-VERIFICATION.md`: Lean decision core, `comparator --paranoid` — measured 6 kernels accept honest in 28 s, all reject the forgery — statements as terms, fvdep on its own specs); (3) trusted boundary (OS, runner, Lean compiler + runtime, C shim + binding, spec ↔ standard fidelity) vs Intent "whole system … formally verified". Prototype CLI = unverified Python.
 
 ## Tasks
 
@@ -51,7 +51,10 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] de60fa0 ITERATE r2: profile publish status — `published` iff agreement + completeness proven per op, else `preview` (list, scan, profile)
 - [x] de60fa0 ITERATE r2: Lean via C library — export proven Base64Acc through a C ABI + proven wrapper theorem; Rust, Python, Node bindings; `fvdep check` reports the Lean proof + trusted base for a binding; binding vs oracle = integration evidence
 - [x] b72d2cb ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
-- [x] b72d2cb ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`; user review pending)
+- [x] b72d2cb ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`)
+- [x] ea9d56e ITERATE r2: navigator-3 + janitor-5 fixes (tour installs Node binding, step exit codes, `--skip-package` REJECTS)
+- [x] 2896e6b ITERATE r3: trim past-illustration parts (user ruling r3)
+- [ ] ITERATE close: review of ITERATE diff from 1f7d89d, deferred rows, `Phase: IMPLEMENT`
 - Deferred → `.agent/deferred.md`
 
 ## Phase

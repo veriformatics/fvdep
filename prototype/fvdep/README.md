@@ -86,6 +86,8 @@ The first run builds the Lean library and the oracle. This takes about two minut
 
 - `fvdep request` only saves the request in `.state/requests.jsonl`. No order
   service exists.
+- `fvdep outdated` and `fvdep upgrade` read the library in this folder. No update
+  feed or alert service exists.
 - The Lean check copies the implementation project and puts a copy of the library in
   it, because the sandbox of `lake comparator` hides your home directory. A real
   project gets the library from a pinned Git revision. The project must use
@@ -98,9 +100,13 @@ The first run builds the Lean library and the oracle. This takes about two minut
   valid input, and no theorem states that its list of deviations is complete.
 - `semver.parse@1.0.0` and `semver.compare@1.0.0` keep their open obligations, because
   a published version does not change. Version 1.1.0 of each closes them.
+- `fvdep grow` and `fvdep admit` are a sketch of the growth loop. They show its steps
+  on one computer. The real admission service is built in a later phase. It is not
+  decided yet whether a `preview` profile may enter the library.
 - The drafting agent runs with full permissions on this computer, outside a sandbox.
 - The gate checks that the theorems of a profile are proven. It does not check that
   the theorem marked "complete" really describes every deviation.
 - The model of a package is checked against the package by tests only. A profile is
   measured on one package version.
-- The `fvdep` tool itself is Python and is not formally verified.
+- The `fvdep` tool itself is Python and is not formally verified. `SELF-VERIFICATION.md` is a
+  proposal. Its steps and its list of trusted parts are decided in a later phase.
