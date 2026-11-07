@@ -53,7 +53,7 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] b72d2cb ITERATE r2: automation loop — `fvdep grow` (agent drafts) + `fvdep admit` (kernel gate: build, leanchecker, axioms, no sorry, profile fidelity) on npm `semver`; fix `semver.parse.parse_render` (false as stated: pre id alnum "1" renders `0.0.0-1`, parses as num 1) + close `compare_trans`; runs on vflab per `Host`
 - [x] b72d2cb ITERATE: self-verification plan for the fvdep system (`SELF-VERIFICATION.md`)
 - [x] ea9d56e ITERATE r2: navigator-3 + janitor-5 fixes (tour installs Node binding, step exit codes, `--skip-package` REJECTS)
-- [x] 2896e6b ITERATE r3: trim past-illustration parts (user ruling r3)
+- [x] 418ff71 ITERATE r3: trim past-illustration parts (user ruling r3)
 - [ ] ITERATE close: review of ITERATE diff from 1f7d89d, deferred rows, `Phase: IMPLEMENT`
 - Deferred → `.agent/deferred.md`
 
