@@ -2,6 +2,8 @@
 .scratch/
 .claude/settings.local.json
 CLAUDE.local.md
+# gate step ledger (tools/gate.sh)
+.gate/
 # Lean / lake
 .lake/
 lake-packages/
