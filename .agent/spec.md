@@ -72,7 +72,8 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [x] 5476c14 U2 pure core + coverage ledger (kernel): ids + entry-version order (package SemVer = U4 `semver.compare`), evidence attribution + the proof rule as phase facts, status normalization, verdict/policy/delivery/staleness/retraction/lock transitions, effect plan + IO interpreter; `docs/verification.md` + gate stages `coverage` (claim → theorem type → shipped call path) + `ledger-suite` (blind fixture suite, tester-2)
 - [ ] U3 codecs + hashing (kernel; contract `docs/contracts/U3-codecs.md`, consultant-8 rounds 1–2; blind suites tester-3 J H S D on `wt/tester-3`, tester-4 T F; stubs `wip/u3-red`); its astra faithfulness review (reviewer-3) also takes U2's open F27 row (`KernelSpec`, `kernelWalk_spec`; `.agent/review.md`) + the site spec, the D5/D7 error types, the U2 `Decl` argv change
   - [x] 18136f7 J: JSON codec port (fvapi 02d99d1) + J3 duplicate-key site, lean_lib `FvdepAudit`, audit import isolation, ledger rows
-  - [ ] D: receipt, lock + envelope documents, U2 `Decl` argv
+  - [x] f3a0af8 D: receipt, lock + envelope documents, U2 `Decl` argv
+  - [ ] ids: U2 `parseNat` = print round trip (`decimal` appends at the tail) ⇒ a 65,532-digit version component costs 24–33 s on vflab (tester-3 `D.bound.version.*`; lock-decode fuzz hangs, +80 s per suite run) → linear canonical check, ledger statements unchanged
   - [ ] S + H: HACL* SHA-256 (vendored) + hex + framing
   - [ ] T: `fvdep.toml` reader (text stage, `ofLake`, validate) + canonical printer
   - [ ] F: persistence (shim, replace, read, writer lock) + interpreter wiring + interface/Decisions edits
