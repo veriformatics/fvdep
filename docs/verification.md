@@ -765,6 +765,118 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Json.Value`
+
+- Contract: U3 J1 + J5; Decisions Data formats
+- Claim: `Value.object` = the members stably sorted by key; `get?` = the first equal key's value (`none` when absent or not an object); each projection = exactly its constructor's payload.
+- Subject: `FvdepCore.Json.Value.get?`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.JsonClaims.objectLaw` (hash 0x92c070e9), proved by `FvdepAudit.Json.Proof.object_law`:
+
+  ```lean
+  ∀ (ms : List (String × FvdepCore.Json.Value)),
+    ∃ ms',
+      FvdepCore.Json.Value.object ms = FvdepCore.Json.Value.obj ms' ∧
+        ms'.Perm ms ∧
+          List.Pairwise (fun a b => a.fst ≤ b.fst) ms' ∧
+            ∀ (k : String),
+              List.filter (fun x => x.fst == k) ms' = List.filter (fun x => x.fst == k) ms
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.getLaw` (hash 0xa63db91e), proved by `FvdepAudit.Json.Proof.get_law`:
+
+  ```lean
+  (∀ (ms : List (String × FvdepCore.Json.Value)) (k : String) (w : FvdepCore.Json.Value),
+      (FvdepCore.Json.Value.obj ms).get? k = some w ↔
+        ∃ pre post,
+          ms = pre ++ (k, w) :: post ∧ ∀ (p : String × FvdepCore.Json.Value), p ∈ pre → p.fst ≠ k) ∧
+    (∀ (ms : List (String × FvdepCore.Json.Value)) (k : String),
+        (FvdepCore.Json.Value.obj ms).get? k = none ↔
+          ∀ (p : String × FvdepCore.Json.Value), p ∈ ms → p.fst ≠ k) ∧
+      ∀ (v : FvdepCore.Json.Value) (k : String),
+        (∀ (ms : List (String × FvdepCore.Json.Value)), v ≠ FvdepCore.Json.Value.obj ms) →
+          v.get? k = none
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.asLaws` (hash 0xfe9fe25c), proved by `FvdepAudit.Json.Proof.as_laws`:
+
+  ```lean
+  (∀ (v : FvdepCore.Json.Value) (b : Bool), v.asBool? = some b ↔ v = FvdepCore.Json.Value.bool b) ∧
+    (∀ (v : FvdepCore.Json.Value) (n : Int), v.asInt? = some n ↔ v = FvdepCore.Json.Value.int n) ∧
+      (∀ (v : FvdepCore.Json.Value) (s : String),
+          v.asStr? = some s ↔ v = FvdepCore.Json.Value.str s) ∧
+        (∀ (v : FvdepCore.Json.Value) (xs : List FvdepCore.Json.Value),
+            v.asArr? = some xs ↔ v = FvdepCore.Json.Value.arr xs) ∧
+          ∀ (v : FvdepCore.Json.Value) (ms : List (String × FvdepCore.Json.Value)),
+            v.asObj? = some ms ↔ v = FvdepCore.Json.Value.obj ms
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Json.Decode`
+
+- Contract: U3 J1–J3 + J5–J6; Decisions Data formats
+- Claim: `decode` returns exactly the outcome the reviewed byte grammar assigns (too deep, malformed, too large, the duplicate key's site, else the canonical value); every success is a valid value; a text denotes one value.
+- Subject: `FvdepCore.Json.decode`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.JsonClaims.decodeExact` (hash 0x824d1cd), proved by `FvdepAudit.Json.Proof.decode_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (r : Except FvdepCore.Json.DecodeError FvdepCore.Json.Value),
+    FvdepCore.Json.decode b = r ↔ FvdepAudit.Json.Spec.Outcome b.data.toList r
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.decodeValid` (hash 0x437e8ca8), proved by `FvdepAudit.Json.Proof.decode_valid`:
+
+  ```lean
+  ∀ (b : ByteArray) (v : FvdepCore.Json.Value),
+    FvdepCore.Json.decode b = Except.ok v → FvdepAudit.Json.Spec.Valid v
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.textUnique` (hash 0x2d919288), proved by `FvdepAudit.Json.Proof.text_unique`:
+
+  ```lean
+  ∀ (bs : FvdepAudit.Json.Spec.Bytes) (v w : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Text bs v → FvdepAudit.Json.Spec.Text bs w → v = w
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Json.Print`
+
+- Contract: U3 J4 + J6; Decisions Data formats
+- Claim: `print` emits exactly the reviewed canonical text; a valid value's text decodes back to it (by the grammar + through the shipped decoder); canonical text tells valid values apart.
+- Subject: `FvdepCore.Json.print`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.JsonClaims.printExact` (hash 0x517210), proved by `FvdepAudit.Json.Proof.print_exact`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    (FvdepCore.Json.print v).data.toList = FvdepAudit.Json.Spec.canonical v
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.roundTrip` (hash 0x61552e60), proved by `FvdepAudit.Json.Proof.round_trip`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      FvdepAudit.Json.Spec.Outcome (FvdepAudit.Json.Spec.canonical v) (Except.ok v)
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.printDecode` (hash 0x177f8f24), proved by `FvdepAudit.Json.Proof.print_decode`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v → FvdepCore.Json.decode (FvdepCore.Json.print v) = Except.ok v
+  ```
+- Statement `FvdepLedger.Rows.JsonClaims.canonicalInjective` (hash 0xe30cf881), proved by `FvdepAudit.Json.Proof.canonical_injective`:
+
+  ```lean
+  ∀ (v w : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      FvdepAudit.Json.Spec.Valid w →
+        FvdepAudit.Json.Spec.canonical v = FvdepAudit.Json.Spec.canonical w → v = w
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

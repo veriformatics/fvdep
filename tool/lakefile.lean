@@ -33,6 +33,10 @@ lean_lib FvdepIO where roots := #[`FvdepIO, `Main]
 
 lean_exe «fvdep-tests» where root := `Tests
 
+/-- Specs + proofs about the shipped code (contract `docs/contracts/U3-codecs.md` A): gate-only,
+imported by the ledger alone (gate stage `imports`), replayed by the ledger's kernel check. -/
+lean_lib FvdepAudit where globs := #[.andSubmodules `FvdepAudit]
+
 /-- Coverage ledger + its checker (gate stage `coverage`; contract U2 L1–L8): a gate tool, never
 shipped (`Main` imports none of it). -/
 lean_lib FvdepLedger

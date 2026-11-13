@@ -137,6 +137,52 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Core
 
+/-! Compiled-code smoke for the JSON codec (contract U3 J3, J5): the proofs cover the definitions,
+these run the compiled C, incl. the error-path loops over 10^6 siblings (stack safety). -/
+
+namespace Json
+
+open FvdepCore.Json
+
+def text (s : String) : ByteArray := s.toUTF8
+
+/-- `decode` names this duplicate-key site. -/
+def siteIs (s : String) (site : List PathSeg × String) : Bool :=
+  match decode (text s) with
+  | .error (.duplicateKey got) => got == site
+  | _ => false
+
+/-- 10^6 integers, then an object repeating a key. -/
+def longArray : String :=
+  "[" ++ String.intercalate "," (List.replicate 1000000 "0") ++ ",{\"a\":1,\"a\":2}]"
+
+/-- An object with 10^6 distinct keys + one late repeat of `k500000`. -/
+def flatObject : String :=
+  "{" ++ String.intercalate "," ((List.range 1000000).map fun i => s!"\"k{i}\":0") ++
+    ",\"k500000\":1}"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("json: J3 site example 1: {\"a\":{\"b\":1,\"b\":2},\"a\":3} → ([], a)", fun _ =>
+      siteIs "{\"a\":{\"b\":1,\"b\":2},\"a\":3}" ([], "a")),
+    ("json: J3 site example 2 → ([1], c)", fun _ =>
+      siteIs "[{\"x\":1},{\"y\":1,\"y\":2,\"c\":3,\"c\":4}]" ([.index 1], "c")),
+    ("json: a nested site names its key + index path", fun _ =>
+      siteIs "{\"p\":[{\"q\":{\"z\":0,\"z\":1}}]}" ([.key "p", .index 0, .key "q"], "z")),
+    ("json: an escaped alias repeats its key", fun _ => siteIs "{\"a\":1,\"\\u0061\":2}" ([], "a")),
+    ("json: decode → canonical value; print → canonical text; decode ∘ print = id", fun _ =>
+      match decode (text "{ \"b\" : [1, -2, \"\\u00e9\"], \"a\" : null }") with
+      | .ok v =>
+        (print v).data == (text "{\"a\":null,\"b\":[1,-2,\"é\"]}").data &&
+          match decode (print v) with
+          | .ok w => w == v
+          | .error _ => false
+      | .error _ => false),
+    ("json: a site after 10^6 array elements (no stack overflow)", fun _ =>
+      siteIs longArray ([.index 1000000], "a")),
+    ("json: a late repeat among 10^6 object keys", fun _ => siteIs flatObject ([], "k500000"))]
+
+end Json
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -169,7 +215,7 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            Core.cases.map fun c => check c.1 c.2).mapM
+            (Core.cases ++ Json.cases).map fun c => check c.1 c.2).mapM
         id
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

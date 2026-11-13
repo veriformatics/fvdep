@@ -1,3 +1,5 @@
+import FvdepAudit.Json.Proof.Access
+import FvdepAudit.Json.Proof.Corollaries
 import FvdepLedger.Types
 import Main
 
@@ -478,6 +480,73 @@ def oldOrNew : Prop :=
 
 end FvdepLedger.Rows.StatusClaims
 
+namespace FvdepLedger.Rows.JsonClaims
+
+open FvdepCore.Json
+
+/-- J6: decoding returns exactly the outcome the byte grammar assigns (total + deterministic; errors
++ the duplicate-key site included). -/
+def decodeExact : Prop :=
+  ∀ (b : ByteArray) (r : Except DecodeError Value),
+    decode b = r ↔ FvdepAudit.Json.Spec.Outcome b.data.toList r
+
+/-- J1, J6: a successful decode returns a valid value. -/
+def decodeValid : Prop :=
+  ∀ (b : ByteArray) (v : Value), decode b = .ok v → FvdepAudit.Json.Spec.Valid v
+
+/-- J6: the grammar is deterministic: a text denotes one value (members in text order). -/
+def textUnique : Prop :=
+  ∀ (bs : FvdepAudit.Json.Spec.Bytes) (v w : Value),
+    FvdepAudit.Json.Spec.Text bs v → FvdepAudit.Json.Spec.Text bs w → v = w
+
+/-- J6: the shipped printer emits exactly the reviewed canonical text. -/
+def printExact : Prop := ∀ v : Value, (print v).data.toList = FvdepAudit.Json.Spec.canonical v
+
+/-- J6: the canonical text of a valid value decodes, by the grammar, to that value. -/
+def roundTrip : Prop :=
+  ∀ v : Value,
+    FvdepAudit.Json.Spec.Valid v →
+      FvdepAudit.Json.Spec.Outcome (FvdepAudit.Json.Spec.canonical v) (.ok v)
+
+/-- J6 corollary: shipped `print`, then shipped `decode`, returns a valid value unchanged. -/
+def printDecode : Prop := ∀ v : Value, FvdepAudit.Json.Spec.Valid v → decode (print v) = .ok v
+
+/-- J6 corollary: canonical text tells valid values apart. -/
+def canonicalInjective : Prop :=
+  ∀ v w : Value,
+    FvdepAudit.Json.Spec.Valid v →
+      FvdepAudit.Json.Spec.Valid w →
+      FvdepAudit.Json.Spec.canonical v = FvdepAudit.Json.Spec.canonical w → v = w
+
+/-- J5: `Value.object ms` = `ms` stably sorted by key: a permutation, keys ascending, members with
+equal keys in their original order (children untouched). -/
+def objectLaw : Prop :=
+  ∀ ms : List (String × Value),
+    ∃ ms',
+      Value.object ms = .obj ms' ∧
+        ms'.Perm ms ∧
+        ms'.Pairwise (fun a b => a.1 ≤ b.1) ∧ ∀ k, ms'.filter (·.1 == k) = ms.filter (·.1 == k)
+
+/-- J5: `get? key` = the value of the first member whose key equals `key`; `none` for an absent key
+or a non-object. -/
+def getLaw : Prop :=
+  (∀ (ms : List (String × Value)) (k : String) (w : Value),
+      (Value.obj ms).get? k = some w ↔
+        ∃ pre post, ms = pre ++ (k, w) :: post ∧ ∀ p ∈ pre, p.1 ≠ k) ∧
+    (∀ (ms : List (String × Value)) (k : String),
+      (Value.obj ms).get? k = none ↔ ∀ p ∈ ms, p.1 ≠ k) ∧
+    ∀ (v : Value) (k : String), (∀ ms, v ≠ .obj ms) → v.get? k = none
+
+/-- J5: each projection returns exactly its constructor's payload, `none` for the rest. -/
+def asLaws : Prop :=
+  (∀ v b, Value.asBool? v = some b ↔ v = .bool b) ∧
+    (∀ v n, Value.asInt? v = some n ↔ v = .int n) ∧
+    (∀ v s, Value.asStr? v = some s ↔ v = .str s) ∧
+    (∀ v xs, Value.asArr? v = some xs ↔ v = .arr xs) ∧
+    ∀ v ms, Value.asObj? v = some ms ↔ v = .obj ms
+
+end FvdepLedger.Rows.JsonClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -694,12 +763,67 @@ def statusRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U3 J: the JSON profile codec (port of fvapi's; J3's duplicate-key site added). -/
+def jsonValueRow : Row :=
+  { component := `FvdepCore.Json.Value
+    contract := "U3 J1 + J5; Decisions Data formats"
+    claim :=
+      "`Value.object` = the members stably sorted by key; `get?` = the first equal key's value " ++
+        "(`none` when absent or not an object); each projection = exactly its constructor's " ++
+        "payload."
+    claims :=
+      [(``JsonClaims.objectLaw, ``FvdepAudit.Json.Proof.object_law),
+        (``JsonClaims.getLaw, ``FvdepAudit.Json.Proof.get_law),
+        (``JsonClaims.asLaws, ``FvdepAudit.Json.Proof.as_laws)]
+    subject := ``FvdepCore.Json.Value.get?
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+def jsonDecodeRow : Row :=
+  { component := `FvdepCore.Json.Decode
+    contract := "U3 J1–J3 + J5–J6; Decisions Data formats"
+    claim :=
+      "`decode` returns exactly the outcome the reviewed byte grammar assigns (too deep, " ++
+        "malformed, too large, the duplicate key's site, else the canonical value); every " ++
+        "success is a valid value; a text denotes one value."
+    claims :=
+      [(``JsonClaims.decodeExact, ``FvdepAudit.Json.Proof.decode_exact),
+        (``JsonClaims.decodeValid, ``FvdepAudit.Json.Proof.decode_valid),
+        (``JsonClaims.textUnique, ``FvdepAudit.Json.Proof.text_unique)]
+    subject := ``FvdepCore.Json.decode
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+def jsonPrintRow : Row :=
+  { component := `FvdepCore.Json.Print
+    contract := "U3 J4 + J6; Decisions Data formats"
+    claim :=
+      "`print` emits exactly the reviewed canonical text; a valid value's text decodes back to " ++
+        "it (by the grammar + through the shipped decoder); canonical text tells valid values " ++
+        "apart."
+    claims :=
+      [(``JsonClaims.printExact, ``FvdepAudit.Json.Proof.print_exact),
+        (``JsonClaims.roundTrip, ``FvdepAudit.Json.Proof.round_trip),
+        (``JsonClaims.printDecode, ``FvdepAudit.Json.Proof.print_decode),
+        (``JsonClaims.canonicalInjective, ``FvdepAudit.Json.Proof.canonical_injective)]
+    subject := ``FvdepCore.Json.print
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
     plan := ``Cli.plan
     libs := [`FvdepCore, `FvdepIO]
-    rows := [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow]
+    rows :=
+      [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow, jsonValueRow,
+        jsonDecodeRow, jsonPrintRow]
     residue := residue }
 
 end FvdepLedger.Rows

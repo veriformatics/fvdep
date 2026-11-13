@@ -113,7 +113,7 @@ FAST_STAGES='imports preview spec shell python fanout deps renovate meta lean-bu
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
-TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepLedger «fvdep-ledger» FvdepLedgerFixtures)
+TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepAudit FvdepLedger «fvdep-ledger» FvdepLedgerFixtures)
 
 # Every shard STAGES names, once each, in first-use order.
 shard_names() { awk 'NF { for (i = 2; i <= NF; i++) if (!seen[$i]++) print $i }' <<<"$STAGES"; }

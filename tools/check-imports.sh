@@ -3,7 +3,9 @@
 #   imports: library modules (Fvdep, FvdepPreview, FvdepProofs trees) import Init, Std + library
 #            modules alone, so a consumer's build of a pinned snapshot stays toolchain-only; tool
 #            shipped modules (tool/Main.lean, tool/FvdepCore + tool/FvdepIO trees) add Lean, Lake +
-#            the tool's own libraries. Test modules are free.
+#            the tool's own libraries. Test modules are free. The audit tree (tool/FvdepAudit:
+#            specs + proofs about shipped code, gate-only) is imported by tool/FvdepLedger/Rows.lean
+#            alone, so no shipped or test module depends on it.
 #   preview: no module under Fvdep imports the preview or proof trees (previews + phase-2 proofs
 #            never enter the published library).
 # Usage: tools/check-imports.sh imports|preview
@@ -37,6 +39,24 @@ check() {
 
 files() { git ls-files -co --exclude-standard -- "$@"; }
 
+# refuse PATTERN FILES… — no import of FILES matches PATTERN (an awk ERE, as in `check`).
+refuse() {
+    local banned="$1"
+    shift
+    awk -v no="$banned" '
+        match($0, /^[ \t]*((public|private|meta)[ \t]+)*import[ \t]+/) {
+            n = split(substr($0, RSTART + RLENGTH), mods, /[ \t]+/)
+            for (i = 1; i <= n; i++) {
+                if (mods[i] == "" || mods[i] ~ /^--/) break
+                if (mods[i] ~ no) {
+                    printf "%s:%d: import %s\n", FILENAME, FNR, mods[i]
+                    bad = 1
+                }
+            }
+        }
+        END { exit bad }' "$@" >&2
+}
+
 case "${1:-}" in
 imports)
     rc=0
@@ -46,6 +66,9 @@ imports)
     mapfile -t tool < <(files tool/Main.lean tool/FvdepCore.lean 'tool/FvdepCore/*.lean' \
         tool/FvdepIO.lean 'tool/FvdepIO/*.lean')
     check '^(Init|Std|Lean|Lake|Fvdep|FvdepCore|FvdepIO)([.]|$)' "${tool[@]}" || rc=1
+    mapfile -t others < <(files 'tool/*.lean' |
+        grep -v -e '^tool/FvdepAudit[./]' -e '^tool/FvdepLedger/Rows[.]lean$')
+    refuse '^FvdepAudit([.]|$)' "${others[@]}" || rc=1
     exit $rc
     ;;
 preview)
