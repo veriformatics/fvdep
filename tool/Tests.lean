@@ -1,5 +1,6 @@
 import FvdepCore
 import FvdepIO.Sha256
+import FvdepIO.Toml
 
 /-! `lake test` driver (contract U1 K3): PASS/FAIL per case, the slowest case, exit = failures.
 Generated cases use a fixed seed (printed; `FVDEP_TEST_SEED` overrides it for exploration), so a
@@ -16,6 +17,13 @@ structure Result where
 def check (name : String) (ok : Unit → Bool) : IO Result := do
   let t0 ← IO.monoMsNow
   let held := ok ()
+  let t1 ← IO.monoMsNow
+  IO.println s!"{if held then "PASS" else "FAIL"} {name}"
+  return ⟨name, held, t1 - t0⟩
+
+def checkIO (name : String) (ok : IO Bool) : IO Result := do
+  let t0 ← IO.monoMsNow
+  let held ← ok
   let t1 ← IO.monoMsNow
   IO.println s!"{if held then "PASS" else "FAIL"} {name}"
   return ⟨name, held, t1 - t0⟩
@@ -378,6 +386,163 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Hash
 
+/-! Compiled-code smoke for `fvdep.toml` (contract U3 T1–T4): the text stage's order + offsets,
+validation + refusal order, the canonical bytes, the read path through Lake's parser. The blind
+suite (`tests/manifest/`) carries the T3 oracle, the T4 encoder + `tomllib`. -/
+
+namespace Manifest
+
+open FvdepCore.Manifest FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status FvdepIO.Toml
+
+def bytes (xs : List Nat) : ByteArray := ⟨(xs.map Nat.toUInt8).toArray⟩
+
+def textError? : Except TextError String → Option TextError
+  | .error e => some e
+  | .ok _ => none
+
+def textOk? : Except TextError String → Option String
+  | .ok s => some s
+  | .error _ => none
+
+def lib : String := "0123456789abcdef0123456789abcdef01234567"
+
+def commit : Commit := (Commit.parse lib).getD FvdepCore.Doc.defaultCommit
+
+def proofEntry : Entry :=
+  { decl :=
+      { module := (ModuleId.parse "base64.encode").getD FvdepCore.Doc.defaultModule
+        version := ⟨1, 0, 0⟩
+        shape := some .abi
+        kind := .proof
+        impl := some "Impl.encode"
+        proof := some "Proof.encode_eq"
+        adapter := none }
+    implModules := ["Impl", "Impl.B"]
+    proofModules := ["Proof"] }
+
+def diffEntry : Entry :=
+  { decl :=
+      { module := (ModuleId.parse "base64.decode").getD FvdepCore.Doc.defaultModule
+        version := ⟨1, 2, 3⟩
+        shape := none
+        kind := .differential
+        impl := none
+        proof := none
+        adapter := some ["py\"th\\on\u0001", "", "é😀\x7f"] }
+    implModules := []
+    proofModules := [] }
+
+def sample : ManifestFile := ⟨commit, .development, [diffEntry, proofEntry]⟩
+
+def sampleText : String :=
+  "schema = 1\n\n[library]\ncommit = \"" ++ lib ++ "\"\n\n[policy]\nproof = \"development\"\n\n" ++
+    "[modules.\"base64.decode\"]\nversion = \"1.2.3\"\nevidence = \"differential\"\n" ++
+    "adapter = [\"py\\\"th\\\\on\\u0001\", \"\", \"é😀\\u007F\"]\n\n[modules.\"base64.encode\"]\n" ++
+    "version = \"1.0.0\"\nshape = \"abi\"\nimpl_modules = [\"Impl\", \"Impl.B\"]\n" ++
+    "proof_modules = [\"Proof\"]\nimpl = \"Impl.encode\"\nproof = \"Proof.encode_eq\"\n"
+
+def root (ms : List (String × Tree)) : Tree :=
+  .tbl ([("schema", .int 1), ("library", .tbl [("commit", .str lib)])] ++ ms)
+
+def acceptsAs (t : Tree) (m : ManifestFile) : Bool :=
+  match validate t with
+  | .ok m' => m' == m
+  | .error _ => false
+
+def refusedAs (t : Tree) (e : ManifestError) : Bool :=
+  match validate t with
+  | .error e' => e' == e
+  | .ok _ => false
+
+def cases : List (String × (Unit → Bool)) :=
+  [("manifest: text stage = size, then BOM, then the first UTF-8 offset, else the text", fun _ =>
+      let big := bytes (List.replicate 65537 97)
+      textError? (textStage big) == some .tooLarge &&
+        textError? (textStage (bytes ([0xEF, 0xBB, 0xBF] ++ List.replicate 65534 97))) ==
+          some .tooLarge &&
+        textError? (textStage (bytes [0xEF, 0xBB, 0xBF, 0x61])) == some .bom &&
+        textError? (textStage (bytes [0x61, 0xC3, 0x28])) == some (.utf8 1) &&
+        textOk? (textStage (bytes (List.replicate 65536 97))) ==
+          some (String.ofList (List.replicate 65536 'a'))),
+    ("manifest: utf8ErrorOffset = the longest valid prefix (truncated, overlong, surrogate)",
+      fun _ =>
+      utf8ErrorOffset (bytes [0xE2, 0x82]) == some 0 &&
+        utf8ErrorOffset (bytes [0x41, 0xE2, 0x82]) == some 1 &&
+        utf8ErrorOffset (bytes [0xC0, 0x80]) == some 0 &&
+        utf8ErrorOffset (bytes [0xED, 0xA0, 0x80]) == some 0 &&
+        utf8ErrorOffset (bytes [0xF0, 0x9F, 0x98, 0x80, 0xFF]) == some 4 &&
+        utf8ErrorOffset (bytes [0xF0, 0x9F, 0x98, 0x80]) == none),
+    ("manifest: printManifest = the canonical bytes (escapes, \\u00XX, non-BMP)", fun _ =>
+      (printManifest sample).data == sampleText.toUTF8.data),
+    ("manifest: validate (toTree m) = m, member order free", fun _ =>
+      let t :=
+        root
+          [("policy", .tbl [("proof", .str "development")]),
+            ("modules",
+              .tbl
+                [("base64.encode", .tbl ((entryMembers proofEntry).reverse)),
+                  ("base64.decode", .tbl (entryMembers diffEntry))])]
+      acceptsAs (toTree sample) sample && acceptsAs t sample),
+    ("manifest: refusal order: repeated key, schema, unknown (byte order), missing library",
+      fun _ =>
+      refusedAs (.tbl [("b", .int 1), ("a", .int 1), ("b", .int 2), ("a", .int 3)])
+          ⟨[], .duplicateKey "a"⟩ &&
+        refusedAs (.tbl [("library", .int 1)]) ⟨[.key "schema"], .missingField⟩ &&
+        refusedAs (.tbl [("schema", .str "1")]) ⟨[.key "schema"], .wrongType .integer⟩ &&
+        refusedAs (.tbl [("schema", .int 2)]) ⟨[.key "schema"], .badValue⟩ &&
+        refusedAs (.tbl [("schema", .int 1), ("zeta", .int 1), ("alpha", .int 1)])
+          ⟨[.key "alpha"], .unknownField⟩ &&
+        refusedAs (.tbl [("schema", .int 1)]) ⟨[.key "library"], .missingField⟩ &&
+        refusedAs (.arr []) ⟨[], .wrongType .table⟩),
+    ("manifest: entry rules: evidence kinds, forbidden + missing keys, list repeats, overlap",
+      fun _ =>
+      let entry (ms : List (String × Tree)) := root [("modules", .tbl [("base64.encode", .tbl ms)])]
+      let p := [FvdepCore.Json.PathSeg.key "modules", .key "base64.encode"]
+      refusedAs (entry [("evidence", .str "proof")]) ⟨p ++ [.key "evidence"], .badValue⟩ &&
+        refusedAs (entry [("evidence", .int 1)]) ⟨p ++ [.key "evidence"], .wrongType .string⟩ &&
+        refusedAs
+          (entry
+            [("evidence", .str "differential"), ("version", .str "1.0.0"),
+              ("adapter", .arr [.str "x"]), ("shape", .str "fn")])
+          ⟨p ++ [.key "shape"], .forbiddenField⟩ &&
+        refusedAs (entry [("version", .str "1.0.0")]) ⟨p ++ [.key "impl"], .missingField⟩ &&
+        refusedAs
+          (entry
+            ((entryMembers proofEntry).map fun m =>
+              if m.1 == "impl_modules" then (m.1, .arr [.str "A", .str "B", .str "A"]) else m))
+          ⟨p ++ [.key "impl_modules", .index 2], .badValue⟩ &&
+        refusedAs
+          (entry
+            ((entryMembers proofEntry).map fun m =>
+              if m.1 == "proof_modules" then (m.1, .arr [.str "Impl.B", .str "Impl"]) else m))
+          ⟨p, .inBothLists "Impl"⟩),
+    ("manifest: keyPath quotes non-bare keys + renders indices", fun _ =>
+      keyPath [.key "modules", .key "base64.encode", .key "impl_modules", .index 1] ==
+          "modules.\"base64.encode\".impl_modules[1]" &&
+        keyPath [.key "a-b_1"] == "a-b_1" &&
+        keyPath [.key ""] == "\"\"")]
+
+/-- Through Lake's parser (IO). -/
+def ioCases : List (String × IO Bool) :=
+  [("manifest: printManifest reads back through Lake's parser", do
+      match ← readManifest (printManifest sample) with
+      | .ok m =>
+        return m == sample
+      | .error _ =>
+        return false),
+    ("manifest: Lake syntax + repeated keys refuse with a 1-based line; code schema", do
+      let a ← readManifest "schema = \n".toUTF8
+      let b ← readManifest "a = 1\na = 2\n".toUTF8
+      return match a, b with
+        | .error (.parse (.syntax 1 _ _)), .error (.parse (.syntax 2 _ _)) => true
+        | _, _ => false),
+    ("manifest: a BOM refuses before Lake runs", do
+      return match ← readManifest (bytes [0xEF, 0xBB, 0xBF, 0x61]) with
+        | .error (.text .bom) => true
+        | _ => false)]
+
+end Manifest
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -410,8 +575,11 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases ++ Doc.cases ++ Hash.cases).map fun c => check c.1 c.2).mapM
+            (Core.cases ++ Json.cases ++ Doc.cases ++ Hash.cases ++ Manifest.cases).map fun c =>
+              check c.1 c.2).mapM
         id
+  let ioResults ← Manifest.ioCases.mapM fun c => checkIO c.1 c.2
+  let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length
   IO.println s!"slowest: {slowest.name} ({slowest.ms} ms)"
