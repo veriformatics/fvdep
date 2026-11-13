@@ -289,6 +289,14 @@ plant_tool_import() { sed -i '1i import Mathlib' tool/FvdepCore/Cli.lean; }
 plant_preview() { sed -i '1i import FvdepPreview' Fvdep.lean; }
 probe imports-library plant_lib_import "Fvdep/Version.lean:1: import Lean" bash tools/check-imports.sh imports
 probe imports-tool plant_tool_import "tool/FvdepCore/Cli.lean:1: import Mathlib" bash tools/check-imports.sh imports
+# The audit tree reaches the build through the ledger alone: a shipped module + the test driver
+# importing it.
+plant_audit_shipped() { sed -i '1i import FvdepAudit.Json.Spec' tool/FvdepCore/Json.lean; }
+plant_audit_test() { sed -i '1i import FvdepAudit.Json.Spec' tool/Tests.lean; }
+probe imports-audit-shipped plant_audit_shipped "tool/FvdepCore/Json.lean:1: import FvdepAudit.Json.Spec" \
+    bash tools/check-imports.sh imports
+probe imports-audit-test plant_audit_test "tool/Tests.lean:1: import FvdepAudit.Json.Spec" \
+    bash tools/check-imports.sh imports
 probe preview plant_preview "Fvdep.lean:1: import FvdepPreview" bash tools/check-imports.sh preview
 # A module whose name only starts like an allowed root (the `\.`-in-awk-v regression).
 plant_prefix() { sed -i '1i import FvdepPlanted' FvdepPreview.lean; }
