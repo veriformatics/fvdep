@@ -8,7 +8,7 @@ the library by path. Shipped modules import Init, Std, Lean, Lake + fvdep's own 
 package fvdeptool where
   version := v!"0.1.0"
   description := "The fvdep command-line tool: checks Lean implementations against fvdep specs."
-  license := "Apache-2.0"
+  license := "Apache-2.0 WITH LLVM-exception"
   testDriver := "«fvdep-tests»"
   -- Lints ride the build (warnings are errors): a separate `lake lint --linters` build would
   -- rebuild every module twice per gate run (measured: 4 → 4 → 4 rebuilt modules).

@@ -12,7 +12,7 @@ package fvdep where
   "Formal specifications of popular dependencies with machine-checked proofs, package " ++
     "profiles and C-ABI shapes."
   keywords := #["formal-verification", "lean", "dependencies", "specifications"]
-  license := "Apache-2.0"
+  license := "Apache-2.0 WITH LLVM-exception"
   licenseFiles := #["LICENSE"]
   -- Lints ride the build (warnings are errors): a separate `lake lint --linters` build would
   -- rebuild every module twice per gate run (measured: 4 → 4 → 4 rebuilt modules).
