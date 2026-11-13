@@ -341,15 +341,37 @@ theorem normalize_preserves (l : Lock) :
     l.normalize.library = l.library ∧
       l.normalize.entries.Perm l.entries ∧
       (l.normalize.entries.map idOf).Pairwise (· ≤ ·) ∧
-      ∀ a b, [a, b].Sublist l.entries → idOf a = idOf b → [a, b].Sublist l.normalize.entries := by
+      ∀ k,
+        l.normalize.entries.filter (fun r => idOf r == k) =
+          l.entries.filter (fun r => idOf r == k) := by
   refine ⟨rfl, List.mergeSort_perm _ _, ?_, ?_⟩
   · have h := List.pairwise_mergeSort key_trans key_total l.entries
     rw [List.pairwise_map]
     exact h.imp fun hab => of_decide_eq_true hab
-  · intro a b hs he
-    apply List.pair_sublist_mergeSort key_trans key_total _ hs
-    have : moduleKey a = moduleKey b := he
-    simp [this, Std.le_refl]
+  · intro k
+    have hpw :
+      (l.entries.filter fun r => idOf r == k).Pairwise fun a b =>
+        decide (moduleKey a ≤ moduleKey b) := by
+      rw [List.pairwise_iff_forall_sublist]
+      intro a b hab
+      have ha : a ∈ l.entries.filter fun r => idOf r == k := hab.subset (by simp)
+      have hb : b ∈ l.entries.filter fun r => idOf r == k := hab.subset (by simp)
+      replace ha := (List.mem_filter.mp ha).2
+      replace hb := (List.mem_filter.mp hb).2
+      have : moduleKey a = moduleKey b := by
+        simp only [beq_iff_eq] at ha hb
+        exact ha.trans hb.symm
+      simp [this, Std.le_refl]
+    have hsub :=
+      List.sublist_mergeSort key_trans key_total hpw (List.filter_sublist (l := l.entries))
+    have h1 :
+      (l.entries.filter fun r => idOf r == k).Sublist
+        (l.normalize.entries.filter fun r => idOf r == k) := by
+      simpa [List.filter_filter, Lock.normalize] using hsub.filter (fun r => idOf r == k)
+    have hlen :=
+      ((List.mergeSort_perm l.entries fun a b => decide (moduleKey a ≤ moduleKey b)).filter
+          (fun r => idOf r == k)).length_eq
+    exact (h1.eq_of_length hlen.symm).symm
 
 /-- D7 `NormalizeSorted`. -/
 theorem normalize_sorted (l : Lock) (hd : (l.entries.map idOf).Nodup)
@@ -358,5 +380,8 @@ theorem normalize_sorted (l : Lock) (hd : (l.entries.map idOf).Nodup)
   refine ⟨fun r hr => hw r (hp.mem_iff.mp hr), ?_⟩
   have hne : (l.normalize.entries.map idOf).Nodup := ((hp.map idOf).nodup_iff).mpr hd
   exact (hle.and hne).imp fun h => string_lt_of_le_ne h.1 h.2
+
+/-- D8 (reviewer-3 D10): the lock schema's general types = interface §6 + D4's, written apart. -/
+theorem lock_kinds : kindTable "" [] lockTy = lockKinds := by rfl
 
 end FvdepAudit.Doc.Proof

@@ -541,4 +541,7 @@ theorem receipt_valid (r : Receipt) (h : ReceiptWF r) : FvdepAudit.Json.Spec.Val
       simp [receiptLayout, FvdepAudit.Json.Spec.depth, FvdepAudit.Json.Spec.depthMembers,
         depth_nullOr, strs_depth, Receipt.common, FvdepAudit.Json.Spec.maxDepth]
 
+/-- D8 (reviewer-3 D10): the receipt schema's general types = interface §6 + D3's, written apart. -/
+theorem receipt_kinds : kindTable "" [] receiptTy = receiptKinds := by rfl
+
 end FvdepAudit.Doc.Proof

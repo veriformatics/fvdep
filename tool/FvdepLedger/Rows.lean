@@ -1,5 +1,7 @@
 import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
+import FvdepAudit.Hash.Proof.Frame
+import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepLedger.Types
@@ -580,6 +582,10 @@ def receiptValid : Prop := ∀ (r : Receipt) (_h : ReceiptWF r), FvdepAudit.Json
 /-- D8: `Receipt.wellFormed` decides D2 + D3 well-formedness. -/
 def receiptCheck : Prop := ∀ (r : Receipt), r.wellFormed = true ↔ ReceiptWF r
 
+/-- D5 + D8: each receipt field's general type (what `wrong_type` is judged against) in the shared
+schema data = interface §6 + D3's, written apart. -/
+def receiptKindsExact : Prop := kindTable "" [] receiptTy = receiptKinds
+
 end FvdepLedger.Rows.DocClaims
 
 namespace FvdepLedger.Rows.DocClaims
@@ -613,6 +619,10 @@ def lockValid : Prop := ∀ (l : Lock) (_h : LockWF l), FvdepAudit.Json.Spec.Val
 ids). -/
 def lockCheck : Prop := ∀ (l : Lock), l.wellFormed = true ↔ LockWF l
 
+/-- D5 + D8: each lock field's general type in the shared schema data = interface §6 + D4's,
+written apart. -/
+def lockKindsExact : Prop := kindTable "" [] lockTy = lockKinds
+
 /-- D7 LockBytes: a well-formed lock's canonical bytes decode back to it. -/
 def lockBytesEncode : Prop := ∀ (l : Lock) (_h : LockWF l), decodeLock (encodeLock l) = .ok l
 
@@ -631,13 +641,14 @@ def lockBytesError : Prop :=
         ∃ v d, decode b = .ok v ∧ firstViolation lockTy v = some d ∧ e = .doc d
 
 /-- D7: `Lock.normalize` keeps the library + the receipts (a permutation), orders module ids
-nondecreasingly, keeps equal ids in input order. -/
+nondecreasingly, keeps equal ids in input order (each id's receipts = the same sequence). -/
 def normalizePreserves : Prop :=
   ∀ (l : Lock),
     l.normalize.library = l.library ∧
       l.normalize.entries.Perm l.entries ∧
       (l.normalize.entries.map idOf).Pairwise (· ≤ ·) ∧
-      ∀ a b, [a, b].Sublist l.entries → idOf a = idOf b → [a, b].Sublist l.normalize.entries
+      ∀ k,
+        l.normalize.entries.filter (fun r => idOf r == k) = l.entries.filter (fun r => idOf r == k)
 
 /-- D7: normalizing well-formed receipts with distinct module ids gives a well-formed lock. -/
 def normalizeSorted : Prop :=
@@ -675,6 +686,41 @@ def clipBound : Prop := ∀ (s : String), (clip s).utf8ByteSize ≤ 65536
 
 end FvdepLedger.Rows.DocClaims
 
+namespace FvdepLedger.Rows.HashClaims
+
+open FvdepCore.Hash FvdepAudit.Hash.Spec
+
+/-- H4: `hex` = each byte's two lowercase hex digits, high nibble first. -/
+def hexExact : Prop := ∀ (b : ByteArray), hex b = hexSpec b
+
+/-- H4: `frame`'s bytes = H2's layout. -/
+def frameLayout : Prop :=
+  ∀ (t : String) (fs : List (String × ByteArray)), (frame t fs).data.toList = frameSpec t fs
+
+/-- H4: inside H2's domain, `unframe` returns the tag + the files in path order. -/
+def frameDecode : Prop :=
+  ∀ (t : String) (fs : List (String × ByteArray)) (_h : FrameDomain t fs),
+    unframe (frame t fs) = some (t, byPath fs)
+
+/-- H4: inside H2's domain, equal frames have equal tags + the same files (in any order). -/
+def frameInjective : Prop :=
+  ∀ (t : String) (fs : List (String × ByteArray)) (t' : String) (fs' : List (String × ByteArray))
+    (_h : FrameDomain t fs) (_h' : FrameDomain t' fs') (_he : frame t fs = frame t' fs'),
+    t = t' ∧ fs.Perm fs'
+
+/-- H4: `unframe` accepts exactly frames: a decoded tag + files lie in H2's domain, their paths
+strictly ascend, and they frame back to the input bytes. -/
+def unframeExact : Prop :=
+  ∀ (b : ByteArray) (t : String) (fs : List (String × ByteArray)) (_h : unframe b = some (t, fs)),
+    FrameDomain t fs ∧ (fs.map (·.1)).Pairwise (· < ·) ∧ frame t fs = b
+
+/-- S3: a stream's byte count saturates at 2^64 − 1 on its way to the C limit check (never wraps).
+-/
+def saturateLaw : Prop :=
+  ∀ (n : Nat), (FvdepIO.Hash.Sha256.saturate n).toNat = min n (UInt64.size - 1)
+
+end FvdepLedger.Rows.HashClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -698,6 +744,19 @@ def residue : List Residue :=
       reason := "outside Lean; fvdep's effects reach them through the interpreter"
       ruling := "OS, filesystem + process semantics"
       boundary := [] },
+    { id := "hacl-sha256"
+      what :=
+        "SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional " ++
+          "correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration " ++
+          "(`c/fvdep_sha256*.c`, `FvdepIO.Hash`)"
+      reason :=
+        "C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance " ++
+          "claim); the shim + orchestration are small, reviewed + tested (FIPS 180-4 " ++
+          "examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching)"
+      ruling := "HACL* (verified upstream) + FFI wrapper (tested)"
+      boundary :=
+        [``FvdepIO.Hash.sha256, ``FvdepIO.Hash.Sha256.initState, ``FvdepIO.Hash.Sha256.absorb,
+          ``FvdepIO.Hash.Sha256.squeeze] },
     { id := "literal"
       what := "literal data (the version string `Fvdep.version`)"
       reason :=
@@ -954,14 +1013,16 @@ def docReceiptRow : Row :=
         "accepts exactly the layouts of well-formed receipts (returning that receipt) and " ++
         "refuses with the D5 walk's first violation; a well-formed receipt encodes to a valid " ++
         "value; " ++
-        "`Receipt.wellFormed` decides well-formedness."
+        "`Receipt.wellFormed` decides well-formedness; each field's general type in the schema " ++
+        "data = interface §6's."
     claims :=
       [(``DocClaims.receiptEncodeExact, ``FvdepAudit.Doc.Proof.receipt_encode),
         (``DocClaims.receiptSchemaExact, ``FvdepAudit.Doc.Proof.receipt_schema_exact),
         (``DocClaims.receiptDecodeOk, ``FvdepAudit.Doc.Proof.receipt_ok),
         (``DocClaims.receiptDecodeError, ``FvdepAudit.Doc.Proof.receipt_error),
         (``DocClaims.receiptValid, ``FvdepAudit.Doc.Proof.receipt_valid),
-        (``DocClaims.receiptCheck, ``FvdepAudit.Doc.Proof.receipt_check)]
+        (``DocClaims.receiptCheck, ``FvdepAudit.Doc.Proof.receipt_check),
+        (``DocClaims.receiptKindsExact, ``FvdepAudit.Doc.Proof.receipt_kinds)]
     subject := ``FvdepCore.Status.Receipt.ofJson
     path := []
     noCaller := "U8"
@@ -978,7 +1039,7 @@ def docLockRow : Row :=
         "and refuses with J3's text error first, else the walk's first violation; " ++
         "`Lock.normalize` keeps the receipts + library, orders module ids (stable), and yields " ++
         "a well-formed lock from distinct well-formed receipts; `Lock.wellFormed` decides " ++
-        "well-formedness."
+        "well-formedness; each field's general type in the schema data = interface §6's."
     claims :=
       [(``DocClaims.lockEncodeExact, ``FvdepAudit.Doc.Proof.lock_encode),
         (``DocClaims.lockSchemaExact, ``FvdepAudit.Doc.Proof.lock_schema_exact),
@@ -986,6 +1047,7 @@ def docLockRow : Row :=
         (``DocClaims.lockDecodeError, ``FvdepAudit.Doc.Proof.lock_error),
         (``DocClaims.lockValid, ``FvdepAudit.Doc.Proof.lock_valid),
         (``DocClaims.lockCheck, ``FvdepAudit.Doc.Proof.lock_check),
+        (``DocClaims.lockKindsExact, ``FvdepAudit.Doc.Proof.lock_kinds),
         (``DocClaims.lockBytesEncode, ``FvdepAudit.Doc.Proof.lock_bytes_encode),
         (``DocClaims.lockBytesOk, ``FvdepAudit.Doc.Proof.lock_bytes_ok),
         (``DocClaims.lockBytesError, ``FvdepAudit.Doc.Proof.lock_bytes_error),
@@ -1029,6 +1091,57 @@ def docClipRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U3 H: hex + framing (pure). -/
+def hashFrameRow : Row :=
+  { component := `FvdepCore.Hash.Frame
+    contract := "U3 H1–H4"
+    claim :=
+      "`hex` writes each byte as two lowercase hex digits, high nibble first; `frame` emits " ++
+        "exactly H2's layout (tag, count, then the files in path order; UTF-8 lengths as 8-byte " ++
+        "big-endian numbers); inside H2's domain `unframe` returns the tag + the files in path " ++
+        "order, so equal frames have equal tags + the same files; `unframe` accepts exactly " ++
+        "frames (domain, strictly ascending paths, every byte consumed)."
+    claims :=
+      [(``HashClaims.hexExact, ``FvdepAudit.Hash.Proof.hex_exact),
+        (``HashClaims.frameLayout, ``FvdepAudit.Hash.Proof.frame_layout),
+        (``HashClaims.frameDecode, ``FvdepAudit.Hash.Proof.frame_decode),
+        (``HashClaims.frameInjective, ``FvdepAudit.Hash.Proof.frame_injective),
+        (``HashClaims.unframeExact, ``FvdepAudit.Hash.Proof.unframe_exact)]
+    subject := ``FvdepCore.Hash.frame
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+/-- U3 S + H3: the digest producers call (tested residue `hacl-sha256`). -/
+def sha256DigestRow : Row :=
+  { component := `FvdepIO.Sha256
+    contract := "U3 S1–S4 + H3"
+    claim :=
+      "`digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = " ++
+        "HACL*'s verified C behind the FFI (tested residue `hacl-sha256`)."
+    claims := []
+    subject := ``FvdepIO.Hash.digest
+    path := []
+    noCaller := "U4"
+    residue := ["runtime"]
+    unproven := ["hacl-sha256"] }
+
+/-- U3 S3: streaming SHA-256; the byte count saturates (never wraps) on its way to the C check. -/
+def sha256StreamRow : Row :=
+  { component := `FvdepIO.Sha256
+    contract := "U3 S3"
+    claim :=
+      "`saturate`, the byte count `finish` passes to the C limit check (2^61 bytes; residue " ++
+        "`hacl-sha256`), = min n (2^64 − 1), never wrapped. `update`, `finish`, `ofReader` + " ++
+        "`sha256File` join a row's subject closure when U8 wires them."
+    claims := [(``HashClaims.saturateLaw, ``FvdepAudit.Hash.Proof.saturate_toNat)]
+    subject := ``FvdepIO.Hash.Sha256.saturate
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := ["hacl-sha256"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1036,7 +1149,8 @@ def ledger : Ledger :=
     libs := [`FvdepCore, `FvdepIO]
     rows :=
       [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow, jsonValueRow,
-        jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow]
+        jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow,
+        hashFrameRow, sha256DigestRow, sha256StreamRow]
     residue := residue }
 
 end FvdepLedger.Rows

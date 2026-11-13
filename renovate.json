@@ -19,6 +19,13 @@
         "jcreinhold/lean-fmt"
       ],
       "groupName": "Lean toolchain"
+    },
+    {
+      "description": "Source pins track a branch's commits, which carry no release timestamp (an age gate would hold them forever); tools/vendor-hacl.sh <commit> relocks the vendored files in the same PR",
+      "matchDatasources": [
+        "git-refs"
+      ],
+      "minimumReleaseAge": "0 days"
     }
   ],
   "customManagers": [
@@ -57,6 +64,19 @@
         "\"url\":\\s*\"https://github\\.com/(?<packageName>[^\"]+?)(?:\\.git)?\",[\\s\\S]*?\"rev\":\\s*\"(?<currentDigest>[0-9a-f]{40})\",[\\s\\S]*?\"name\":\\s*\"(?<depName>[^\"]+)\",[\\s\\S]*?\"inputRev\":\\s*\"(?<currentValue>[^\"]+)\""
       ],
       "datasourceTemplate": "github-tags"
+    },
+    {
+      "customType": "regex",
+      "description": "Vendored upstream C (every vendor/*/lock.json): the commit on main; red on `vendor-upstream` until relocked",
+      "managerFilePatterns": [
+        "/^vendor/[^/]+/lock\\.json$/"
+      ],
+      "matchStrings": [
+        "\"upstream\":\\s*\"https://github\\.com/(?<depName>[^\"]+)\",\\s*\"commit\":\\s*\"(?<currentDigest>[0-9a-f]{40})\""
+      ],
+      "packageNameTemplate": "https://github.com/{{{depName}}}",
+      "currentValueTemplate": "main",
+      "datasourceTemplate": "git-refs"
     }
   ]
 }

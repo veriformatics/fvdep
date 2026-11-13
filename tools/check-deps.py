@@ -2,8 +2,9 @@
 """Every pinned dependency has a row in docs/dependencies.md (gate stage `deps`).
 
 Pins: the Lean toolchain of every `lean-toolchain`, each tools/tools.lock tool, each workflow action
-(`uses: owner/repo[/path]@…`), each git package of every tracked `lake-manifest.json` (by its
-GitHub `owner/repo`). A row = the name in backticks somewhere in the table. Prints each missing
+(`uses: owner/repo[/path]@…`), each git package of every tracked `lake-manifest.json` + each
+vendored upstream (`vendor/*/lock.json`), both by GitHub `owner/repo`. A row = the name in backticks
+somewhere in the table. Prints each missing
 name. Usage: python3 -I tools/check-deps.py
 """
 
@@ -42,6 +43,9 @@ def pins() -> set[str]:
         for p in json.loads(f.read_text(encoding="utf-8")).get("packages", []):
             if p.get("type") == "git":
                 names.add(re.sub(r"\.git$", "", p["url"].removeprefix("https://github.com/")))
+    for f in tracked("vendor/*/lock.json"):
+        upstream = json.loads(f.read_text(encoding="utf-8")).get("upstream", "")
+        names.add(re.sub(r"\.git$", "", upstream.removeprefix("https://github.com/")))
     return names
 
 

@@ -880,7 +880,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepCore.Doc`
 
 - Contract: U3 D2 + D3 + D5 + D7 + D8; Decisions Data formats
-- Claim: `Receipt.toJson` emits exactly the D3 layout; on a J1-valid value `Receipt.ofJson` accepts exactly the layouts of well-formed receipts (returning that receipt) and refuses with the D5 walk's first violation; a well-formed receipt encodes to a valid value; `Receipt.wellFormed` decides well-formedness.
+- Claim: `Receipt.toJson` emits exactly the D3 layout; on a J1-valid value `Receipt.ofJson` accepts exactly the layouts of well-formed receipts (returning that receipt) and refuses with the D5 walk's first violation; a well-formed receipt encodes to a valid value; `Receipt.wellFormed` decides well-formedness; each field's general type in the schema data = interface §6's.
 - Subject: `FvdepCore.Status.Receipt.ofJson`
 - Path: none yet (wired by U8)
 - Statement `FvdepLedger.Rows.DocClaims.receiptEncodeExact` (hash 0x757e655), proved by `FvdepAudit.Doc.Proof.receipt_encode`:
@@ -923,6 +923,11 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
   ```lean
   ∀ (r : FvdepCore.Status.Receipt), r.wellFormed = true ↔ FvdepAudit.Doc.Spec.ReceiptWF r
   ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptKindsExact` (hash 0x23752374), proved by `FvdepAudit.Doc.Proof.receipt_kinds`:
+
+  ```lean
+  FvdepAudit.Doc.Spec.kindTable "" [] FvdepCore.Doc.receiptTy = FvdepAudit.Doc.Spec.receiptKinds
+  ```
 - Uninterpreted: none
 - Residue: none
 - Unproven: none
@@ -930,7 +935,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepCore.Doc`
 
 - Contract: U3 D2 + D4 + D5 + D7 + D8; Decisions Data formats
-- Claim: `fvdep.lock`: a lock's JSON is exactly the D4 layout; on a J1-valid value `Lock.ofJson` accepts exactly the layouts of well-formed locks and refuses with the D5 walk's first violation; `decodeLock` returns a well-formed lock's canonical bytes back as that lock and refuses with J3's text error first, else the walk's first violation; `Lock.normalize` keeps the receipts + library, orders module ids (stable), and yields a well-formed lock from distinct well-formed receipts; `Lock.wellFormed` decides well-formedness.
+- Claim: `fvdep.lock`: a lock's JSON is exactly the D4 layout; on a J1-valid value `Lock.ofJson` accepts exactly the layouts of well-formed locks and refuses with the D5 walk's first violation; `decodeLock` returns a well-formed lock's canonical bytes back as that lock and refuses with J3's text error first, else the walk's first violation; `Lock.normalize` keeps the receipts + library, orders module ids (stable), and yields a well-formed lock from distinct well-formed receipts; `Lock.wellFormed` decides well-formedness; each field's general type in the schema data = interface §6's.
 - Subject: `FvdepCore.Doc.decodeLock`
 - Path: none yet (wired by U8)
 - Statement `FvdepLedger.Rows.DocClaims.lockEncodeExact` (hash 0x4b3a96fd), proved by `FvdepAudit.Doc.Proof.lock_encode`:
@@ -972,6 +977,11 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
   ```lean
   ∀ (l : FvdepCore.Status.Lock), l.wellFormed = true ↔ FvdepAudit.Doc.Spec.LockWF l
   ```
+- Statement `FvdepLedger.Rows.DocClaims.lockKindsExact` (hash 0x17ff4f7e), proved by `FvdepAudit.Doc.Proof.lock_kinds`:
+
+  ```lean
+  FvdepAudit.Doc.Spec.kindTable "" [] FvdepCore.Doc.lockTy = FvdepAudit.Doc.Spec.lockKinds
+  ```
 - Statement `FvdepLedger.Rows.DocClaims.lockBytesEncode` (hash 0xea2dfe55), proved by `FvdepAudit.Doc.Proof.lock_bytes_encode`:
 
   ```lean
@@ -997,17 +1007,16 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
             FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.lockTy v = some d ∧
               e = FvdepCore.Doc.LockError.doc d
   ```
-- Statement `FvdepLedger.Rows.DocClaims.normalizePreserves` (hash 0x65ee3cf6), proved by `FvdepAudit.Doc.Proof.normalize_preserves`:
+- Statement `FvdepLedger.Rows.DocClaims.normalizePreserves` (hash 0x406e5a8d), proved by `FvdepAudit.Doc.Proof.normalize_preserves`:
 
   ```lean
   ∀ (l : FvdepCore.Status.Lock),
     l.normalize.library = l.library ∧
       l.normalize.entries.Perm l.entries ∧
         List.Pairwise (fun x1 x2 => x1 ≤ x2) (List.map FvdepAudit.Doc.Spec.idOf l.normalize.entries) ∧
-          ∀ (a b : FvdepCore.Status.Receipt),
-            [a, b].Sublist l.entries →
-              FvdepAudit.Doc.Spec.idOf a = FvdepAudit.Doc.Spec.idOf b →
-                [a, b].Sublist l.normalize.entries
+          ∀ (k : String),
+            List.filter (fun r => FvdepAudit.Doc.Spec.idOf r == k) l.normalize.entries =
+              List.filter (fun r => FvdepAudit.Doc.Spec.idOf r == k) l.entries
   ```
 - Statement `FvdepLedger.Rows.DocClaims.normalizeSorted` (hash 0xe05d2787), proved by `FvdepAudit.Doc.Proof.normalize_sorted`:
 
@@ -1067,9 +1076,80 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Hash.Frame`
+
+- Contract: U3 H1–H4
+- Claim: `hex` writes each byte as two lowercase hex digits, high nibble first; `frame` emits exactly H2's layout (tag, count, then the files in path order; UTF-8 lengths as 8-byte big-endian numbers); inside H2's domain `unframe` returns the tag + the files in path order, so equal frames have equal tags + the same files; `unframe` accepts exactly frames (domain, strictly ascending paths, every byte consumed).
+- Subject: `FvdepCore.Hash.frame`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.HashClaims.hexExact` (hash 0x29a94a63), proved by `FvdepAudit.Hash.Proof.hex_exact`:
+
+  ```lean
+  ∀ (b : ByteArray), FvdepCore.Hash.hex b = FvdepAudit.Hash.Spec.hexSpec b
+  ```
+- Statement `FvdepLedger.Rows.HashClaims.frameLayout` (hash 0x337b544e), proved by `FvdepAudit.Hash.Proof.frame_layout`:
+
+  ```lean
+  ∀ (t : String) (fs : List (String × ByteArray)),
+    (FvdepCore.Hash.frame t fs).data.toList = FvdepAudit.Hash.Spec.frameSpec t fs
+  ```
+- Statement `FvdepLedger.Rows.HashClaims.frameDecode` (hash 0xa2c19e56), proved by `FvdepAudit.Hash.Proof.frame_decode`:
+
+  ```lean
+  ∀ (t : String) (fs : List (String × ByteArray)),
+    FvdepAudit.Hash.Spec.FrameDomain t fs →
+      FvdepCore.Hash.unframe (FvdepCore.Hash.frame t fs) = some (t, FvdepAudit.Hash.Spec.byPath fs)
+  ```
+- Statement `FvdepLedger.Rows.HashClaims.frameInjective` (hash 0xe5521fa8), proved by `FvdepAudit.Hash.Proof.frame_injective`:
+
+  ```lean
+  ∀ (t : String) (fs : List (String × ByteArray)) (t' : String) (fs' : List (String × ByteArray)),
+    FvdepAudit.Hash.Spec.FrameDomain t fs →
+      FvdepAudit.Hash.Spec.FrameDomain t' fs' →
+        FvdepCore.Hash.frame t fs = FvdepCore.Hash.frame t' fs' → t = t' ∧ fs.Perm fs'
+  ```
+- Statement `FvdepLedger.Rows.HashClaims.unframeExact` (hash 0x9b6d6725), proved by `FvdepAudit.Hash.Proof.unframe_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (t : String) (fs : List (String × ByteArray)),
+    FvdepCore.Hash.unframe b = some (t, fs) →
+      FvdepAudit.Hash.Spec.FrameDomain t fs ∧
+        List.Pairwise (fun x1 x2 => x1 < x2) (List.map (fun x => x.fst) fs) ∧
+          FvdepCore.Hash.frame t fs = b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepIO.Sha256`
+
+- Contract: U3 S1–S4 + H3
+- Claim: `digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = HACL*'s verified C behind the FFI (tested residue `hacl-sha256`).
+- Subject: `FvdepIO.Hash.digest`
+- Path: none yet (wired by U4)
+- Uninterpreted: `FvdepIO.Hash.sha256`
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`))
+
+## `FvdepIO.Sha256`
+
+- Contract: U3 S3
+- Claim: `saturate`, the byte count `finish` passes to the C limit check (2^61 bytes; residue `hacl-sha256`), = min n (2^64 − 1), never wrapped. `update`, `finish`, `ofReader` + `sha256File` join a row's subject closure when U8 wires them.
+- Subject: `FvdepIO.Hash.Sha256.saturate`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.HashClaims.saturateLaw` (hash 0xe7b8dad0), proved by `FvdepAudit.Hash.Proof.saturate_toNat`:
+
+  ```lean
+  ∀ (n : Nat), (FvdepIO.Hash.Sha256.saturate n).toNat = min n (UInt64.size - 1)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`))
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
 - `runtime` — Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives): the toolchain is trusted (Decisions `Self-verification scope`) (ruling: "Lean compiler + runtime")
 - `os` — OS, filesystem + process semantics: outside Lean; fvdep's effects reach them through the interpreter (ruling: "OS, filesystem + process semantics")
+- `hacl-sha256` — SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`): C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance claim); the shim + orchestration are small, reviewed + tested (FIPS 180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching) (ruling: "HACL* (verified upstream) + FFI wrapper (tested)")
 - `literal` — literal data (the version string `Fvdep.version`): a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both lakefiles (ruling: "Literal data (the version string) is checked by the gate's `meta` stage")
