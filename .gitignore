@@ -2,11 +2,13 @@
 .scratch/
 .claude/settings.local.json
 CLAUDE.local.md
-# gate step ledger (tools/gate.sh)
+# gate step ledger (tools/gate.sh) + pinned tools (tools/fetch-tools.sh)
 .gate/
-# Lean / lake
+.tools/
+# Lean / lake (+ the lean-fmt result cache)
 .lake/
 lake-packages/
+.lean-fmt-cache/
 # Python / uv
 __pycache__/
 *.py[cod]

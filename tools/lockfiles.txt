@@ -1,0 +1,9 @@
+# Lockfiles osv-scanner reads (gate stage `vulns`, tools/check-vulns.py): one path per line;
+# `fixture <path>` = a test input never installed (listed, not scanned); `none` alone = no lockfile.
+prototype/fvdep/cli/uv.lock
+prototype/fvdep/impls/node/base64-ffi/pnpm-lock.yaml
+prototype/fvdep/impls/rust/base64/Cargo.lock
+prototype/fvdep/impls/rust/base64-ffi/Cargo.lock
+prototype/fvdep/packages/crates-base64/Cargo.lock
+prototype/fvdep/packages/npm-base64-js/pnpm-lock.yaml
+prototype/fvdep/packages/npm-semver/pnpm-lock.yaml

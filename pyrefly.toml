@@ -1,0 +1,5 @@
+preset = "default"
+untyped-def-behavior = "check-and-infer-return-type"
+python-version = "3.12"
+project-includes = ["tools/*.py", "tests/**/*.py"]
+project-excludes = ["prototype/**"]
