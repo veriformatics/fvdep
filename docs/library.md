@@ -4,10 +4,10 @@ Binding source = `.agent/spec.md` `Decisions` (Spec modularity, Domains + deviat
 
 ## Naming
 
-- Module id `<dep>.<op>` (lowercase; `_` inside `<op>`); entry version `x.y.z` = three decimal numbers without leading zeros (no pre-release or build part), ordered numerically by field.
+- Module id `<dep>.<op>`: `<dep>` = `[a-z][a-z0-9]*`; `<op>` = one or more `_`-joined segments, each `[a-z][a-z0-9]*` (a segment starts with a letter, so the Lean module name below determines the id); entry version `x.y.z` = three decimal numbers without leading zeros (no pre-release or build part), ordered numerically by field.
 - Lean module `Fvdep.<Dep>.<Op>.V<x>_<y>_<z>` (UpperCamelCase of each part: `encode_url` → `EncodeUrl`); spec constant = `<Lean module>.<fn>`.
 - Shared definitions = their own versioned modules (immutable once a published entry imports them).
-- Reserved Lean module prefixes for consumers: `Init`, `Std`, `Lean`, `Lake`, `Fvdep`, `FvdepPreview`, `FvdepProofs`, `FvdepTool`.
+- Reserved consumer module names: the first name component is `Init`, `Std`, `Lean` or `Lake`, or starts with `Fvdep` (fvdep's libraries + tool: `Fvdep`, `FvdepPreview`, `FvdepProofs`, `FvdepCore`, `FvdepIO`, …).
 
 ## Operations (shape `fn` statement: `@<impl> = @<spec constant>`)
 

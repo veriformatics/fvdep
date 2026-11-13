@@ -89,6 +89,8 @@ lean-build  lean
 lean-style  lean
 lean-test   lean
 cli         lean
+coverage    lean
+ledger-suite lean
 imports     checks
 preview     checks
 spec        checks
@@ -107,11 +109,11 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout deps renovate meta lean-build lean-style lean-test cli'
+FAST_STAGES='imports preview spec shell python fanout deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
-TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests»)
+TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepLedger «fvdep-ledger» FvdepLedgerFixtures)
 
 # Every shard STAGES names, once each, in first-use order.
 shard_names() { awk 'NF { for (i = 2; i <= NF; i++) if (!seen[$i]++) print $i }' <<<"$STAGES"; }
@@ -164,6 +166,33 @@ lean_test() { (cd tool && lake test); }
 
 # The shipped binary end to end: output streams + exit codes (docs/interface.md §1).
 cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
+
+# Coverage ledger (docs/contracts/U2-core.md L1–L8): every claim's theorem type = its statement,
+# axioms ⊆ std, root shape + call paths, compiled = checked, kernel replay (leanchecker), and
+# docs/verification.md = the rendering.
+coverage() { (cd tool && lake exe fvdep-ledger --check ../docs/verification.md); }
+
+# The suite's input closure: checker, fixtures, driver, both Lake configs + toolchain pins.
+ledger_suite_key() {
+    git ls-files -co --exclude-standard -z -- tool/FvdepLedger tool/FvdepLedger.lean \
+        tool/LedgerMain.lean tool/FvdepLedgerFixtures tool/FvdepLedgerFixtures.lean tests/ledger \
+        tool/lakefile.lean tool/lake-manifest.json tool/lean-toolchain lakefile.lean \
+        lake-manifest.json lean-toolchain | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-64
+}
+
+# The blind fixture suite (L9): the checker's planted breaches + clean controls. It grades the
+# checker alone ⇒ with FVDEP_REUSE=1 (the fast gate) a green verdict stands while its input closure
+# stays byte-identical; the full gate always runs it.
+ledger_suite() {
+    local key mark=.gate/ledger-suite.green
+    key="$(ledger_suite_key)" || key=''
+    if [[ "${FVDEP_REUSE:-0}" == 1 && -n "$key" && -f "$mark" && "$(cat "$mark")" == "$key" ]]; then
+        printf 'ledger-suite: input closure %s = the last green run: verdict reused\n' "${key:0:12}"
+        return 0
+    fi
+    bash tests/ledger/run.sh || return 1
+    if [[ -n "$key" ]]; then mkdir -p .gate && printf '%s\n' "$key" >"$mark"; fi
+}
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.
 probes() { bash tools/gate-probe.sh; }

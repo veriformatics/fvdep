@@ -22,7 +22,9 @@ require fvdep from ".."
 
 lean_lib FvdepCore
 
-lean_lib FvdepIO
+/-- `Main` (the exe root) belongs here too: lib modules (the ledger's rows) import it, and Lake
+tracks an import only into a library's modules. -/
+lean_lib FvdepIO where roots := #[`FvdepIO, `Main]
 
 /-- Target name ≠ `fvdep`: the `require` above already declares that name. -/
 @[default_target] lean_exe «fvdep-cli» where
@@ -30,3 +32,17 @@ lean_lib FvdepIO
   exeName := "fvdep"
 
 lean_exe «fvdep-tests» where root := `Tests
+
+/-- Coverage ledger + its checker (gate stage `coverage`; contract U2 L1–L8): a gate tool, never
+shipped (`Main` imports none of it). -/
+lean_lib FvdepLedger
+
+lean_exe «fvdep-ledger» where
+  root := `LedgerMain
+  supportInterpreter := true
+
+/-- Planted ledger breaches + clean controls (contract U2 L9; `tests/ledger/run.sh`). `sorry` +
+forged fixtures build on purpose ⇒ warnings stay warnings in this library alone. -/
+lean_lib FvdepLedgerFixtures where
+  globs := #[.andSubmodules `FvdepLedgerFixtures]
+  leanOptions := #[⟨`warningAsError, false⟩]
