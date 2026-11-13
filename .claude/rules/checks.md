@@ -19,5 +19,6 @@ paths:
 - Stage `python` = pinned Ruff (correctness families E4, E9, E711–E722, F, B; `ruff.toml`) + Pyrefly (`pyrefly.toml`: preset `default` — without the file Pyrefly silently falls back to `basic`; unannotated bodies checked, warnings fail) over `tools/*.py` + `tests/**/*.py`; a suppression carries its reason on the line.
 - Stage `vulns`: `tools/lockfiles.txt` lists every lockfile of the tree (`fixture <path>` = a test input never installed: listed, not scanned); osv-scanner needs network (osv.dev).
 - An edit to `tools/vflab-run` or `tools/vflab-reclaim.sh` reruns `bash tools/vflab-run-probe.sh` from the desktop.
+- An edit to `tools/vflab-provision.sh` or `tools/vflab-agent-smoke.sh` reruns both from the desktop (a host change ⇒ announce it to the fvapi session first): smoke rc 0, or 3 while the token is absent.
 - An edit to `renovate.json` records `tools/vflab-run bash -c 'npx --yes --package renovate@<release ≥ 7 days old> renovate-config-validator --strict renovate.json'` → rc 0 in the commit body.
 - `tools/pin-tool.sh NAME VERSION` re-pins a tool (asset name = the current one with the version replaced); a Renovate bump of the version column alone stays red on `renovate` + `tools` until re-pinned.
