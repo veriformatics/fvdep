@@ -73,7 +73,7 @@ Provably secure dependencies. This repo is a library and automated system for bu
 - [ ] U3 codecs + hashing (kernel; contract `docs/contracts/U3-codecs.md`, consultant-8 rounds 1–2; blind suites tester-3 J H S D on `wt/tester-3`, tester-4 T F; stubs `wip/u3-red`); its astra faithfulness review (reviewer-3) also takes U2's open F27 row (`KernelSpec`, `kernelWalk_spec`; `.agent/review.md`) + the site spec, the D5/D7 error types, the U2 `Decl` argv change
   - [x] 18136f7 J: JSON codec port (fvapi 02d99d1) + J3 duplicate-key site, lean_lib `FvdepAudit`, audit import isolation, ledger rows
   - [x] f3a0af8 D: receipt, lock + envelope documents, U2 `Decl` argv
-  - [ ] ids: U2 `parseNat` = print round trip (`decimal` appends at the tail) ⇒ a 65,532-digit version component costs 24–33 s on vflab (tester-3 `D.bound.version.*`; lock-decode fuzz hangs, +80 s per suite run) → linear canonical check, ledger statements unchanged
+  - [ ] ids: U2 `parseNat` = print round trip (`decimal` appends at the tail) ⇒ a 65,532-digit version component costs 24–33 s on vflab (tester-3 `D.bound.version.*`; lock-decode fuzz hangs, +80 s per suite run) → print + read by halves (`decimalFast`, `valueFast`, each proven equal to its reference on every input; shipped bodies call them), ledger statements unchanged
   - [ ] S + H: HACL* SHA-256 (vendored) + hex + framing
   - [ ] T: `fvdep.toml` reader (text stage, `ofLake`, validate) + canonical printer
   - [ ] F: persistence (shim, replace, read, writer lock) + interpreter wiring + interface/Decisions edits
