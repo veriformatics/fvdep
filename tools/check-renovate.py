@@ -3,9 +3,10 @@
 
 Each customManager's regex is applied to its files the way Renovate's regex manager does (every
 matchString over the whole file); the result must equal an independent parse of the same file:
-every `lean-toolchain`, tools/tools.lock and every `lake-manifest.json` (git packages; path packages
-carry no pin), plus a synthetic two-package Lake manifest (tests/renovate/lake-manifest.json), so a
-manager that matches only one package or none still fails. Each tools.lock line's URL must name its
+every `lean-toolchain`, tools/tools.lock, every `lake-manifest.json` (git packages; path packages
+carry no pin) and every vendor/*/lock.json (upstream + commit), plus a synthetic two-package Lake
+manifest (tests/renovate/lake-manifest.json), so a manager that matches only one package or none
+still fails. Each tools.lock line's URL must name its
 own version (a half-applied Renovate bump = re-pin with tools/pin-tool.sh). Renovate compiles with
 RE2; the patterns here use no RE2-incompatible syntax (`renovate-config-validator --strict`,
 `.claude/rules/checks.md`). Usage: python3 -I tools/check-renovate.py
@@ -94,6 +95,14 @@ def main() -> int:
                 for p in packages if p.get("type") == "git"]
         if rel == FIXTURE and len(want) < 2:
             errors.append(f"{FIXTURE}: the fixture must list two git packages")
+        got = extract(ROOT / rel, rel)
+        if got != want:
+            errors.append(f"{rel}: extracted {got}, want {want}")
+
+    for rel in tracked("vendor/*/lock.json"):
+        lock = json.loads((ROOT / rel).read_text(encoding="utf-8"))
+        want = [{"depName": lock["upstream"].removeprefix("https://github.com/"),
+                 "currentDigest": lock["commit"]}]
         got = extract(ROOT / rel, rel)
         if got != want:
             errors.append(f"{rel}: extracted {got}, want {want}")

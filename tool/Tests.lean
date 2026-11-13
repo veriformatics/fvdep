@@ -1,4 +1,5 @@
 import FvdepCore
+import FvdepIO.Sha256
 
 /-! `lake test` driver (contract U1 K3): PASS/FAIL per case, the slowest case, exit = failures.
 Generated cases use a fixed seed (printed; `FVDEP_TEST_SEED` overrides it for exploration), so a
@@ -292,6 +293,91 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Doc
 
+/-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
+HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
+The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
+
+namespace Hash
+
+open FvdepCore.Hash FvdepIO.Hash
+
+def bytes (xs : List Nat) : ByteArray := ⟨(xs.map Nat.toUInt8).toArray⟩
+
+def text (s : String) : ByteArray := s.toUTF8
+
+/-- `n < 256` as 8 big-endian bytes. -/
+def be (n : Nat) : List Nat := [0, 0, 0, 0, 0, 0, 0, n]
+
+def hexOf (b : ByteArray) : String := hex (sha256 b)
+
+def million : ByteArray := ⟨(List.replicate 1000000 (97 : UInt8)).toArray⟩
+
+/-- `b` fed in chunks of `n` bytes (the last shorter). -/
+def chunked (b : ByteArray) (n : Nat) : ByteArray :=
+  Sha256.finish <|
+    (List.range ((b.size + n - 1) / n)).foldl
+      (fun s i => Sha256.update s (b.extract (i * n) (i * n + n))) Sha256.init
+
+def msg448 : String := "abcdbcdecdefdefgefghfghighijhijkijkljklmklmnlmnomnopnopq"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("sha256: FIPS 180-4 examples (empty, abc, 448-bit, 10^6 × a)", fun _ =>
+      hexOf .empty == "e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855" &&
+        hexOf (text "abc") == "ba7816bf8f01cfea414140de5dae2223b00361a396177a9cb410ff61f20015ad" &&
+        hexOf (text msg448) == "248d6a61d20638b8e5c026930c3e6039a33ce45964ff2167f6ecedd419db06c1" &&
+        hexOf million == "cdc76e5c9914fb9281a1c7e284d73e67f1809a48a497200e046d39ccc7112cd0"),
+    ("sha256: update over 1, 7, 55, 63, 64, 65, 4096-byte chunks = one-shot", fun _ =>
+      let b := (text msg448).extract 0 56 ++ million.extract 0 9000
+      [1, 7, 55, 63, 64, 65, 4096].all fun n => (chunked b n).data == (sha256 b).data),
+    ("sha256: a shared state branches without interference + stays reusable", fun _ =>
+      let s := Sha256.update Sha256.init (text "abc")
+      let x := Sha256.finish (Sha256.update s (text msg448))
+      let y := Sha256.finish (Sha256.update s million)
+      x.data == (sha256 (text ("abc" ++ msg448))).data &&
+        y.data == (sha256 (text "abc" ++ million)).data &&
+        (Sha256.finish s).data == (sha256 (text "abc")).data),
+    ("hex: two lowercase digits per byte, high nibble first", fun _ =>
+      hex (bytes [0, 15, 16, 160, 255]) == "000f10a0ff" && hex .empty == ""),
+    ("frame: H2 layout (multibyte tag + path, files in path order, UTF-8 lengths)", fun _ =>
+      (frame "t\u00e9" [("b", bytes [1]), ("\u00e9", .empty), ("a", bytes [2, 3])]).data ==
+        (bytes
+            ([0, 0, 0, 0, 0, 0, 0, 3, 116, 195, 169, 0, 0, 0, 0, 0, 0, 0, 3] ++
+              [0, 0, 0, 0, 0, 0, 0, 1, 97, 0, 0, 0, 0, 0, 0, 0, 2, 2, 3] ++
+              [0, 0, 0, 0, 0, 0, 0, 1, 98, 0, 0, 0, 0, 0, 0, 0, 1, 1] ++
+              [0, 0, 0, 0, 0, 0, 0, 2, 195, 169, 0, 0, 0, 0, 0, 0, 0, 0])).data),
+    ("unframe: frame round trip; truncation, a trailing byte, unsorted + repeated paths → none",
+      fun _ =>
+      let fs := [("b", bytes [1]), ("a", bytes [2, 3])]
+      let f := frame "tag" fs
+      let sorted := [("a", bytes [2, 3]), ("b", bytes [1])]
+      (match unframe f with
+        | some (t, gs) =>
+          t == "tag" && gs.map (fun g => (g.1, g.2.data)) == sorted.map (fun g => (g.1, g.2.data))
+        | none => false) &&
+        (unframe (f.extract 0 (f.size - 1))).isNone &&
+        (unframe (f.push 0)).isNone &&
+        (unframe
+            (bytes
+              (be 3 ++ [116, 97, 103] ++ be 2 ++ be 1 ++ [98] ++ be 0 ++ be 1 ++ [97] ++
+                be 0))).isNone &&
+        (unframe
+            (bytes
+              (be 3 ++ [116, 97, 103] ++ be 2 ++ be 1 ++ [97] ++ be 0 ++ be 1 ++ [97] ++
+                be 0))).isNone),
+    ("digest: hex SHA-256 of the tagged frame; adapter entries: argv first, named paths once",
+      fun _ =>
+      digest .entry [("x", text "y")] == hexOf (frame "fvdep/entry/1" [("x", text "y")]) &&
+        (adapterEntries ["run", "a.py", "a.py"]
+                [("a.py", text "1"), ("a.py", text "1"), ("", text "2")]).map
+            (·.1) ==
+          ["", "a.py"] &&
+        (argvBytes ["ab", ""]).data ==
+          (bytes
+              [0, 0, 0, 0, 0, 0, 0, 2, 0, 0, 0, 0, 0, 0, 0, 2, 97, 98, 0, 0, 0, 0, 0, 0, 0,
+                0]).data)]
+
+end Hash
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -324,7 +410,7 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases ++ Doc.cases).map fun c => check c.1 c.2).mapM
+            (Core.cases ++ Json.cases ++ Doc.cases ++ Hash.cases).map fun c => check c.1 c.2).mapM
         id
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

@@ -274,6 +274,12 @@ JSON
 probe vulns-unlisted plant_unlisted "probe/Cargo.lock: lockfile not listed" vulns_stage
 probe vulns-missing plant_missing "probe/uv.lock does not exist" vulns_stage
 probe vulns-advisory plant_vulnerable "lodash" vulns_stage
+# A vendored commit OSV lists as affected (libxml2 6c128fd5, OSS-Fuzz git ranges).
+plant_vendor_vulnerable() {
+    sed -i 's/"commit": "f557259007db9933442dde10aa995c1b00bd3446"/"commit": "6c128fd58a0e4641c23a345d413672494622db1b"/' \
+        vendor/hacl-star/lock.json
+}
+probe vulns-vendor plant_vendor_vulnerable "OSV lists" vulns_stage
 
 # workflows: zizmor + actionlint each fire on a planted defect.
 workflows_stage() { bash -c 'source tools/gate.sh; workflows'; }
@@ -331,6 +337,27 @@ plant_tool() {
         >>tools/tools.lock
 }
 probe deps plant_tool "planted has no row" python3 -I tools/check-deps.py
+plant_vendor_upstream() {
+    sed -i 's#"upstream": "https://github.com/hacl-star/hacl-star"#"upstream": "https://github.com/planted/vendored"#' \
+        vendor/hacl-star/lock.json
+}
+probe deps-vendor plant_vendor_upstream "planted/vendored has no row" python3 -I tools/check-deps.py
+
+# vendor: one changed byte, a locked file missing, an unlocked file beside the locked ones.
+vendor_stage() { bash -c 'source tools/gate.sh; vendor'; }
+plant_vendor_byte() { printf 'x' >>vendor/hacl-star/dist/gcc-compatible/Hacl_Hash_SHA2.h; }
+plant_vendor_missing() { rm vendor/hacl-star/dist/LICENSE.txt; }
+plant_vendor_extra() { printf 'int planted;\n' >vendor/hacl-star/dist/gcc-compatible/planted.c; }
+probe vendor-byte plant_vendor_byte "Hacl_Hash_SHA2.h sha256 differs" vendor_stage
+probe vendor-missing plant_vendor_missing "dist/LICENSE.txt missing" vendor_stage
+probe vendor-extra plant_vendor_extra "planted.c not in" vendor_stage
+# vendor-upstream: a commit-only bump to d826c0c9 (its Hacl_Hash_SHA2.c predates the locked one).
+plant_vendor_commit() {
+    sed -i 's/"commit": "f557259007db9933442dde10aa995c1b00bd3446"/"commit": "d826c0c9fb494f9476aa3449d7a62412fb5be7d6"/' \
+        vendor/hacl-star/lock.json
+}
+probe vendor-upstream plant_vendor_commit "no longer yields the locked bytes" \
+    bash -c 'source tools/gate.sh; vendor_upstream'
 
 # renovate: a manager that stops matching; a half-applied version bump; a greedy Lake manager that
 # fuses two packages into one match (the two-package fixture catches it).
@@ -341,6 +368,9 @@ probe renovate-repin plant_halfbump "re-pin with tools/pin-tool.sh zizmor 99.0.0
     python3 -I tools/check-renovate.py
 plant_lake_manager() { sed -i 's/\*?\\"name\\"/*\\"name\\"/' renovate.json; }
 probe renovate-lake plant_lake_manager "tests/renovate/lake-manifest.json: extracted" \
+    python3 -I tools/check-renovate.py
+plant_vendor_manager() { sed -i 's/\\"commit\\"/\\"comit\\"/' renovate.json; }
+probe renovate-vendor plant_vendor_manager "vendor/hacl-star/lock.json: extracted" \
     python3 -I tools/check-renovate.py
 
 # meta: version disagreement; an unquoted rule `paths:` entry; a Lake target the gate never builds.

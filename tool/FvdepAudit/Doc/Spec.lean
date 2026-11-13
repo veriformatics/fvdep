@@ -305,6 +305,66 @@ def LockWF (l : Lock) : Prop :=
 
 /-! ## D6 envelope -/
 
+/-! ## D5 general types (reviewer-3 D10): the kinds a field's `wrong_type` is judged against,
+written from interface §6 + D3 + D4 apart from the shipped schema data. -/
+
+mutual
+/-- Each node's general JSON kinds by key path, pre-order: an object = `obj`, then its
+discriminator, then its fields in stored order (a string discriminator: every accepted variant's
+fields under `@<variant>`, in accepted order); an array = its kinds, then element 0 (`0`) + every
+later element (`*`); a variant type = its case for the enclosing variant. -/
+def kindTable (tag : String) (p : List String) : Ty → List (List String × List JKind)
+  | .scalar ks _ => [(p, ks)]
+  | .obj none fs => (p, [.obj]) :: fieldKinds tag p fs
+  | .obj (some (.int k _)) fs => (p, [.obj]) :: (p ++ [k], [.int]) :: fieldKinds tag p fs
+  | .obj (some (.str k vs)) fs =>
+    (p, [.obj]) :: (p ++ [k], [.str]) :: vs.flatMap fun v => fieldKinds v (p ++ ["@" ++ v]) fs
+  | .arr ks h t _ => (p, ks) :: (kindTable tag (p ++ ["0"]) h ++ kindTable tag (p ++ ["*"]) t)
+  | .byTag cs => caseKinds tag p cs
+/-- The fields' tables, in stored order. -/
+def fieldKinds (tag : String) (p : List String) :
+    List (String × Ty) → List (List String × List JKind)
+  | [] => []
+  | (k, t) :: fs => kindTable tag (p ++ [k]) t ++ fieldKinds tag p fs
+/-- The first case named `tag`. -/
+def caseKinds (tag : String) (p : List String) :
+    List (String × Ty) → List (List String × List JKind)
+  | [] => []
+  | (v, t) :: cs => if v == tag then kindTable tag p t else caseKinds tag p cs
+end
+
+/-- Interface §6 `<receipt>` for one evidence variant: `T` = `[str]`, `T|null` = `[null, str]`,
+objects `[obj]`; `request.adapter` = `[argv…]|null`, its elements strings under differential
+evidence (proof evidence: null alone, elements never judged). -/
+def receiptVariantKinds (v : String) : List (List String × List JKind) :=
+  let at_ (ks : List String) := ["@" ++ v] ++ ks
+  [(at_ ["checked"], [.str]), (at_ ["digests"], [.obj]),
+      (at_ ["digests", "adapter"], [.null, .str]), (at_ ["digests", "impl_sources"], [.null, .str]),
+      (at_ ["digests", "phase1_export"], [.null, .str]),
+      (at_ ["digests", "proof_sources"], [.null, .str]),
+      (at_ ["digests", "solution_export"], [.null, .str]),
+      (at_ ["digests", "spec_closure"], [.str]), (at_ ["library"], [.str]),
+      (at_ ["policy"], [.str]), (at_ ["request"], [.obj]),
+      (at_ ["request", "adapter"], [.arr, .null])] ++
+    (if v == "differential" then
+      [(at_ ["request", "adapter", "0"], [.str]), (at_ ["request", "adapter", "*"], [.str])]
+    else []) ++
+    [(at_ ["request", "impl"], [.null, .str]), (at_ ["request", "module"], [.str]),
+      (at_ ["request", "proof"], [.null, .str]), (at_ ["request", "shape"], [.null, .str]),
+      (at_ ["request", "version"], [.str]), (at_ ["verification_profile"], [.str])]
+
+/-- D3: a receipt object, its discriminator `evidence` (a string), both variants. -/
+def receiptKinds : List (List String × List JKind) :=
+  ([], [.obj]) ::
+    (["evidence"], [.str]) :: (receiptVariantKinds "differential" ++ receiptVariantKinds "proof")
+
+/-- D4: the lock root, its discriminator `schema` (an integer), `library`, `modules` = an array of
+receipts. -/
+def lockKinds : List (List String × List JKind) :=
+  [([], [.obj]), (["schema"], [.int]), (["library"], [.str]), (["modules"], [.arr])] ++
+    receiptKinds.map (fun e => (["modules", "0"] ++ e.1, e.2)) ++
+    receiptKinds.map (fun e => (["modules", "*"] ++ e.1, e.2))
+
 /-- Interface §6: the name of each command with `--json` output. -/
 def commandText : Command → String
   | .check => "check"

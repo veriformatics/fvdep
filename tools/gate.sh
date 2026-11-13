@@ -100,6 +100,8 @@ secrets     checks
 vulns       checks
 workflows   checks
 fanout      checks
+vendor      checks
+vendor-upstream checks
 deps        checks
 renovate    checks
 meta        checks
@@ -109,7 +111,7 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
@@ -298,12 +300,20 @@ fanout() {
     return $rc
 }
 
-# Every pin (lean-toolchain, tools/tools.lock, workflow actions, Lake packages) has a row in
-# docs/dependencies.md naming its update path + scanner.
+# Vendored upstream trees (vendor/*/lock.json) hold exactly their locked bytes; relock with
+# tools/vendor-hacl.sh.
+vendor() { bash tools/check-vendor.sh; }
+
+# The locked upstream commit's allowlisted blobs = the lock + the tree (network: a fresh fetch by
+# commit id; a Renovate bump of `commit` alone stays red here until relocked).
+vendor_upstream() { bash tools/vendor-hacl.sh --check; }
+
+# Every pin (lean-toolchain, tools/tools.lock, workflow actions, Lake packages, vendored
+# upstreams) has a row in docs/dependencies.md naming its update path + scanner.
 deps() { python3 -I tools/check-deps.py; }
 
 # Renovate's custom managers extract every pin they own (lean-toolchain, tools/tools.lock, every
-# Lake manifest), and the lock file keeps one coherent version per tool.
+# Lake manifest, every vendor lock), and the lock file keeps one coherent version per tool.
 renovate() { python3 -I tools/check-renovate.py; }
 
 # One version in Fvdep/Version.lean + both lakefiles; the target lists above = every lean_lib +
