@@ -79,7 +79,7 @@ Binding source = `.agent/spec.md` `Decisions` (Public interface, Data formats, L
   - `list`: `{"operations":[{"id":<id>,"version":<str>,"obligations":{"proven":<n>,"total":<n>}}…],"profiles":[{"id":<profile>,"version":<str>,"area":"published"|"preview","operations":[{"name":<str>,"contract":<id@ver>,"status":"published"|"preview"}…]}…]}`.
   - `outdated`: `{"modules":[{"module":<id>,"pinned":<str>,"latest":<str>,"compat":"same_behaviour"|"not_stated"|"major"|"up_to_date","retracted":null|{"reason":<str>,"replacement":<str|null>}}…]}`.
   - `scan`: `{"dependencies":[{"ecosystem":<str>,"package":<str>,"resolved":<str|null>,"range":<str|null>,"scope":"direct"|"indirect","coverage":"covered"|"conditional"|"preview"|"not_covered"|"unresolved","operations":null|{"proven":<k>,"total":<n>},"suggestions":[<profile>…],"assumes":[<str>…],"lockfile":<path>}…]}`.
-- Codes: `profile_construct`, `import_not_allowed`, `reserved_module`, `build_failed`, `statement_mismatch`, `graph_mismatch`, `axiom`, `kernel_reject`, `kernel_crash`, `kernel_timeout`, `kernel_decline`, `sandbox_setup`, `tool_missing`, `stale_receipt`, `retracted`, `policy_proof_required`, `mismatch`, `not_delivered`, `usage`, `no_project`, `schema`, `toolchain`, `adapter`, `fetch_failed`, `io`, `commit_io`, `internal` (fvdep's own evidence pipeline broke its protocol: exit 2).
+- Codes: `profile_construct`, `import_not_allowed`, `reserved_module`, `build_failed`, `statement_mismatch`, `graph_mismatch`, `axiom`, `kernel_reject`, `kernel_crash`, `kernel_timeout`, `kernel_decline`, `sandbox_setup`, `tool_missing`, `stale_receipt`, `retracted`, `policy_proof_required`, `mismatch`, `not_delivered`, `usage`, `no_project`, `schema`, `toolchain`, `adapter`, `fetch_failed`, `io`, `commit_io`, `internal` (fvdep's own evidence pipeline or TOML reader broke its protocol: exit 2).
 - Text only in v1: `show`, `profile`, `trust`, `admit`, `fvdep-grow` (`.agent/deferred.md`).
 
 ## 7 `fvdep.toml` schema 1
@@ -111,6 +111,7 @@ adapter = ["python3", "impl/decode.py"]
 - Proof entry: `version`, `shape`, `impl_modules`, `proof_modules`, `impl`, `proof`, all required. Differential entry: `version`, `evidence = "differential"`, `adapter`, all required; proof-entry keys forbidden there.
 - Module lists: nonempty, no repeats, no module in both lists; module `A.B` = file `A/B.lean` under the project directory; reserved prefixes (`docs/library.md` Naming) refused. `adapter` = nonempty argv, run from the project directory.
 - Unknown key, duplicate key, missing required key, forbidden key, wrong type, unknown `schema` → exit 2 naming it.
+- Size: at most 64 KiB (65,536 bytes). A larger `fvdep.toml` → exit 2 `schema`.
 
 ## 8 Adapter protocol v1 (differential checks + package profiles)
 
