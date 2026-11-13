@@ -14,7 +14,9 @@ registry_ok || exit 2
 start="$(stamp)"
 ledger_begin fast
 
-sequential=(lean-build lean-style lean-test cli)
+sequential=(lean-build lean-style lean-test cli coverage ledger-suite)
+# The fixture suite's green verdict stands while its inputs are unchanged (gate.sh ledger_suite).
+export FVDEP_REUSE=1
 parallel=()
 for name in $FAST_STAGES; do
     [[ " ${sequential[*]} " == *" $name "* ]] || parallel+=("$name")

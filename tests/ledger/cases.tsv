@@ -1,0 +1,82 @@
+# id	case	fixture	rc	code	spec	action
+T1	clean ledger writes then checks	Clean	0	-	open	writecheck
+T2	doc drift	Clean	1	doc	open	drift
+T3	caller bypasses subject	Bypass	1	edge	open	negative
+T4	unused reference with weakened theorem	UnusedReference	1	statement	open	negative
+T5	theorem differs from statement	WrongTheoremType	1	statement	open	negative
+T6	sorry theorem	Sorry	1	axiom	open	negative
+T7	foreign axiom	ForeignAxiom	1	axiom	open	negative
+T8	forged theorem in owned import	Forged	1	replay	open	negative
+T9	uncovered reachable definition in covered module	UncoveredDefinition	1	uncovered	open	negative
+T10	missing row for reachable imported module	MissingReachableModule	1	module	open	negative
+T11	claim-free row without unproven id	EmptyWaiver	1	waiver	open	negative
+T12	unknown residue id	UnknownResidue	1	residue	open	negative
+T13	missing ruling text	MissingRuling	1	ruling	open	negative
+T14	stale noCaller for reachable subject	StaleNoCaller	1	nocaller	open	negative
+T15a	noCaller names closed unit	Detached	1	nocaller	closed	negative
+T15b	noCaller names absent unit	Detached	1	nocaller	absent	negative
+T16	implemented_by in proved closure	ImplementedBy	1	compiled	open	negative
+T17	extern with body in proved closure	Extern	1	compiled	open	negative
+T18	partial definition in proved closure	Partial	1	compiled	open	negative
+T19	broken root shape	BrokenRoot	1	root	open	negative
+T20	statement never mentions subject	NotAboutSubject	1	about	open	negative
+T21a	path omits main endpoint	PathStart	1	path	open	negative
+T21b	path ends at another constant	PathEnd	1	path	open	negative
+T22	subject outside row component	WrongComponent	1	subject	open	negative
+T23	proof name denotes a definition	NotTheorem	1	theorem	open	negative
+T24a	cited extern boundary	ExternBoundary	0	-	open	writecheck
+T24b	cited opaque boundary	OpaqueBoundary	0	-	open	writecheck
+T24c	cited implemented_by boundary	ImplementedBoundary	0	-	open	writecheck
+T25a	unknown option	Clean	2	-	open	usage-unknown
+T25b	missing module	Clean	2	-	open	usage-module
+T25c	opaque nonliteral ledger	Nonliteral	2	-	open	usage-nonliteral
+T25d	missing ledger declaration	Clean	2	-	open	usage-ledger
+T25e	missing doc argument	Clean	2	-	open	usage-argument
+T25f	missing check or write mode	Clean	2	-	open	usage-mode
+T26	unreachable shipped library module without row	MissingUnusedLibrary	1	module	open	negative
+T27	unknown unproven id	UnknownUnproven	1	residue	open	negative
+T28	statement definition has non-Prop type	StatementNotProp	1	statement	open	negative
+T29	statement is a theorem not a definition	StatementNotDefinition	1	statement	open	negative
+T30	missing statement declaration	MissingStatement	1	statement	open	negative
+T31	missing theorem declaration	MissingTheorem	1	theorem	open	negative
+T32	missing subject declaration	MissingSubject	1	subject	open	negative
+T33	main edge bypasses plan and interpreter	MainEdge	1	path	open	negative
+T34	call edge lacks a proved composition	UnprovedEdge	1	edge	open	negative
+T35	empty path without noCaller	EmptyNoCaller	1	nocaller	open	negative
+T36	detached subject with open noCaller	Detached	0	-	open	writecheck
+T37	unit prefix is not the named unit	Detached	1	nocaller	prefix	negative
+T38	opaque definition outside boundary	Opaque	1	compiled	open	negative
+T39	boundary not cited by claim row	UncitedBoundary	1	compiled	open	negative
+T40	ancestor boundary does not waive descendants	AncestorBoundary	1	compiled	open	negative
+T41	claim-free row with ruled unproven id	RuledWaiver	0	-	open	writecheck
+T42	alpha-equivalent binder names	AlphaEquivalent	0	-	open	writecheck
+T43	definitional equality is not alpha equality	DefeqNotAlpha	1	statement	open	negative
+T44	seeded doc mutation property	Clean	1	doc	open	property-drift
+T45	write is byte-deterministic	Clean	0	-	open	idempotent
+T46	finding does not create missing doc	WrongTheoremType	1	statement	open	no-create
+T47	render contains row claims and residue reasons	Clean	0	-	open	render
+T48	standard Classical.choice axiom is allowed	StdChoice	0	-	open	writecheck
+T49	universe parameters differ	UniverseMismatch	1	statement	open	negative
+T50	extern deeper in proved closure	NestedExtern	1	compiled	open	negative
+T51	implemented_by deeper in proved closure	NestedImplementedBy	1	compiled	open	negative
+T52	forged theorem in unused owned import	ForgedUnusedImport	1	replay	open	negative
+T53	interpreter is exempt from compiled scan	InterpreterExempt	0	-	open	writecheck
+T54	transitive call edge with proved composition	TransitiveEdge	0	-	open	writecheck
+T55	extern in path closure outside subject closure	PathClosureExtern	1	compiled	open	negative
+T56	unsafe subject in proved closure	Unsafe	1	compiled	open	negative
+T57	owned by module metadata despite foreign-looking namespace	MetadataOwned	1	module	open	negative
+T58	subject component uses module metadata not namespace	MetadataSubject	0	-	open	writecheck
+T59	doc finding names first differing line	Clean	1	doc	open	first-line
+T60	write creates canonical document when absent	Clean	0	-	open	create
+T61	opaque behind an owned helper	NestedOpaque	1	compiled	open	negative
+T62	unsafe behind safe owned helpers	NestedUnsafe	1	compiled	open	negative
+T63	partial behind an owned helper	NestedPartial	1	compiled	open	negative
+T64	support component reached by a valid caller row	Support	0	-	open	writecheck
+T65	support component absent from all caller closures	SupportOrphan	1	nocaller	open	negative
+T66	root main cannot be a row subject	RootSubject	1	subject	open	negative
+T67	ruling occurs only outside Decisions	RulingOutside	1	ruling	outside	negative
+T68	deep statement is not truncated	DeepStatement	0	-	open	deep
+T69	support anchor has an invalid nonempty path	SupportBadPath	1	nocaller	open	negative
+T70	statement hash matches independent Expr.hash oracle	Clean	0	-	open	hash
+T71	supporting theorem unused by caller proof	SupportUnusedProof	0	-	open	writecheck
+T72	claim-free supporting literal with ruled unproven residue	SupportLiteral	0	-	support-data	writecheck

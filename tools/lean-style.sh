@@ -17,6 +17,9 @@ if [[ ${#files[@]} -eq 0 ]]; then
 fi
 rc=0
 for f in "${files[@]}"; do
+    # Generated ledger fixtures (tests/ledger/generate.py + regenerate.sh): their layout = the
+    # generator's + lean-fmt's (a 160-deep statement stairs past 100 columns); lean-fmt still checks.
+    [[ "$f" == tool/FvdepLedgerFixtures/* ]] && continue
     LC_ALL=C.UTF-8 awk -v f="$f" '
         /\t/ { printf "%s:%d: tab\n", f, FNR; bad = 1 }
         /[ \t]$/ { printf "%s:%d: trailing whitespace\n", f, FNR; bad = 1 }

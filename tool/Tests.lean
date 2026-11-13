@@ -55,6 +55,88 @@ def expected (args : List String) : Outcome :=
       ⟨usage, "", 0⟩
     else ⟨"", usage, 2⟩
 
+/-! Core regressions (contract U2 E3, E5, P7, P9): named cases from reviewer-2's counterexamples. -/
+
+namespace Core
+
+open FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status
+
+def seg : Seg := ⟨⟨0, by decide⟩, []⟩
+
+def modId : ModuleId := ⟨seg, seg, []⟩
+
+def commit : Commit := ⟨List.replicate 40 ⟨0, by decide⟩, by decide⟩
+
+def decl : Decl := ⟨modId, ⟨1, 0, 0⟩, some .fn, .proof, some "Impl.f", some "Proof.eq"⟩
+
+def request : RequestKey := ⟨decl, "spec", some "impl", some "proof", none⟩
+
+def profile : Profile := ⟨"qualified-v1", ["propext", "Classical.choice", "Quot.sound"]⟩
+
+def key : ChallengeKey := ⟨request, commit, profile, "statement"⟩
+
+/-- Phases 0–2 passed; the statement did not match. -/
+def statementFailed : List Observation :=
+  [Obs.implProfile none, .phase1 (.ok "e1"), .phase2 "e1" (.ok "e2"),
+        .statement "e1" "e2" false].map
+    fun o => ⟨key, o⟩
+
+def base : FvdepCore.Evidence.Result := result key statementFailed
+
+def diffKey : ChallengeKey :=
+  { key with
+    request :=
+      { request with
+        decl :=
+          { decl with
+            kind := .differential
+            shape := none
+            impl := none
+            proof := none }
+        implSources := none
+        proofSources := none
+        adapter := some "adapter" } }
+
+def comparison : Observation :=
+  ⟨diffKey, .compare "adapter" "encode" "00" (.mismatch "wrong" "right")⟩
+
+def common : Common := ⟨request, commit, profile.id, .required, "now"⟩
+
+/-- An empty manifest + a lock with one entry: the files disagree. -/
+def emptyManifest : Manifest := ⟨commit, []⟩
+
+def extraLock : Lock := ⟨commit, [.proof common "e1" "e2"]⟩
+
+def outOfDateNamed : LockState → Bool
+  | .outOfDate cs => !cs.isEmpty
+  | _ => false
+
+def cases : List (String × (Unit → Bool)) :=
+  [("core: a failed statement is NOT PROVEN with statement_mismatch", fun _ =>
+      match base with
+      | .verdict .notProven rs => rs.any (·.code == .statementMismatch)
+      | _ => false),
+    ("core E3: an observation bound to other exports never changes the result", fun _ =>
+      result key (statementFailed ++ [⟨key, .graph "other-e1" "other-e2" true⟩]) == base),
+    ("core E5: a protocol violation keeps the failed phase's reasons", fun _ =>
+      match base, result key (statementFailed ++ [⟨key, .graph "e1" "e2" true⟩]) with
+      | .verdict .notProven rs, .infra cause ns => cause.code == .internal && ns == rs
+      | _, _ => false),
+    ("core E3: an identical comparison counts once", fun _ =>
+      result diffKey [comparison, comparison] == result diffKey [comparison]),
+    ("core P7: files that disagree → development status exit 1, no manifest module too", fun _ =>
+      statusExit .development emptyManifest extraLock ⟨[]⟩ [] == .negative),
+    ("core P7: files that disagree → required status exit 1, no manifest module too", fun _ =>
+      statusExit .required emptyManifest extraLock ⟨[]⟩ [] == .negative),
+    ("core P9: an export-only lock difference names its change", fun _ =>
+      outOfDateNamed (lockState (some (.proof common "e1" "e2")) (.proof common "e1'" "e2"))),
+    ("core P9: a policy-only lock difference names its change", fun _ =>
+      outOfDateNamed
+        (lockState (some (.proof common "e1" "e2"))
+          (.proof { common with policy := .development } "e1" "e2")))]
+
+end Core
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -66,26 +148,28 @@ def main : IO UInt32 := do
   IO.println s!"seed {seed}"
   let generated := argLists seed 2000
   let results ←
-    [check "cli: --version prints exactly \"fvdep <version>\" + LF on stdout, rc 0" fun _ =>
-              run ["--version"] == ⟨s!"fvdep {Fvdep.version}\n", "", 0⟩,
-            check "cli: help + --help print usage on stdout, rc 0" fun _ =>
-              run ["help"] == ⟨usage, "", 0⟩ && run ["--help"] == ⟨usage, "", 0⟩,
-            check "cli: help <command> + <command> --help print usage on stdout, rc 0" fun _ =>
-              run ["help", "help"] == ⟨usage, "", 0⟩ && run ["help", "--help"] == ⟨usage, "", 0⟩,
-            check "cli: no argument → usage on stderr, rc 2" fun _ => run [] == ⟨"", usage, 2⟩,
-            check "cli: unknown command, unknown option, extra argument → usage on stderr, rc 2"
-              fun _ =>
-              run ["frobnicate"] == ⟨"", usage, 2⟩ && run ["--frobnicate"] == ⟨"", usage, 2⟩ &&
-                run ["--version", "extra"] == ⟨"", usage, 2⟩ &&
-                run ["help", "help", "x"] == ⟨"", usage, 2⟩,
-            check "cli: usage starts with the usage line + names every command and option" fun _ =>
-              usage.startsWith "Usage: fvdep <command>" &&
-                ["help [<command>]", "--help", "--version"].all fun s =>
-                  (usage.splitOn s).length > 1,
-            check s!"cli: {generated.length} generated argument lists match the contract table"
-              fun _ => generated.all fun args => run args == expected args,
-            check "cli: generated lists reach every outcome class" fun _ =>
-              [0, 2].all fun rc => generated.any fun args => (run args).exit == rc].mapM
+    ([check "cli: --version prints exactly \"fvdep <version>\" + LF on stdout, rc 0" fun _ =>
+                run ["--version"] == ⟨s!"fvdep {Fvdep.version}\n", "", 0⟩,
+              check "cli: help + --help print usage on stdout, rc 0" fun _ =>
+                run ["help"] == ⟨usage, "", 0⟩ && run ["--help"] == ⟨usage, "", 0⟩,
+              check "cli: help <command> + <command> --help print usage on stdout, rc 0" fun _ =>
+                run ["help", "help"] == ⟨usage, "", 0⟩ && run ["help", "--help"] == ⟨usage, "", 0⟩,
+              check "cli: no argument → usage on stderr, rc 2" fun _ => run [] == ⟨"", usage, 2⟩,
+              check "cli: unknown command, unknown option, extra argument → usage on stderr, rc 2"
+                fun _ =>
+                run ["frobnicate"] == ⟨"", usage, 2⟩ && run ["--frobnicate"] == ⟨"", usage, 2⟩ &&
+                  run ["--version", "extra"] == ⟨"", usage, 2⟩ &&
+                  run ["help", "help", "x"] == ⟨"", usage, 2⟩,
+              check "cli: usage starts with the usage line + names every command and option"
+                fun _ =>
+                usage.startsWith "Usage: fvdep <command>" &&
+                  ["help [<command>]", "--help", "--version"].all fun s =>
+                    (usage.splitOn s).length > 1,
+              check s!"cli: {generated.length} generated argument lists match the contract table"
+                fun _ => generated.all fun args => run args == expected args,
+              check "cli: generated lists reach every outcome class" fun _ =>
+                [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
+            Core.cases.map fun c => check c.1 c.2).mapM
         id
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

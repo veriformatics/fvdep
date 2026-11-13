@@ -41,6 +41,10 @@ copy() {
     for d in .lake tool/.lake; do
         [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
     done
+    # The fixture suite's green mark (keyed on its inputs): the fast gate in a copy reuses it.
+    if [[ -f "$root/.gate/ledger-suite.green" ]]; then
+        mkdir -p "$dir/.gate" && cp "$root/.gate/ledger-suite.green" "$dir/.gate/"
+    fi
     printf '%s' "$dir"
 }
 
@@ -348,6 +352,17 @@ probe meta-targets plant_target "FvdepPlanted" meta_stage
 # spec: a spec missing its Phase section.
 plant_spec() { sed -i '/^## Phase/,$d' .agent/spec.md; }
 probe spec plant_spec "spec-lint:" bash -c 'source tools/gate.sh; spec'
+
+# coverage: docs/verification.md one byte off the ledger's rendering → the `doc` finding.
+plant_doc_drift() { sed -i '1s/^/x/' docs/verification.md; }
+probe coverage plant_doc_drift "ledger: root: doc:" bash -c 'source tools/gate.sh; coverage'
+
+# ledger-suite: a negative case whose expected rc is flipped fails the suite, named (one case).
+plant_case_flip() {
+    awk -F'\t' -v OFS='\t' '$1 == "T5" { $4 = 0 } 1' tests/ledger/cases.tsv >cases.tmp &&
+        mv cases.tmp tests/ledger/cases.tsv
+}
+probe ledger-suite plant_case_flip "FAIL T5" env FVDEP_LEDGER_ONLY=T5 bash tests/ledger/run.sh
 
 # cli: a binary answering as the contract says passes; one printing a wrong version fails. The fake
 # mirrors docs/interface.md §1–§2 whole, failed writes included (exit 2; the message unless the pipe
