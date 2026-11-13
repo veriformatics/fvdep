@@ -353,11 +353,122 @@ theorem decimal_free (n : Nat) (c : Char) (hc : c = '.' ∨ c = '_' ∨ c = '@')
       simp only [List.mem_append, List.mem_singleton, not_or]
       exact ⟨ih (n / 10) (by omega), fun e => hdig (n % 10) (Nat.mod_lt _ (by omega)) e.symm⟩
 
+/-! Fast forms. `decimal` + `value` = the references: one bignum division (print) or copy (read) per
+digit + appends at the tail ⇒ O(n²), 24–33 s per 65,532-digit version on vflab. Parsers + printers
+call the fast forms (halves: one big multiplication or division per level), each proven equal to its
+reference on every input. -/
+
+/-- The `k` low digits of `m`, zero-padded, most significant first. -/
+def digitsK : Nat → Nat → List Char
+  | 0, _ => []
+  | k + 1, m => digitsK k (m / 10) ++ [digit (m % 10)]
+
+theorem digitsK_add (a b m : Nat) : digitsK (a + b) m = digitsK a (m / 10 ^ b) ++ digitsK b m := by
+  induction b generalizing m with
+  | zero => simp [digitsK]
+  | succ b ih =>
+    show digitsK (a + b + 1) m = digitsK a (m / 10 ^ (b + 1)) ++ digitsK (b + 1) m
+    simp only [digitsK, ih, Nat.div_div_eq_div_mul, Nat.pow_succ', List.append_assoc]
+
+theorem digitsK_mod (k m : Nat) : digitsK k (m % 10 ^ k) = digitsK k m := by
+  induction k generalizing m with
+  | zero => rfl
+  | succ k ih =>
+    simp only [digitsK, Nat.pow_succ', Nat.mod_mul_right_div_self, ih,
+      Nat.mod_mod_of_dvd _ (Nat.dvd_mul_right 10 _)]
+
+/-- `digitsK` by halves. -/
+def padded (k m : Nat) : List Char :=
+  if k ≤ 9 then digitsK k m
+  else padded (k - k / 2) (m / 10 ^ (k / 2)) ++ padded (k / 2) (m % 10 ^ (k / 2))
+termination_by k
+decreasing_by all_goals omega
+
+theorem padded_eq (k m : Nat) : padded k m = digitsK k m := by
+  induction k using Nat.strongRecOn generalizing m with
+  | _ k ih =>
+    unfold padded
+    split
+    · rfl
+    · rw [ih _ (by omega), ih _ (by omega), digitsK_mod, ← digitsK_add,
+        Nat.sub_add_cancel (Nat.div_le_self k 2)]
+
+theorem decimal_ge {n : Nat} (h : 10 ≤ n) : decimal n = decimal (n / 10) ++ [digit (n % 10)] := by
+  rw [decimal]
+  split
+  · exact absurd h (by omega)
+  · rfl
+
+theorem decimal_split (k n : Nat) (h : 10 ^ k ≤ n) :
+    decimal n = decimal (n / 10 ^ k) ++ digitsK k n := by
+  induction k generalizing n with
+  | zero => simp [digitsK]
+  | succ k ih =>
+    have hp : 0 < 10 ^ k := Nat.pow_pos (by decide)
+    rw [Nat.pow_succ'] at h
+    have hq : 10 ^ k ≤ n / 10 := (Nat.le_div_iff_mul_le (by decide)).2 (by rwa [Nat.mul_comm])
+    rw [decimal_ge (by omega), ih _ hq]
+    simp only [digitsK, Nat.div_div_eq_div_mul, Nat.pow_succ', List.append_assoc]
+
+/-- `decimal` by halves: `n = hi * 10^k + lo` ⇒ `decimal hi ++` the `k` digits of `lo`; `k` ≈ half
+the digits (log₁₀ 2 ≈ 3/10). The guard keeps the reference where a split would not shrink `n`. -/
+def decimalFast (n : Nat) : List Char :=
+  if n < 1000000000 then decimal n
+  else
+    let k := n.log2 * 3 / 20
+    if 0 < k ∧ 10 ^ k ≤ n then decimalFast (n / 10 ^ k) ++ padded k (n % 10 ^ k) else decimal n
+termination_by n
+decreasing_by exact Nat.div_lt_self (by omega) (Nat.one_lt_pow (by omega) (by decide))
+
+theorem decimalFast_eq (n : Nat) : decimalFast n = decimal n := by
+  induction n using Nat.strongRecOn with
+  | _ n ih =>
+    unfold decimalFast
+    split
+    · rfl
+    · dsimp only
+      split
+      · rename_i h
+        rw [ih _ (Nat.div_lt_self (by omega) (Nat.one_lt_pow (by omega) (by decide))), padded_eq,
+          digitsK_mod, ← decimal_split _ _ h.2]
+      · rfl
+
+theorem value_append' (a b : List Char) : value (a ++ b) = value a * 10 ^ b.length + value b := by
+  induction b generalizing a with
+  | nil => simp [value]
+  | cons c b ih =>
+    have hc : value [c] = c.toNat - 48 := by simp [value]
+    have hm : 10 * value a * 10 ^ b.length = value a * (10 ^ b.length * 10) := by
+      rw [Nat.mul_comm 10 (value a), Nat.mul_assoc, Nat.mul_comm 10]
+    rw [List.length_cons, show a ++ c :: b = a ++ [c] ++ b by simp, ih, value_append,
+      show c :: b = [c] ++ b from rfl, ih [c], hc, Nat.pow_succ, Nat.add_mul]
+    omega
+
+/-- `value` by halves. -/
+def valueFast (cs : List Char) : Nat :=
+  if cs.length ≤ 9 then value cs
+  else
+    valueFast (cs.take (cs.length / 2)) * 10 ^ (cs.length - cs.length / 2) +
+      valueFast (cs.drop (cs.length / 2))
+termination_by cs.length
+decreasing_by all_goals simp only [List.length_take, List.length_drop]; omega
+
+theorem valueFast_eq (cs : List Char) : valueFast cs = value cs := by
+  unfold valueFast
+  split
+  · rfl
+  · rw [valueFast_eq (cs.take _), valueFast_eq (cs.drop _)]
+    conv =>
+      rhs; rw [← List.take_append_drop (cs.length / 2) cs]
+    rw [value_append', List.length_drop]
+termination_by cs.length
+decreasing_by all_goals simp only [List.length_take, List.length_drop]; omega
+
 /-- A canonical decimal: no sign, no leading zero, digits alone. -/
-def parseNat (cs : List Char) : Option Nat := canon decimal cs (some (value cs))
+def parseNat (cs : List Char) : Option Nat := canon decimalFast cs (some (valueFast cs))
 
 theorem parseNat_decimal (n : Nat) : parseNat (decimal n) = some n := by
-  simp [parseNat, canon, value_decimal]
+  simp [parseNat, canon, decimalFast_eq, valueFast_eq, value_decimal]
 
 /-- `x.y.z` (`docs/library.md`: three decimal numbers without leading zeros). -/
 structure EntryVersion where
@@ -367,7 +478,7 @@ structure EntryVersion where
   deriving DecidableEq, Repr
 
 def EntryVersion.chars (v : EntryVersion) : List Char :=
-  decimal v.major ++ '.' :: (decimal v.minor ++ '.' :: decimal v.patch)
+  decimalFast v.major ++ '.' :: (decimalFast v.minor ++ '.' :: decimalFast v.patch)
 
 def EntryVersion.rough (cs : List Char) : Option EntryVersion :=
   match cut '.' cs with
@@ -387,6 +498,7 @@ instance : ToString EntryVersion where
 
 theorem EntryVersion.rough_chars (v : EntryVersion) : EntryVersion.rough v.chars = some v := by
   unfold EntryVersion.rough EntryVersion.chars
+  simp only [decimalFast_eq]
   rw [cut_append _ _ _ (decimal_free _ _ (.inl rfl)),
     cut_append _ _ _ (decimal_free _ _ (.inl rfl)), cut_free _ _ (decimal_free _ _ (.inl rfl))]
   simp [parseNat_decimal]
@@ -526,10 +638,10 @@ theorem decimal_inj {a b : Nat} (h : decimal a = decimal b) : a = b := by
 
 /-- The `V<x>_<y>_<z>` part of a Lean module name. -/
 def vPart (v : EntryVersion) : List Char :=
-  'V' :: (decimal v.major ++ '_' :: (decimal v.minor ++ '_' :: decimal v.patch))
+  'V' :: (decimalFast v.major ++ '_' :: (decimalFast v.minor ++ '_' :: decimalFast v.patch))
 
 theorem vPart_inj {v v' : EntryVersion} (h : vPart v = vPart v') : v = v' := by
-  simp only [vPart, List.cons.injEq, true_and] at h
+  simp only [vPart, decimalFast_eq, List.cons.injEq, true_and] at h
   have hc := congrArg (cut '_') h
   rw [cut_append _ _ _ (decimal_free _ _ (.inr (.inl rfl))),
     cut_append _ _ _ (decimal_free _ _ (.inr (.inl rfl))),
@@ -603,7 +715,7 @@ theorem ModuleId.at_free (m : ModuleId) : '@' ∉ m.chars := by
   exact Seg.char_free g _ (.inr (.inr rfl))
 
 theorem EntryVersion.at_free (v : EntryVersion) : '@' ∉ v.chars := by
-  simp only [EntryVersion.chars, List.mem_append, List.mem_cons, not_or]
+  simp only [EntryVersion.chars, decimalFast_eq, List.mem_append, List.mem_cons, not_or]
   exact
     ⟨decimal_free _ _ (.inr (.inr rfl)), by decide, decimal_free _ _ (.inr (.inr rfl)), by decide,
       decimal_free _ _ (.inr (.inr rfl))⟩
