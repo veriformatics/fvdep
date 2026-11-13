@@ -877,6 +877,196 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Doc`
+
+- Contract: U3 D2 + D3 + D5 + D7 + D8; Decisions Data formats
+- Claim: `Receipt.toJson` emits exactly the D3 layout; on a J1-valid value `Receipt.ofJson` accepts exactly the layouts of well-formed receipts (returning that receipt) and refuses with the D5 walk's first violation; a well-formed receipt encodes to a valid value; `Receipt.wellFormed` decides well-formedness.
+- Subject: `FvdepCore.Status.Receipt.ofJson`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.DocClaims.receiptEncodeExact` (hash 0x757e655), proved by `FvdepAudit.Doc.Proof.receipt_encode`:
+
+  ```lean
+  ∀ (r : FvdepCore.Status.Receipt), r.toJson = FvdepAudit.Doc.Spec.receiptLayout r
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptSchemaExact` (hash 0x80686a8b), proved by `FvdepAudit.Doc.Proof.receipt_schema_exact`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      (FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.receiptTy v = none ↔
+        ∃ r, FvdepAudit.Doc.Spec.ReceiptWF r ∧ v = FvdepAudit.Doc.Spec.receiptLayout r)
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptDecodeOk` (hash 0x3ec9d0), proved by `FvdepAudit.Doc.Proof.receipt_ok`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      ∀ (r : FvdepCore.Status.Receipt),
+        FvdepCore.Status.Receipt.ofJson v = Except.ok r ↔
+          FvdepAudit.Doc.Spec.ReceiptWF r ∧ v = FvdepAudit.Doc.Spec.receiptLayout r
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptDecodeError` (hash 0x39f5496a), proved by `FvdepAudit.Doc.Proof.receipt_error`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value) (e : FvdepCore.Doc.DocError),
+    FvdepCore.Status.Receipt.ofJson v = Except.error e ↔
+      FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.receiptTy v = some e
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptValid` (hash 0x7dc4d944), proved by `FvdepAudit.Doc.Proof.receipt_valid`:
+
+  ```lean
+  ∀ (r : FvdepCore.Status.Receipt),
+    FvdepAudit.Doc.Spec.ReceiptWF r → FvdepAudit.Json.Spec.Valid r.toJson
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.receiptCheck` (hash 0x9f7c0357), proved by `FvdepAudit.Doc.Proof.receipt_check`:
+
+  ```lean
+  ∀ (r : FvdepCore.Status.Receipt), r.wellFormed = true ↔ FvdepAudit.Doc.Spec.ReceiptWF r
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Doc`
+
+- Contract: U3 D2 + D4 + D5 + D7 + D8; Decisions Data formats
+- Claim: `fvdep.lock`: a lock's JSON is exactly the D4 layout; on a J1-valid value `Lock.ofJson` accepts exactly the layouts of well-formed locks and refuses with the D5 walk's first violation; `decodeLock` returns a well-formed lock's canonical bytes back as that lock and refuses with J3's text error first, else the walk's first violation; `Lock.normalize` keeps the receipts + library, orders module ids (stable), and yields a well-formed lock from distinct well-formed receipts; `Lock.wellFormed` decides well-formedness.
+- Subject: `FvdepCore.Doc.decodeLock`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.DocClaims.lockEncodeExact` (hash 0x4b3a96fd), proved by `FvdepAudit.Doc.Proof.lock_encode`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock), l.toJson = FvdepAudit.Doc.Spec.lockLayout l
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockSchemaExact` (hash 0x69eeff4d), proved by `FvdepAudit.Doc.Proof.lock_schema_exact`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      (FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.lockTy v = none ↔
+        ∃ l, FvdepAudit.Doc.Spec.LockWF l ∧ v = FvdepAudit.Doc.Spec.lockLayout l)
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockDecodeOk` (hash 0xa30dea06), proved by `FvdepAudit.Doc.Proof.lock_ok`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      ∀ (l : FvdepCore.Status.Lock),
+        FvdepCore.Status.Lock.ofJson v = Except.ok l ↔
+          FvdepAudit.Doc.Spec.LockWF l ∧ v = FvdepAudit.Doc.Spec.lockLayout l
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockDecodeError` (hash 0xa8337ed9), proved by `FvdepAudit.Doc.Proof.lock_error`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value) (e : FvdepCore.Doc.DocError),
+    FvdepCore.Status.Lock.ofJson v = Except.error e ↔
+      FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.lockTy v = some e
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockValid` (hash 0x538af00a), proved by `FvdepAudit.Doc.Proof.lock_valid`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock), FvdepAudit.Doc.Spec.LockWF l → FvdepAudit.Json.Spec.Valid l.toJson
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockCheck` (hash 0x6999123f), proved by `FvdepAudit.Doc.Proof.lock_check`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock), l.wellFormed = true ↔ FvdepAudit.Doc.Spec.LockWF l
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockBytesEncode` (hash 0xea2dfe55), proved by `FvdepAudit.Doc.Proof.lock_bytes_encode`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock),
+    FvdepAudit.Doc.Spec.LockWF l → FvdepCore.Doc.decodeLock (FvdepCore.Doc.encodeLock l) = Except.ok l
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockBytesOk` (hash 0xdaf245e), proved by `FvdepAudit.Doc.Proof.lock_bytes_ok`:
+
+  ```lean
+  ∀ (b : ByteArray) (l : FvdepCore.Status.Lock),
+    FvdepCore.Doc.decodeLock b = Except.ok l →
+      FvdepAudit.Doc.Spec.LockWF l ∧
+        ∃ v, FvdepCore.Json.decode b = Except.ok v ∧ v = FvdepAudit.Doc.Spec.lockLayout l
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.lockBytesError` (hash 0xf465d599), proved by `FvdepAudit.Doc.Proof.lock_bytes_error`:
+
+  ```lean
+  ∀ (b : ByteArray) (e : FvdepCore.Doc.LockError),
+    FvdepCore.Doc.decodeLock b = Except.error e ↔
+      (∃ j, FvdepCore.Json.decode b = Except.error j ∧ e = FvdepCore.Doc.LockError.text j) ∨
+        ∃ v d,
+          FvdepCore.Json.decode b = Except.ok v ∧
+            FvdepAudit.Doc.Spec.firstViolation FvdepCore.Doc.lockTy v = some d ∧
+              e = FvdepCore.Doc.LockError.doc d
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.normalizePreserves` (hash 0x65ee3cf6), proved by `FvdepAudit.Doc.Proof.normalize_preserves`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock),
+    l.normalize.library = l.library ∧
+      l.normalize.entries.Perm l.entries ∧
+        List.Pairwise (fun x1 x2 => x1 ≤ x2) (List.map FvdepAudit.Doc.Spec.idOf l.normalize.entries) ∧
+          ∀ (a b : FvdepCore.Status.Receipt),
+            [a, b].Sublist l.entries →
+              FvdepAudit.Doc.Spec.idOf a = FvdepAudit.Doc.Spec.idOf b →
+                [a, b].Sublist l.normalize.entries
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.normalizeSorted` (hash 0xe05d2787), proved by `FvdepAudit.Doc.Proof.normalize_sorted`:
+
+  ```lean
+  ∀ (l : FvdepCore.Status.Lock),
+    (List.map FvdepAudit.Doc.Spec.idOf l.entries).Nodup →
+      (∀ (r : FvdepCore.Status.Receipt), r ∈ l.entries → FvdepAudit.Doc.Spec.ReceiptWF r) →
+        FvdepAudit.Doc.Spec.LockWF l.normalize
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Doc`
+
+- Contract: U3 D6 + D7 + D8; docs/interface.md §6
+- Claim: The `--json` envelope's JSON is exactly the D6 layout (result members verbatim, diagnostics clipped); a well-formed envelope encodes to a valid value; `Envelope.wellFormed` decides well-formedness.
+- Subject: `FvdepCore.Doc.Envelope.toJson`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.DocClaims.envelopeEncodeExact` (hash 0xddf0636c), proved by `FvdepAudit.Doc.Proof.envelope_encode`:
+
+  ```lean
+  ∀ (e : FvdepCore.Doc.Envelope), e.toJson = FvdepAudit.Doc.Spec.envelopeLayout e
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.envelopeCheck` (hash 0xa7b6a7a0), proved by `FvdepAudit.Doc.Proof.envelope_check`:
+
+  ```lean
+  ∀ (e : FvdepCore.Doc.Envelope), e.wellFormed = true ↔ FvdepAudit.Doc.Spec.EnvelopeWF e
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.envelopeValid` (hash 0x69694adb), proved by `FvdepAudit.Doc.Proof.envelope_valid`:
+
+  ```lean
+  ∀ (e : FvdepCore.Doc.Envelope),
+    FvdepAudit.Doc.Spec.EnvelopeWF e → FvdepAudit.Json.Spec.Valid e.toJson
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Doc`
+
+- Contract: U3 D1 + D7
+- Claim: `clip` keeps a text within 65,536 UTF-8 bytes, else its longest scalar-boundary prefix within 65,520 bytes + ` [truncated]`; every clipped text fits 65,536 bytes.
+- Subject: `FvdepCore.Doc.clip`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.DocClaims.clipExact` (hash 0x2d156300), proved by `FvdepAudit.Doc.Proof.clip_exact`:
+
+  ```lean
+  ∀ (s : String), FvdepCore.Doc.clip s = FvdepAudit.Doc.Spec.clipSpec s
+  ```
+- Statement `FvdepLedger.Rows.DocClaims.clipBound` (hash 0x2ced49c1), proved by `FvdepAudit.Doc.Proof.clip_bound`:
+
+  ```lean
+  ∀ (s : String), (FvdepCore.Doc.clip s).utf8ByteSize ≤ 65536
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

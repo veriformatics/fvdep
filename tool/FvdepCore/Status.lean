@@ -134,16 +134,18 @@ def Receipt.common : Receipt → Common
   | .differential c => c
 
 /-- P3: the digests + names a request of its kind carries (`docs/interface.md` §6–§7): proof =
-shape, implementation + proof constants, both source digests, no adapter; differential = the
-adapter digest, none of the proof fields. -/
+shape, implementation + proof constants, both source digests, no adapter argv or digest;
+differential = the adapter argv + its digest, none of the proof fields. -/
 def shaped (r : RequestKey) : Bool :=
   match r.decl.kind with
   | .proof =>
-    r.decl.shape.isSome && r.decl.impl.isSome && r.decl.proof.isSome && r.implSources.isSome &&
+    r.decl.shape.isSome && r.decl.impl.isSome && r.decl.proof.isSome && r.decl.adapter.isNone &&
+      r.implSources.isSome &&
       r.proofSources.isSome &&
       r.adapter.isNone
   | .differential =>
-    r.decl.shape.isNone && r.decl.impl.isNone && r.decl.proof.isNone && r.implSources.isNone &&
+    r.decl.shape.isNone && r.decl.impl.isNone && r.decl.proof.isNone && r.decl.adapter.isSome &&
+      r.implSources.isNone &&
       r.proofSources.isNone &&
       r.adapter.isSome
 
@@ -257,6 +259,7 @@ structure Manifest where
 structure Lock where
   library : Commit
   entries : List Receipt
+  deriving DecidableEq
 
 inductive Disagreement where
   | library
