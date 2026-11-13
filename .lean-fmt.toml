@@ -1,0 +1,5 @@
+exclude = ["prototype/**", "tool/**", "tools/**"]
+
+[format]
+line-width = 100
+declaration-body = "same-line"

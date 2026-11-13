@@ -1,0 +1,169 @@
+#!/usr/bin/env bash
+# Runs a command on vflab (shared with fvapi; `.claude/rules/gate.md`) in this worktree's
+# workspace, inside fvapi_gate.slice, and exits with the command's exit status. Contract U1 R1–R5.
+# Workspace ~/gate/ws/fvdep-<worktree>-<8 hex of sha256(worktree path)>: before each run, inside
+# the unit + under the workspace lock, it becomes a git repository at this worktree's HEAD (fetched
+# from a per-run bundle of the full history uploaded beside it; never fvapi's shared repository)
+# holding exactly the worktree's tracked + untracked-unignored files; every `.lake/` + `.tools/`
+# persist as caches, `.gate/` as the gate's step ledger. Lock, sync + command share one systemd
+# unit, so a dropped connection cannot free the workspace while the command runs; a workspace
+# recorded for another worktree path is refused. The slice must already exist with its caps
+# (fvapi's bootstrap): systemd would otherwise create an empty one on demand.
+# The unit is Type=oneshot (a simple service counts SIGTERM as success → a false green) with
+# --expand-environment=no (arguments stay literal) and IgnoreSIGPIPE=no (local shell semantics);
+# its own MemoryMax (below the slice's 40 GiB) keeps an OOM kill inside this run.
+# Output streams live, the remote workspace path mapped back to this worktree; the unit's
+# accounting (result, runtime, CPU time, memory peak) closes stderr as one `vflab-run:` line.
+# Usage: tools/vflab-run <command> [args…]   FVDEP_VFLAB = ssh target (default vflab);
+# FVDEP_VFLAB_TIMEOUT = whole seconds before the unit is stopped (default 7200);
+# FVDEP_VFLAB_MEMORY = the unit's MemoryMax, a K/M/G/T size below the slice's cap (default 24G).
+# Exit: the command's status (0–255); 2 = usage or a malformed setting (no remote action);
+# 125 = setup, sync or output mapping failed with the command at 0 (a MemoryMax not below the
+# slice's cap included); a signal, OOM kill, timeout or lost connection ≠ 0, never 0.
+# Remote command lines are composed here on purpose (quoted argv for the remote shell).
+# shellcheck disable=SC2029
+set -uo pipefail
+
+[[ $# -ge 1 ]] || {
+    printf 'usage: tools/vflab-run <command> [args…]\n' >&2
+    exit 2
+}
+root="$(git -C "$(dirname -- "${BASH_SOURCE[0]}")" rev-parse --show-toplevel)" || exit 2
+host="${FVDEP_VFLAB:-vflab}"
+timeout="${FVDEP_VFLAB_TIMEOUT:-7200}"
+memory="${FVDEP_VFLAB_MEMORY:-24G}"
+# Timeout + memory enter the remote command line unquoted (systemd properties) and the host is
+# ssh's argv (a leading `-` reads as an option) ⇒ plain forms alone, refused before any remote
+# action. TimeoutStartSec=0 would disable the deadline.
+bad_setting() {
+    printf 'vflab-run: %s=%q: want %s\n' "$1" "$2" "$3" >&2
+    exit 2
+}
+[[ -n "$host" && "$host" != -* ]] || bad_setting FVDEP_VFLAB "$host" 'an ssh host'
+[[ "$timeout" =~ ^[1-9][0-9]{0,6}$ ]] ||
+    bad_setting FVDEP_VFLAB_TIMEOUT "$timeout" 'whole seconds, 1 or more'
+[[ "$memory" =~ ^([1-9][0-9]{0,5})([KMGT])$ ]] ||
+    bad_setting FVDEP_VFLAB_MEMORY "$memory" 'a size such as 24G (suffix K, M, G or T)'
+# systemd sizes are 1024-based; the slice-cap comparison runs on the host (below).
+case "${BASH_REMATCH[2]}" in K) shift_by=10 ;; M) shift_by=20 ;; G) shift_by=30 ;; *) shift_by=40 ;; esac
+memory_bytes=$((BASH_REMATCH[1] << shift_by))
+slice=fvapi_gate.slice
+# The id reaches remote command lines: anything outside [A-Za-z0-9._-] → _. The `fvdep-` prefix
+# marks fvdep's workspaces beside fvapi's.
+id="fvdep-$(basename -- "$root" | tr -c 'A-Za-z0-9._\n-' _)-$(printf '%s' "$root" | sha256sum | cut -c1-8)"
+home=/home/eturkes
+ws="$home/gate/ws/$id"
+ssh_opts=(-o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
+
+fail_setup() {
+    printf 'vflab-run: %s (workspace %s:%s)\n' "$1" "$host" "$ws" >&2
+    exit 125
+}
+
+head="$(git -C "$root" rev-parse --verify -q HEAD)" || fail_setup 'no HEAD commit'
+tmp="$(mktemp -d)"
+trap 'rm -rf "$tmp"' EXIT
+git -C "$root" bundle create -q "$tmp/head.bundle" HEAD || fail_setup 'git bundle failed'
+# Per run: concurrent runs of one worktree each upload their own bundle before taking the lock.
+bundle="$ws.bundle.$(od -An -N6 -tx1 /dev/urandom | tr -d ' \n')"
+# The unit's MemoryMax must sit below the slice's, else an OOM kill can land on fvapi's processes.
+ssh "${ssh_opts[@]}" "$host" "[ -e /etc/systemd/system/$slice ] && systemctl is-active --quiet $slice || {
+        echo '$slice missing or inactive' >&2; exit 1; }
+    cap=\$(systemctl show -P MemoryMax $slice) &&
+        { [ \"\$cap\" = infinity ] || [ \"\$cap\" -gt $memory_bytes ]; } || {
+        echo \"MemoryMax $memory is not below the cap of $slice (\$cap)\" >&2; exit 1; }
+    mkdir -p '$home/gate/ws' && cat >'$bundle'" <"$tmp/head.bundle" ||
+    fail_setup "$slice missing, inactive or capped at or below MemoryMax $memory, or bundle upload failed"
+
+# Runs inside the unit, under the workspace lock: sync from the tar stream on stdin, then the
+# command with stdin from /dev/null. Exit 125 before the command = sync refused or failed.
+# shellcheck disable=SC2016
+inner='set -uo pipefail
+ws=$1 origin=$2 bundle=$3 head=$4
+shift 4
+trap '\''rm -f "$bundle"'\'' EXIT
+fail() { printf "vflab-run: %s\n" "$1" >&2; exit 125; }
+if [ -e "$ws.origin" ] && [ "$(cat "$ws.origin")" != "$origin" ]; then
+    fail "workspace $ws belongs to $(cat "$ws.origin"), not $origin"
+fi
+printf "%s\n" "$origin" >"$ws.origin" || fail "cannot record the workspace origin"
+if [ ! -d "$ws/.git" ]; then
+    mkdir -p "$ws" && git -C "$ws" init -q || fail "workspace init failed"
+fi
+git -C "$ws" fetch -q "$bundle" HEAD || fail "fetch from the run bundle failed"
+[ "$(git -C "$ws" rev-parse FETCH_HEAD)" = "$head" ] || fail "bundle HEAD is not $head"
+git -C "$ws" reset -q --hard FETCH_HEAD || fail "reset failed"
+rm -rf "$ws/.incoming" && mkdir "$ws/.incoming" || fail "staging failed"
+tar -C "$ws/.incoming" -xf - || fail "file stream truncated"
+rsync -a --delete --exclude=/.git/ --exclude=.lake/ --exclude=/.tools/ --exclude=/.gate/ \
+    --exclude=/.incoming/ "$ws/.incoming/" "$ws/" || fail "file sync failed"
+rm -rf "$ws/.incoming"
+cd "$ws" || fail "workspace missing"
+"$@" </dev/null'
+
+quote() { printf '%q ' "$@"; }
+remote="sudo systemd-run --uid=eturkes --gid=eturkes --slice=$slice \
+    --wait --pipe --collect --expand-environment=no --property=Type=oneshot \
+    --property=TimeoutStartSec=$timeout --property=TimeoutStopSec=30 \
+    --property=MemoryMax=$memory --property=MemorySwapMax=0 --property=IgnoreSIGPIPE=no \
+    --setenv=HOME=$home \
+    --setenv=PATH=$home/.elan/bin:$ws/.tools/bin:$home/.local/node/bin:/usr/local/bin:/usr/bin:/bin \
+    -- $(quote /usr/bin/flock "$ws.lock" /bin/bash -c "$inner" vflab-run "$ws" "$root" "$bundle" \
+        "$head" "$@")"
+
+# Output through FIFOs so each mapping filter's status is checked: a failed filter never turns a
+# successful command into green, and a failed command keeps its own status. The filters rewrite
+# the workspace path literally; on stderr they drop systemd-run's opening "Running as unit" line
+# and fold its closing accounting block (result, runtime, CPU, memory peak) into one line.
+# shellcheck disable=SC2016
+filter='function map(s,   out, i) {
+    out = ""
+    while ((i = index(s, ws)) > 0) { out = out substr(s, 1, i - 1) root; s = substr(s, i + length(ws)) }
+    return out s
+}
+err && NR == 1 && /^Running as unit: / { next }
+err && /^ *(Finished with result|Main processes terminated with|Service runtime|CPU time consumed|Memory peak|Memory swap peak|IO bytes read|IO bytes written|IP traffic received|IP traffic sent): / {
+    buf[++n] = $0; next
+}
+{ for (i = 1; i <= n; i++) print map(buf[i]); n = 0; print map($0); fflush() }
+END {
+    s = ""
+    for (i = 1; i <= n; i++) { line = buf[i]; sub(/^ +/, "", line); s = s (s == "" ? "" : "; ") line }
+    if (s != "") print "vflab-run: " s
+    fflush()
+}'
+mkfifo "$tmp/out" "$tmp/err"
+awk -v ws="$ws" -v root="$root" -v err=0 "$filter" <"$tmp/out" &
+out_pid=$!
+awk -v ws="$ws" -v root="$root" -v err=1 "$filter" <"$tmp/err" >&2 &
+err_pid=$!
+# The graded file set: tracked (minus deleted) + untracked-unignored. `comm -z`, not `grep -z -f`:
+# grep reads its pattern file newline-separated even under -z, so a deleted path would stay listed.
+git -C "$root" ls-files -d -z | sort -z >"$tmp/deleted" &&
+    git -C "$root" ls-files -co --exclude-standard --deduplicate -z | sort -z |
+    comm -z -23 - "$tmp/deleted" >"$tmp/files"
+list_rc=$?
+tar -C "$root" --null -T "$tmp/files" -cf - |
+    ssh "${ssh_opts[@]}" "$host" "$remote" >"$tmp/out" 2>"$tmp/err"
+statuses=("${PIPESTATUS[@]}")
+wait "$out_pid"
+out_rc=$?
+wait "$err_pid"
+err_rc=$?
+# The unit removes its bundle; one that never started leaves it here.
+ssh "${ssh_opts[@]}" "$host" "rm -f '$bundle'" || true
+rc="${statuses[1]}"
+if [[ $rc -ne 0 ]]; then
+    exit "$rc"
+fi
+if [[ $list_rc -ne 0 || "${statuses[0]}" -ne 0 ]]; then
+    printf 'vflab-run: local file listing or archive failed (list %s, tar %s)\n' \
+        "$list_rc" "${statuses[0]}" >&2
+    exit 125
+fi
+if [[ $out_rc -ne 0 || $err_rc -ne 0 ]]; then
+    printf 'vflab-run: output mapping failed (stdout filter %s, stderr filter %s)\n' \
+        "$out_rc" "$err_rc" >&2
+    exit 125
+fi
+exit 0

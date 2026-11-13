@@ -1,0 +1,62 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "extends": [
+    "config:recommended",
+    "helpers:pinGitHubActionDigests"
+  ],
+  "ignorePaths": [
+    "**/node_modules/**",
+    "**/tests/**",
+    "prototype/**"
+  ],
+  "minimumReleaseAge": "7 days",
+  "rangeStrategy": "pin",
+  "packageRules": [
+    {
+      "description": "A Lean bump requalifies the verification profile + the whole library (Decisions → Lifecycle); lean-fmt publishes one tag per toolchain, so both move together",
+      "matchPackageNames": [
+        "leanprover/lean4",
+        "jcreinhold/lean-fmt"
+      ],
+      "groupName": "Lean toolchain"
+    }
+  ],
+  "customManagers": [
+    {
+      "customType": "regex",
+      "description": "Lean toolchain (every lean-toolchain file)",
+      "managerFilePatterns": [
+        "/(^|/)lean-toolchain$/"
+      ],
+      "matchStrings": [
+        "leanprover/lean4:v(?<currentValue>\\S+)"
+      ],
+      "depNameTemplate": "leanprover/lean4",
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Pinned scanner binaries (tools/tools.lock); the digest column needs tools/pin-tool.sh",
+      "managerFilePatterns": [
+        "/^tools/tools\\.lock$/"
+      ],
+      "matchStrings": [
+        "(?:^|\\n)(?<depName>\\S+) (?<currentValue>\\S+) linux-x86_64 \\S+ https://github\\.com/(?<packageName>[^/]+/[^/]+)/"
+      ],
+      "datasourceTemplate": "github-releases",
+      "extractVersionTemplate": "^v?(?<version>.*)$"
+    },
+    {
+      "customType": "regex",
+      "description": "Lake packages (every lake-manifest.json): git rev of a GitHub package, tracking its inputRev tag",
+      "managerFilePatterns": [
+        "/(^|/)lake-manifest\\.json$/"
+      ],
+      "matchStrings": [
+        "\"url\":\\s*\"https://github\\.com/(?<packageName>[^\"]+?)(?:\\.git)?\",[\\s\\S]*?\"rev\":\\s*\"(?<currentDigest>[0-9a-f]{40})\",[\\s\\S]*?\"name\":\\s*\"(?<depName>[^\"]+)\",[\\s\\S]*?\"inputRev\":\\s*\"(?<currentValue>[^\"]+)\""
+      ],
+      "datasourceTemplate": "github-tags"
+    }
+  ]
+}
