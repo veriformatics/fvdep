@@ -15,6 +15,7 @@
 | `actions/checkout` | `.github/workflows/*.yml` (commit digest) | Renovate github-actions manager (`helpers:pinGitHubActionDigests`) | zizmor + actionlint; CodeQL `actions` |
 | `github/codeql-action/init` | `.github/workflows/codeql.yml` (commit digest) | as `actions/checkout` | zizmor + actionlint; CodeQL `actions` |
 | `github/codeql-action/analyze` | `.github/workflows/codeql.yml` (commit digest) | as `actions/checkout` | zizmor + actionlint; CodeQL `actions` |
+| `claude-code` (native binary, linux-x64) | `tools/vflab-provision.sh` (`claude_version` 2.1.311 + `claude_sha256`) | manual re-pin: the new release's `manifest.json.sig` verified against key 31DDDE24DDFAB679F42D7BD2BAA929FF1A7ECACE → version + linux-x64 SHA-256 from that manifest → provision + `tools/vflab-agent-smoke.sh` rerun (automation = U13) | SHA-256 checked on vflab before install; runs as `fvdep-agent` under bwrap; never shipped |
 | `git`, `bash`, coreutils, `curl`, `tar`, `rsync`, `ssh`, `python3` (stdlib), `jq`, `gh` | distribution packages (vflab Ubuntu 26.04, CI runners, the desktop) | the distribution's security updates | not pinned: the gate reads their output, never ships them |
 
 Prototype lockfiles (`prototype/fvdep/**`, retired at U14) are scanned by stage `vulns` (`tools/lockfiles.txt`) and left out of Renovate (`renovate.json` `ignorePaths`).
