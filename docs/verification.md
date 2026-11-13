@@ -1146,10 +1146,122 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`))
 
+## `FvdepCore.Manifest`
+
+- Contract: U3 T1 + T5
+- Claim: `utf8ErrorOffset` is `none` exactly on valid UTF-8, else the length of the longest valid prefix; `textStage` refuses more than 65,536 bytes first, then a leading BOM, then the first invalid UTF-8 offset, else returns the text whose bytes are the input.
+- Subject: `FvdepCore.Manifest.textStage`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.ManifestClaims.utf8Offset` (hash 0x7ec747ff), proved by `FvdepAudit.Manifest.Proof.utf8Offset`:
+
+  ```lean
+  ∀ (b : ByteArray),
+    (FvdepCore.Manifest.utf8ErrorOffset b = none ↔ FvdepAudit.Manifest.Spec.ValidUtf8 b) ∧
+      ∀ (k : Nat),
+        FvdepCore.Manifest.utf8ErrorOffset b = some k ↔
+          ¬FvdepAudit.Manifest.Spec.ValidUtf8 b ∧
+            FvdepAudit.Manifest.Spec.ValidUtf8 (b.extract 0 k) ∧
+              ∀ (j : Nat), k < j → j ≤ b.size → ¬FvdepAudit.Manifest.Spec.ValidUtf8 (b.extract 0 j)
+  ```
+- Statement `FvdepLedger.Rows.ManifestClaims.textStageExact` (hash 0x4b0695c8), proved by `FvdepAudit.Manifest.Proof.textStage_spec`:
+
+  ```lean
+  ∀ (b : ByteArray), FvdepAudit.Manifest.Spec.TextSpec b (FvdepCore.Manifest.textStage b)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepCore.Manifest`
+
+- Contract: U3 T2–T3 + T5
+- Claim: `validate` accepts exactly the trees that spell a well-formed manifest (member order free) + returns that manifest, else refuses with the first of T3 + D5's ordered violations (repeated keys, discriminators, unknown, forbidden + missing keys, values in key byte order, list overlap); the tree a well-formed manifest prints to validates back to it.
+- Subject: `FvdepCore.Manifest.validate`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.ManifestClaims.validateOk` (hash 0x3688cd18), proved by `FvdepAudit.Manifest.Proof.validate_ok`:
+
+  ```lean
+  ∀ (t : FvdepCore.Manifest.Tree) (m : FvdepCore.Manifest.ManifestFile),
+    FvdepCore.Manifest.validate t = Except.ok m ↔ FvdepAudit.Manifest.Spec.ManifestSpec t m
+  ```
+- Statement `FvdepLedger.Rows.ManifestClaims.validateError` (hash 0xf07dd338), proved by `FvdepAudit.Manifest.Proof.validate_error`:
+
+  ```lean
+  ∀ (t : FvdepCore.Manifest.Tree) (e : FvdepCore.Manifest.ManifestError),
+    FvdepCore.Manifest.validate t = Except.error e ↔
+      FvdepAudit.Manifest.Spec.firstViolation t = some e
+  ```
+- Statement `FvdepLedger.Rows.ManifestClaims.validateWellFormed` (hash 0xc0ed3bf0), proved by `FvdepAudit.Manifest.Proof.validate_wellFormed`:
+
+  ```lean
+  ∀ (t : FvdepCore.Manifest.Tree) (m : FvdepCore.Manifest.ManifestFile),
+    FvdepCore.Manifest.validate t = Except.ok m → FvdepAudit.Manifest.Spec.WellFormed m
+  ```
+- Statement `FvdepLedger.Rows.ManifestClaims.treeRoundTrip` (hash 0x57dfc308), proved by `FvdepAudit.Manifest.Proof.tree_roundtrip`:
+
+  ```lean
+  ∀ (m : FvdepCore.Manifest.ManifestFile),
+    FvdepAudit.Manifest.Spec.WellFormed m →
+      FvdepCore.Manifest.validate (FvdepCore.Manifest.toTree m) = Except.ok m
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepCore.Manifest`
+
+- Contract: U3 T4 + T5
+- Claim: `printManifest` emits exactly T4's canonical bytes for a well-formed manifest, a document of T4's TOML 1.0 subset (keyvals, one- + two-key headers, basic strings, decimal integers, inline string arrays) denoting `toTree m`; Lake's agreement with that subset = residue `toml-parse` (tested by `lake test`: a printed manifest reads back), never claimed.
+- Subject: `FvdepCore.Manifest.printManifest`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.ManifestClaims.printExact` (hash 0x72df2c56), proved by `FvdepAudit.Manifest.Proof.print_exact`:
+
+  ```lean
+  ∀ (m : FvdepCore.Manifest.ManifestFile),
+    FvdepAudit.Manifest.Spec.WellFormed m →
+      (FvdepCore.Manifest.printManifest m).data.toList = FvdepAudit.Manifest.Spec.canonicalManifest m
+  ```
+- Statement `FvdepLedger.Rows.ManifestClaims.printDenotes` (hash 0x4f219d25), proved by `FvdepAudit.Manifest.Proof.print_denotes`:
+
+  ```lean
+  ∀ (m : FvdepCore.Manifest.ManifestFile),
+    FvdepAudit.Manifest.Spec.WellFormed m →
+      FvdepAudit.Manifest.Spec.TomlText (FvdepCore.Manifest.printManifest m).data.toList
+        (FvdepCore.Manifest.toTree m)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Toml`
+
+- Contract: U3 T1 + T5
+- Claim: `ofLake` rebuilds Lake's table exactly (keys = their one string component, scalars, element + member order, float/date-time tags) or names a key of another shape. `parseTree` (Lake's parser, residue `toml-parse`), `readManifest` (text stage → `parseTree` → `validate`) + `ReadError.code` (`internal` for that key) join a row's subject closure when U8 wires the read path as a plan effect.
+- Subject: `FvdepIO.Toml.ofLake`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.ManifestClaims.ofLakeExact` (hash 0xa81d8130), proved by `FvdepAudit.Manifest.Proof.ofLake_exact`:
+
+  ```lean
+  ∀ (d : Lake.Toml.Table),
+    (∀ (t : FvdepCore.Manifest.Tree),
+        FvdepIO.Toml.ofLake d = Except.ok t ↔
+          ∃ ms,
+            t = FvdepCore.Manifest.Tree.tbl ms ∧
+              FvdepAudit.Manifest.Spec.LakeMembers d.items.toList ms) ∧
+      (∀ (n : Lean.Name),
+          FvdepIO.Toml.ofLake d = Except.error n → FvdepAudit.Manifest.Spec.BadKey d n) ∧
+        ((∀ (n : Lean.Name), ¬FvdepAudit.Manifest.Spec.BadKey d n) →
+          ∃ t, FvdepIO.Toml.ofLake d = Except.ok t)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `toml-parse` (Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message)
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
 - `runtime` — Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives): the toolchain is trusted (Decisions `Self-verification scope`) (ruling: "Lean compiler + runtime")
 - `os` — OS, filesystem + process semantics: outside Lean; fvdep's effects reach them through the interpreter (ruling: "OS, filesystem + process semantics")
 - `hacl-sha256` — SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`): C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance claim); the shim + orchestration are small, reviewed + tested (FIPS 180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching) (ruling: "HACL* (verified upstream) + FFI wrapper (tested)")
+- `toml-parse` — Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message: toolchain code (Decisions: trusted); `ofLake` names any key of another shape; `fvdep.toml` ≤ 64 KiB bounds its recursion depth (T1); tested by `lake test` (a printed manifest reads back, syntax + repeated keys refuse with Lake's line, a BOM refuses first) (ruling: "Lake.Toml + Lake comparison code (toolchain)")
 - `literal` — literal data (the version string `Fvdep.version`): a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both lakefiles (ruling: "Literal data (the version string) is checked by the gate's `meta` stage")

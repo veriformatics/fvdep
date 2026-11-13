@@ -4,6 +4,9 @@ import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
+import FvdepAudit.Manifest.Proof.Denote
+import FvdepAudit.Manifest.Proof.Lake
+import FvdepAudit.Manifest.Proof.Text
 import FvdepLedger.Types
 import Main
 
@@ -721,6 +724,70 @@ def saturateLaw : Prop :=
 
 end FvdepLedger.Rows.HashClaims
 
+namespace FvdepLedger.Rows.ManifestClaims
+
+open FvdepCore.Manifest FvdepAudit.Manifest.Spec
+
+/-- T5 `Utf8Offset`: `none` exactly on valid UTF-8, else the length of the longest valid prefix. -/
+def utf8Offset : Prop :=
+  ∀ (b : ByteArray),
+    (utf8ErrorOffset b = none ↔ ValidUtf8 b) ∧
+      ∀ k,
+        utf8ErrorOffset b = some k ↔
+          ¬ValidUtf8 b ∧
+            ValidUtf8 (b.extract 0 k) ∧ ∀ j, k < j → j ≤ b.size → ¬ValidUtf8 (b.extract 0 j)
+
+/-- T5 `TextStage`: size first, then a BOM, then the first UTF-8 offset, else the text whose bytes
+are the input. -/
+def textStageExact : Prop := ∀ (b : ByteArray), TextSpec b (textStage b)
+
+end FvdepLedger.Rows.ManifestClaims
+
+namespace FvdepLedger.Rows.ManifestClaims
+
+open Lean FvdepCore.Manifest FvdepIO.Toml FvdepAudit.Manifest.Spec
+
+/-- T5 `OfLakeExact`: `ofLake` rebuilds Lake's table exactly when every key is one string component
+(else it names a key of another shape), + always answers one of the two. -/
+def ofLakeExact : Prop :=
+  ∀ (d : Lake.Toml.Table),
+    (∀ t, ofLake d = .ok t ↔ ∃ ms, t = .tbl ms ∧ LakeMembers d.items.toList ms) ∧
+      (∀ n, ofLake d = .error n → BadKey d n) ∧ ((∀ n, ¬BadKey d n) → ∃ t, ofLake d = .ok t)
+
+end FvdepLedger.Rows.ManifestClaims
+
+namespace FvdepLedger.Rows.ManifestClaims
+
+open FvdepCore.Manifest FvdepAudit.Manifest.Spec
+
+/-- T5 `ValidateExact`: `validate` accepts exactly the trees that spell a well-formed manifest,
+returning it. -/
+def validateOk : Prop := ∀ (t : Tree) (m : ManifestFile), validate t = .ok m ↔ ManifestSpec t m
+
+/-- T5 `ValidateExact`: `validate` refuses with exactly the first of T3 + D5's ordered
+violations. -/
+def validateError : Prop :=
+  ∀ (t : Tree) (e : ManifestError),
+    validate t = .error e ↔ FvdepAudit.Manifest.Spec.firstViolation t = some e
+
+/-- T5 `ValidateWellFormed`: every manifest `validate` returns is well formed. -/
+def validateWellFormed : Prop :=
+  ∀ (t : Tree) (m : ManifestFile) (_h : validate t = .ok m), WellFormed m
+
+/-- T5 `TreeRoundTrip`: the tree a well-formed manifest prints to validates back to it. -/
+def treeRoundTrip : Prop := ∀ (m : ManifestFile) (_hw : WellFormed m), validate (toTree m) = .ok m
+
+/-- T5 `PrintExact`: the printer's bytes = T4's canonical layout. -/
+def printExact : Prop :=
+  ∀ (m : ManifestFile) (_hw : WellFormed m), (printManifest m).data.toList = canonicalManifest m
+
+/-- T5 `PrintDenotes`: the printer's bytes are a document of T4's TOML 1.0 subset denoting
+`toTree m`. -/
+def printDenotes : Prop :=
+  ∀ (m : ManifestFile) (_hw : WellFormed m), TomlText (printManifest m).data.toList (toTree m)
+
+end FvdepLedger.Rows.ManifestClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -757,6 +824,17 @@ def residue : List Residue :=
       boundary :=
         [``FvdepIO.Hash.sha256, ``FvdepIO.Hash.Sha256.initState, ``FvdepIO.Hash.Sha256.absorb,
           ``FvdepIO.Hash.Sha256.squeeze] },
+    { id := "toml-parse"
+      what :=
+        "Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + " ++
+          "redefined keys refused, the first error's position + message"
+      reason :=
+        "toolchain code (Decisions: trusted); `ofLake` names any key of another shape; " ++
+          "`fvdep.toml` ≤ 64 KiB bounds its recursion depth (T1); tested by `lake test` " ++
+          "(a printed manifest reads back, syntax + repeated keys refuse with Lake's line, a " ++
+          "BOM refuses first)"
+      ruling := "Lake.Toml + Lake comparison code (toolchain)"
+      boundary := [``Lake.Toml.loadToml] },
     { id := "literal"
       what := "literal data (the version string `Fvdep.version`)"
       reason :=
@@ -1142,6 +1220,80 @@ def sha256StreamRow : Row :=
     residue := ["runtime"]
     unproven := ["hacl-sha256"] }
 
+/-- U3 T1 + T5: the text stage before Lake's parser. -/
+def manifestTextRow : Row :=
+  { component := `FvdepCore.Manifest
+    contract := "U3 T1 + T5"
+    claim :=
+      "`utf8ErrorOffset` is `none` exactly on valid UTF-8, else the length of the longest valid " ++
+        "prefix; `textStage` refuses more than 65,536 bytes first, then a leading BOM, then the " ++
+        "first invalid UTF-8 offset, else returns the text whose bytes are the input."
+    claims :=
+      [(``ManifestClaims.utf8Offset, ``FvdepAudit.Manifest.Proof.utf8Offset),
+        (``ManifestClaims.textStageExact, ``FvdepAudit.Manifest.Proof.textStage_spec)]
+    subject := ``FvdepCore.Manifest.textStage
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 T2–T3 + T5: validation + extraction of the typed manifest. -/
+def manifestValidateRow : Row :=
+  { component := `FvdepCore.Manifest
+    contract := "U3 T2–T3 + T5"
+    claim :=
+      "`validate` accepts exactly the trees that spell a well-formed manifest (member order " ++
+        "free) + returns that manifest, else refuses with the first of T3 + D5's ordered " ++
+        "violations (repeated keys, discriminators, unknown, forbidden + missing keys, values " ++
+        "in key byte order, list overlap); the tree a well-formed manifest prints to validates " ++
+        "back to it."
+    claims :=
+      [(``ManifestClaims.validateOk, ``FvdepAudit.Manifest.Proof.validate_ok),
+        (``ManifestClaims.validateError, ``FvdepAudit.Manifest.Proof.validate_error),
+        (``ManifestClaims.validateWellFormed, ``FvdepAudit.Manifest.Proof.validate_wellFormed),
+        (``ManifestClaims.treeRoundTrip, ``FvdepAudit.Manifest.Proof.tree_roundtrip)]
+    subject := ``FvdepCore.Manifest.validate
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 T4 + T5: the canonical printer `init` + `upgrade` write with. -/
+def manifestPrintRow : Row :=
+  { component := `FvdepCore.Manifest
+    contract := "U3 T4 + T5"
+    claim :=
+      "`printManifest` emits exactly T4's canonical bytes for a well-formed manifest, a " ++
+        "document of T4's TOML 1.0 subset (keyvals, one- + two-key headers, basic strings, " ++
+        "decimal integers, inline string arrays) denoting `toTree m`; Lake's agreement with " ++
+        "that subset = residue `toml-parse` (tested by `lake test`: a printed manifest reads " ++
+        "back), never claimed."
+    claims :=
+      [(``ManifestClaims.printExact, ``FvdepAudit.Manifest.Proof.print_exact),
+        (``ManifestClaims.printDenotes, ``FvdepAudit.Manifest.Proof.print_denotes)]
+    subject := ``FvdepCore.Manifest.printManifest
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 T1 + T5: Lake's table → `Tree` (the read path's step after Lake's parser). -/
+def tomlReadRow : Row :=
+  { component := `FvdepIO.Toml
+    contract := "U3 T1 + T5"
+    claim :=
+      "`ofLake` rebuilds Lake's table exactly (keys = their one string component, scalars, " ++
+        "element + member order, float/date-time tags) or names a key of another shape. " ++
+        "`parseTree` (Lake's parser, residue `toml-parse`), `readManifest` (text stage → " ++
+        "`parseTree` → `validate`) + `ReadError.code` (`internal` for that key) join a row's " ++
+        "subject closure when U8 wires the read path as a plan effect."
+    claims := [(``ManifestClaims.ofLakeExact, ``FvdepAudit.Manifest.Proof.ofLake_exact)]
+    subject := ``FvdepIO.Toml.ofLake
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := ["toml-parse"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1150,7 +1302,8 @@ def ledger : Ledger :=
     rows :=
       [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow, jsonValueRow,
         jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow,
-        hashFrameRow, sha256DigestRow, sha256StreamRow]
+        hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
+        manifestPrintRow, tomlReadRow]
     residue := residue }
 
 end FvdepLedger.Rows
