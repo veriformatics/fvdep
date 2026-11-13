@@ -67,7 +67,7 @@ def modId : ModuleId := ⟨seg, seg, []⟩
 
 def commit : Commit := ⟨List.replicate 40 ⟨0, by decide⟩, by decide⟩
 
-def decl : Decl := ⟨modId, ⟨1, 0, 0⟩, some .fn, .proof, some "Impl.f", some "Proof.eq"⟩
+def decl : Decl := ⟨modId, ⟨1, 0, 0⟩, some .fn, .proof, some "Impl.f", some "Proof.eq", none⟩
 
 def request : RequestKey := ⟨decl, "spec", some "impl", some "proof", none⟩
 
@@ -92,7 +92,8 @@ def diffKey : ChallengeKey :=
             kind := .differential
             shape := none
             impl := none
-            proof := none }
+            proof := none
+            adapter := some ["adapter"] }
         implSources := none
         proofSources := none
         adapter := some "adapter" } }
@@ -183,6 +184,114 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Json
 
+/-! Compiled-code smoke for the documents (contract U3 D1, D3–D6, D8): the proofs cover the
+definitions, these run the compiled C, incl. a 10^4-receipt lock (walk + extraction + sort). -/
+
+namespace Doc
+
+open FvdepCore.Json FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status FvdepCore.Doc
+
+def mid (s : String) : ModuleId := (ModuleId.parse s).getD Core.modId
+
+def ver : EntryVersion := (EntryVersion.parse "1.0.0").getD ⟨0, 0, 0⟩
+
+def cm : Commit := (Commit.parse (String.ofList (List.replicate 40 'a'))).getD Core.commit
+
+def d64 (c : Char) : String := String.ofList (List.replicate 64 c)
+
+def proofReceipt (m : String) : Receipt :=
+  .proof
+    ⟨⟨⟨mid m, ver, some .fn, .proof, some "Impl.f", some "Proof.eq", none⟩, d64 'a', some (d64 'b'),
+        some (d64 'c'), none⟩,
+      cm, "qualified-v1", .required, "2026-11-14T00:00:00Z"⟩
+    (d64 'd') (d64 'e')
+
+def diffReceipt (m : String) : Receipt :=
+  .differential
+    ⟨⟨⟨mid m, ver, none, .differential, none, none, some ["python3", "", "a.py"]⟩, d64 'a', none,
+        none, some (d64 'f')⟩,
+      cm, "qualified-v1", .development, "2026-11-14T00:00:00Z"⟩
+
+/-- Alternating proof + differential receipts for the module ids. -/
+def lockOf (ms : List String) : Lock :=
+  ⟨cm, ms.zipIdx.map fun (m, i) => if i % 2 == 0 then proofReceipt m else diffReceipt m⟩
+
+/-- `m00000.op`, `m00001.op`, …: zero-padded, so byte order = index order. -/
+def ids (n : Nat) : List String :=
+  (List.range n).map fun i =>
+    let s := toString i
+    "m" ++ String.ofList (List.replicate (5 - s.length) '0') ++ s ++ ".op"
+
+def roundTrips (l : Lock) : Bool :=
+  match decodeLock (encodeLock l) with
+  | .ok l' => l' == l
+  | .error _ => false
+
+def rendered (s : String) : String :=
+  match decodeLock s.toUTF8 with
+  | .ok _ => "ok"
+  | .error e => e.render
+
+/-- The receipt's `request.adapter` member replaced by `x`. -/
+def withAdapter (x : Value) : Value → Value
+  | .obj ms =>
+    .obj <|
+      ms.map fun (k, v) =>
+        if k = "request" then
+          (k,
+            match v with
+            | .obj rs => .obj (rs.map fun (k2, v2) => if k2 = "adapter" then (k2, x) else (k2, v2))
+            | other => other)
+        else (k, v)
+  | v => v
+
+/-- An array nested `k` deep around `null` (depth `k`). -/
+def nest : Nat → Value
+  | 0 => .null
+  | k + 1 => .arr [nest k]
+
+def envelope (exit : Exit) (error : Option Failure) (result : List (String × Value)) : Envelope :=
+  ⟨.check, exit, error, result, ⟨some cm, some "2026-11-14T00:00:00Z", none⟩, ["Lean runtime"]⟩
+
+def cases : List (String × (Unit → Bool)) :=
+  [("doc: a well-formed lock (proof + differential receipts) round-trips through its bytes",
+      fun _ =>
+      let l := lockOf ["base64.decode", "base64.encode"]
+      l.wellFormed && roundTrips l),
+    ("doc: an unsorted lock is refused at the second module id; normalize repairs it", fun _ =>
+      let l := lockOf ["base64.encode", "base64.decode"]
+      !l.wellFormed && l.normalize.wellFormed &&
+        rendered ((String.fromUTF8? (encodeLock l)).getD "") ==
+          "/modules/1/request/module bad_value \"base64.decode\""),
+    ("doc: text refusals come first (J3)", fun _ =>
+      rendered "x" == "malformed" && rendered "{\"a\":1,\"a\":2}" == "duplicate_key /a"),
+    ("doc: D5 root + discriminator refusals", fun _ =>
+      rendered "[]" == "wrong_type []" && rendered "{}" == "/schema missing_field" &&
+        rendered "{\"schema\":\"1\"}" == "/schema wrong_type \"1\"" &&
+        rendered "{\"schema\":2}" == "/schema bad_value 2"),
+    ("doc: unknown members before missing ones; RFC 6901 escaping", fun _ =>
+      rendered "{\"schema\":1,\"zz\":0,\"a/b~c\":1}" == "/a~1b~0c unknown_field 1"),
+    ("doc: a nullness violation fails at the field itself (proof receipt, adapter [1])", fun _ =>
+      match Receipt.ofJson (withAdapter (.arr [.int 1]) (proofReceipt "base64.encode").toJson) with
+      | .error e => e.render == "/request/adapter bad_value [1]"
+      | .ok _ => false),
+    ("doc: clip keeps 65,536 bytes whole, cuts longer text to 65,532 bytes", fun _ =>
+      let whole := String.ofList (List.replicate 65536 'x')
+      let long := clip (String.ofList (List.replicate 70000 'é'))
+      clip whole == whole && long.utf8ByteSize == 65532 && long.endsWith " [truncated]"),
+    ("doc: envelope: result depth 31 ok, 32 refused; error exactly when exit 2", fun _ =>
+      (envelope .ok none [("r", nest 30)]).wellFormed &&
+        !(envelope .ok none [("r", nest 31)]).wellFormed &&
+        !(envelope .failure none []).wellFormed &&
+        (envelope .failure (some ⟨.busy, "x"⟩) []).wellFormed &&
+        !(envelope .negative (some ⟨.schema, "x"⟩) []).wellFormed),
+    ("doc: a 10^4-receipt lock round-trips; normalize sorts its reversal back", fun _ =>
+      let l := lockOf (ids 10000)
+      let r : Lock := ⟨l.library, l.entries.reverse⟩
+      roundTrips l && r.normalize == l)]
+
+end Doc
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -215,7 +324,7 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases).map fun c => check c.1 c.2).mapM
+            (Core.cases ++ Json.cases ++ Doc.cases).map fun c => check c.1 c.2).mapM
         id
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

@@ -30,6 +30,8 @@ structure Decl where
   kind : Kind
   impl : Option String
   proof : Option String
+  /-- A differential entry's adapter argv (U3 D3: the receipt names what ran). -/
+  adapter : Option (List String)
   deriving DecidableEq, Repr
 
 /-- E1: what the user asked to check: the declaration + the digests of its current inputs. -/

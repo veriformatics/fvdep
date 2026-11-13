@@ -1,3 +1,5 @@
+import FvdepAudit.Doc.Proof.Envelope
+import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepLedger.Types
@@ -547,6 +549,132 @@ def asLaws : Prop :=
 
 end FvdepLedger.Rows.JsonClaims
 
+namespace FvdepLedger.Rows.DocClaims
+
+open FvdepCore.Json FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status FvdepCore.Doc
+  FvdepAudit.Doc.Spec
+
+/-- D7: a receipt's JSON is exactly its D3 layout (`evidence` = the receipt constructor's kind). -/
+def receiptEncodeExact : Prop := ∀ (r : Receipt), r.toJson = receiptLayout r
+
+/-- D7: on a J1-valid value the D5 walk finds no violation exactly when the value is the layout of a
+well-formed receipt. -/
+def receiptSchemaExact : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v),
+    firstViolation receiptTy v = none ↔ ∃ r, ReceiptWF r ∧ v = receiptLayout r
+
+/-- D7: on a J1-valid value, `Receipt.ofJson` accepts exactly the layouts of well-formed receipts,
+returning that receipt. -/
+def receiptDecodeOk : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v) (r : Receipt),
+    Receipt.ofJson v = .ok r ↔ ReceiptWF r ∧ v = receiptLayout r
+
+/-- D7: `Receipt.ofJson` refuses with exactly the walk's first violation (D5 order), on every value.
+-/
+def receiptDecodeError : Prop :=
+  ∀ (v : Value) (e : DocError), Receipt.ofJson v = .error e ↔ firstViolation receiptTy v = some e
+
+/-- D7: a well-formed receipt's JSON is a J1-valid value. -/
+def receiptValid : Prop := ∀ (r : Receipt) (_h : ReceiptWF r), FvdepAudit.Json.Spec.Valid r.toJson
+
+/-- D8: `Receipt.wellFormed` decides D2 + D3 well-formedness. -/
+def receiptCheck : Prop := ∀ (r : Receipt), r.wellFormed = true ↔ ReceiptWF r
+
+end FvdepLedger.Rows.DocClaims
+
+namespace FvdepLedger.Rows.DocClaims
+
+open FvdepCore.Json FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status FvdepCore.Doc
+  FvdepAudit.Doc.Spec
+
+/-- D7: a lock's JSON is exactly its D4 layout. -/
+def lockEncodeExact : Prop := ∀ (l : Lock), l.toJson = lockLayout l
+
+/-- D7: on a J1-valid value the D5 walk finds no violation exactly when the value is the layout of a
+well-formed lock. -/
+def lockSchemaExact : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v),
+    firstViolation lockTy v = none ↔ ∃ l, LockWF l ∧ v = lockLayout l
+
+/-- D7: on a J1-valid value, `Lock.ofJson` accepts exactly the layouts of well-formed locks,
+returning that lock. -/
+def lockDecodeOk : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v) (l : Lock),
+    Lock.ofJson v = .ok l ↔ LockWF l ∧ v = lockLayout l
+
+/-- D7: `Lock.ofJson` refuses with exactly the walk's first violation, on every value. -/
+def lockDecodeError : Prop :=
+  ∀ (v : Value) (e : DocError), Lock.ofJson v = .error e ↔ firstViolation lockTy v = some e
+
+/-- D7: a well-formed lock's JSON is a J1-valid value. -/
+def lockValid : Prop := ∀ (l : Lock) (_h : LockWF l), FvdepAudit.Json.Spec.Valid l.toJson
+
+/-- D8: `Lock.wellFormed` decides D2 + D4 well-formedness (receipts + strictly ascending module
+ids). -/
+def lockCheck : Prop := ∀ (l : Lock), l.wellFormed = true ↔ LockWF l
+
+/-- D7 LockBytes: a well-formed lock's canonical bytes decode back to it. -/
+def lockBytesEncode : Prop := ∀ (l : Lock) (_h : LockWF l), decodeLock (encodeLock l) = .ok l
+
+/-- D7 LockBytes: bytes `decodeLock` accepts decode (J3) to the layout of the well-formed lock it
+returns. -/
+def lockBytesOk : Prop :=
+  ∀ (b : ByteArray) (l : Lock) (_h : decodeLock b = .ok l),
+    LockWF l ∧ ∃ v, decode b = .ok v ∧ v = lockLayout l
+
+/-- D7 LockBytes: `decodeLock` refuses with J3's text error first, else the walk's first violation.
+-/
+def lockBytesError : Prop :=
+  ∀ (b : ByteArray) (e : LockError),
+    decodeLock b = .error e ↔
+      (∃ j, decode b = .error j ∧ e = .text j) ∨
+        ∃ v d, decode b = .ok v ∧ firstViolation lockTy v = some d ∧ e = .doc d
+
+/-- D7: `Lock.normalize` keeps the library + the receipts (a permutation), orders module ids
+nondecreasingly, keeps equal ids in input order. -/
+def normalizePreserves : Prop :=
+  ∀ (l : Lock),
+    l.normalize.library = l.library ∧
+      l.normalize.entries.Perm l.entries ∧
+      (l.normalize.entries.map idOf).Pairwise (· ≤ ·) ∧
+      ∀ a b, [a, b].Sublist l.entries → idOf a = idOf b → [a, b].Sublist l.normalize.entries
+
+/-- D7: normalizing well-formed receipts with distinct module ids gives a well-formed lock. -/
+def normalizeSorted : Prop :=
+  ∀ (l : Lock) (_hd : (l.entries.map idOf).Nodup) (_hw : ∀ r ∈ l.entries, ReceiptWF r),
+    LockWF l.normalize
+
+end FvdepLedger.Rows.DocClaims
+
+namespace FvdepLedger.Rows.DocClaims
+
+open FvdepCore.Ids FvdepCore.Status FvdepCore.Doc FvdepAudit.Doc.Spec FvdepAudit.Json.Spec
+
+/-- D7: the envelope's JSON is exactly its D6 layout (the result members verbatim; diagnostics
+clipped). -/
+def envelopeEncodeExact : Prop := ∀ (e : Envelope), e.toJson = envelopeLayout e
+
+/-- D8: `Envelope.wellFormed` decides D6 well-formedness. -/
+def envelopeCheck : Prop := ∀ (e : Envelope), e.wellFormed = true ↔ EnvelopeWF e
+
+/-- D7: a well-formed envelope's JSON is a J1-valid value. -/
+def envelopeValid : Prop := ∀ (e : Envelope) (_h : EnvelopeWF e), Valid e.toJson
+
+end FvdepLedger.Rows.DocClaims
+
+namespace FvdepLedger.Rows.DocClaims
+
+open FvdepCore.Doc FvdepAudit.Doc.Spec
+
+/-- D7: `clip` keeps a text within 65,536 bytes, else its longest scalar-boundary prefix within
+65,520 bytes followed by ` [truncated]`. -/
+def clipExact : Prop := ∀ (s : String), clip s = clipSpec s
+
+/-- D7: every clipped text fits 65,536 UTF-8 bytes. -/
+def clipBound : Prop := ∀ (s : String), (clip s).utf8ByteSize ≤ 65536
+
+end FvdepLedger.Rows.DocClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -816,6 +944,91 @@ def jsonPrintRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U3 D: the documents fvdep reads + writes (receipts, `fvdep.lock`, the `--json` envelope) + the
+text bound. -/
+def docReceiptRow : Row :=
+  { component := `FvdepCore.Doc
+    contract := "U3 D2 + D3 + D5 + D7 + D8; Decisions Data formats"
+    claim :=
+      "`Receipt.toJson` emits exactly the D3 layout; on a J1-valid value `Receipt.ofJson` " ++
+        "accepts exactly the layouts of well-formed receipts (returning that receipt) and " ++
+        "refuses with the D5 walk's first violation; a well-formed receipt encodes to a valid " ++
+        "value; " ++
+        "`Receipt.wellFormed` decides well-formedness."
+    claims :=
+      [(``DocClaims.receiptEncodeExact, ``FvdepAudit.Doc.Proof.receipt_encode),
+        (``DocClaims.receiptSchemaExact, ``FvdepAudit.Doc.Proof.receipt_schema_exact),
+        (``DocClaims.receiptDecodeOk, ``FvdepAudit.Doc.Proof.receipt_ok),
+        (``DocClaims.receiptDecodeError, ``FvdepAudit.Doc.Proof.receipt_error),
+        (``DocClaims.receiptValid, ``FvdepAudit.Doc.Proof.receipt_valid),
+        (``DocClaims.receiptCheck, ``FvdepAudit.Doc.Proof.receipt_check)]
+    subject := ``FvdepCore.Status.Receipt.ofJson
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+def docLockRow : Row :=
+  { component := `FvdepCore.Doc
+    contract := "U3 D2 + D4 + D5 + D7 + D8; Decisions Data formats"
+    claim :=
+      "`fvdep.lock`: a lock's JSON is exactly the D4 layout; on a J1-valid value `Lock.ofJson` " ++
+        "accepts exactly the layouts of well-formed locks and refuses with the D5 walk's first " ++
+        "violation; `decodeLock` returns a well-formed lock's canonical bytes back as that lock " ++
+        "and refuses with J3's text error first, else the walk's first violation; " ++
+        "`Lock.normalize` keeps the receipts + library, orders module ids (stable), and yields " ++
+        "a well-formed lock from distinct well-formed receipts; `Lock.wellFormed` decides " ++
+        "well-formedness."
+    claims :=
+      [(``DocClaims.lockEncodeExact, ``FvdepAudit.Doc.Proof.lock_encode),
+        (``DocClaims.lockSchemaExact, ``FvdepAudit.Doc.Proof.lock_schema_exact),
+        (``DocClaims.lockDecodeOk, ``FvdepAudit.Doc.Proof.lock_ok),
+        (``DocClaims.lockDecodeError, ``FvdepAudit.Doc.Proof.lock_error),
+        (``DocClaims.lockValid, ``FvdepAudit.Doc.Proof.lock_valid),
+        (``DocClaims.lockCheck, ``FvdepAudit.Doc.Proof.lock_check),
+        (``DocClaims.lockBytesEncode, ``FvdepAudit.Doc.Proof.lock_bytes_encode),
+        (``DocClaims.lockBytesOk, ``FvdepAudit.Doc.Proof.lock_bytes_ok),
+        (``DocClaims.lockBytesError, ``FvdepAudit.Doc.Proof.lock_bytes_error),
+        (``DocClaims.normalizePreserves, ``FvdepAudit.Doc.Proof.normalize_preserves),
+        (``DocClaims.normalizeSorted, ``FvdepAudit.Doc.Proof.normalize_sorted)]
+    subject := ``FvdepCore.Doc.decodeLock
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+def docEnvelopeRow : Row :=
+  { component := `FvdepCore.Doc
+    contract := "U3 D6 + D7 + D8; docs/interface.md §6"
+    claim :=
+      "The `--json` envelope's JSON is exactly the D6 layout (result members verbatim, " ++
+        "diagnostics clipped); a well-formed envelope encodes to a valid value; " ++
+        "`Envelope.wellFormed` decides well-formedness."
+    claims :=
+      [(``DocClaims.envelopeEncodeExact, ``FvdepAudit.Doc.Proof.envelope_encode),
+        (``DocClaims.envelopeCheck, ``FvdepAudit.Doc.Proof.envelope_check),
+        (``DocClaims.envelopeValid, ``FvdepAudit.Doc.Proof.envelope_valid)]
+    subject := ``FvdepCore.Doc.Envelope.toJson
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+def docClipRow : Row :=
+  { component := `FvdepCore.Doc
+    contract := "U3 D1 + D7"
+    claim :=
+      "`clip` keeps a text within 65,536 UTF-8 bytes, else its longest scalar-boundary prefix " ++
+        "within 65,520 bytes + ` [truncated]`; every clipped text fits 65,536 bytes."
+    claims :=
+      [(``DocClaims.clipExact, ``FvdepAudit.Doc.Proof.clip_exact),
+        (``DocClaims.clipBound, ``FvdepAudit.Doc.Proof.clip_bound)]
+    subject := ``FvdepCore.Doc.clip
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -823,7 +1036,7 @@ def ledger : Ledger :=
     libs := [`FvdepCore, `FvdepIO]
     rows :=
       [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow, jsonValueRow,
-        jsonDecodeRow, jsonPrintRow]
+        jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow]
     residue := residue }
 
 end FvdepLedger.Rows
