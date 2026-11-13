@@ -57,10 +57,25 @@ Provably secure dependencies. This repo is a library and automated system for bu
 
 ## Tasks
 
-- [ ] Stack ruling (spikes A `wt/builder-1` Lean throughout + B `wt/builder-2` Python shell + Lean core; frozen check v3.1, two vflab runs each; scientist-2; consultant-1/2/3; advisor) → Decisions Stack + `.agent/archive/stack-ruling.md`
-- [ ] Core-method ruling (two-phase conformance, implementation + verification profiles, contracts `docs/interface.md` + `docs/library.md`) → Decisions
-- [ ] Unit plan U1–U15 in Tasks → consultant verdict + pre-mortem (scale + performance, agent maintainability + operability, dependency risk + data-model rigidity; the last also reads `docs/interface.md` + `docs/library.md`)
+- [x] 95d5755 Stack ruling (spikes A `wt/builder-1` Lean throughout + B `wt/builder-2` Python shell + Lean core; frozen check v3.1, two vflab runs each; scientist-2; consultant-1/2/3; advisor) → Decisions Stack + `.agent/archive/stack-ruling.md`
+- [x] 95d5755 Core-method ruling (two-phase conformance, implementation + verification profiles, contracts `docs/interface.md` + `docs/library.md`) → Decisions
+- [ ] Unit plan U1–U15 below → consultant verdict + pre-mortem (consultant-4 scale + performance, consultant-5 agent maintainability + operability, consultant-6 dependency risk + data-model rigidity, the last also reading `docs/interface.md` + `docs/library.md`) → plan changes or accepted risks in Decisions
 - [ ] Acceptance suite: `tester-1` (`wt/tester-1`) from Intent + Decisions + `docs/interface.md` + `docs/library.md`, branch kept until close, row names its unmerged test count
+- [ ] U1 foundation (kernel: gate predicates + runner; data: metadata): Lake packages `fvdep` (`Fvdep`, `FvdepPreview`) + `tool/` `fvdeptool` (exe `fvdep`: version, help, usage); `tools/gate.sh` (stage registry, shards, ledger, pinned tools; lean style/build/lint/test, imports, preview direction, spec-lint, shellcheck, betterleaks, osv-scanner, zizmor + actionlint, fanout, deps, renovate, meta, tree-clean, probes with planted inputs) + fast gate; CI `gate.yml` + `codeql.yml`; `renovate.json`; `tools/vflab-run` (per-run MemoryMax); `.agent/review.md`; rules
+- [ ] U2 pure core + coverage ledger (kernel): ids, semver order, evidence record, status normalization, verdict/policy/delivery/staleness/retraction/lock transitions, effect plan + IO interpreter; `docs/verification.md` + gate stage
+- [ ] U3 codecs + hashing (kernel): verified JSON codec port + typed schemas, fvdep.toml validation + canonical printer, HACL* SHA-256 + framing, fsync FFI
+- [ ] U4 library core (kernel): registry + typed validation, launch contracts per `docs/library.md` + obligations, notices, `FvdepPreview`, `fvdep index` + immutability/notice/preview gate stages, spec oracle
+- [ ] U5 sandbox + phases (kernel): bwrap runner (pumps, deadline, cleanup, supervisor isolation, link refusal), content-keyed library build cache, phase-1 + phase-2 builds + exports; regressions escape + link plant
+- [ ] U6 implementation profile v1 (kernel): positive allowlist checker + import/reserved-name policy; launch example implementations (base64 ×4 incl. `abi`, semver ×2) built + admitted; regressions attribute swap, macro hijack, build-time rewrite, spec-module shadow
+- [ ] U7 judge + verification profile v1 (kernel): `Expr` statement builder, graph comparison, axiom audit, kernels Lean + con-leche + NanoDa, canaries, qualification on launch closures; examples PROVEN end to end; regressions forged term, tampered spec, native_decide
+- [ ] U8 project workflow (kernel): `init`, `check`, `status`, `lock`, `list`, `show`, `trust`, `brief` per `docs/interface.md` — first consumable artifact
+- [ ] U9 C library + bindings (kernel ABI / data bindings): `build-lib`, C shim, Rust/Python/Node examples, glue differential tests (sanitizers)
+- [ ] U10 profiles + fidelity (kernel statements / data fidelity): deviation-algebra statement builder, 4 launch profiles → published or preview, differential harness, `profile --check`
+- [ ] U11 updates (kernel): `fetch`, `outdated`, `diff`, `upgrade`, lifecycle snapshot, compat transport, retraction
+- [ ] U12 scan (kernel classification / data readers): lockfile readers (declared subsets), coverage + suggestions, property tests + fuzz targets
+- [ ] U13 growth on vflab (kernel admission + scheduler / ops): `admit`, `fvdep-grow`, systemd units, `data/fvdep`, agent user + token (user action), one real unattended run admitting ≥1 new package
+- [ ] U14 docs + retirement: README (install, run, configure), implementer docs, tag `prototype-whole-product` + `git rm -r prototype/fvdep`
+- [ ] U15 close: `.agent/review.md` complete, acceptance suite merged + green, rules upkeep, Phase MAINTAIN
 - [ ] Evidence branches kept until phase close (local only, never pushed): `wt/builder-1`, `wt/builder-2`, `wip/spike-evidence`
 - Deferred → `.agent/deferred.md`
 
