@@ -917,6 +917,12 @@ def replaceHolds : Prop :=
               FvdepCore.Status.Holds f (bytesOf old)
                 [(.replace f (bytesOf payload), .replace (.error msg))] (bytesOf c)
 
+/-- F4's model step, policy half: a scripted `replace` reads its answers in order (`Causal`: its
+record lists the script's answers in order, the answers it consumed fix its run, and its call k +
+whether it is issued depend on answers 0…k−1 alone). -/
+def replaceCausal : Prop :=
+  ∀ (dir : Path) (name : Name) (pid size : Nat), Causal (replace scripted dir name pid size)
+
 /-- F2 `readFile`: the calls + result follow the protocol written apart (`ReadFile`: ENOENT =
 absent, reads of ≤ 2^20 bytes until 0, the caller's byte cap, one close, the close's failure as
 primary or secondary cause), which fixes the result from the calls. -/
@@ -1025,9 +1031,9 @@ def residue : List Residue :=
         "the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: " ++
           "the open variants, read, write, fsync, close, rename, unlink, flock) + its native " ++
           "writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s " ++
-          "instantiation of the proven policy (`syscalls`: request → export, the read buffer, " ++
-          "the guard's closed mark; `withWriterLock` re-raising the act's exception after the " ++
-          "close)"
+          "instantiation of the proven policy (`syscalls`: each request → its export, run once " ++
+          "in the policy's order with its answer returned; the read buffer; the guard's closed " ++
+          "mark; `withWriterLock` re-raising the act's exception after the close)"
       reason :=
         "C + the OS have no Lean semantics: each export is one reviewed syscall; the policy " ++
           "over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake " ++
@@ -1582,19 +1588,24 @@ def sysReplaceRow : Row :=
         "its own temp; causes in order; `durability`), which fixes the result; one rename step " ++
         "is the only call naming the target; over the directory model the target holds its " ++
         "old state or the new bytes after any run or interruption (new on success), which is " ++
-        "U2 X4's `Holds` step for a present target. Assumed (F4; residue `os`): a stable " ++
-        "directory, cooperative writers (fvdep processes under the writer lock), an atomic " ++
-        "rename + F4's model step, carried by review, not proof: a process stopped after k " ++
-        "calls issued the first k calls of the complete run on the same answers."
+        "U2 X4's `Holds` step for a present target; a run reads its answers in order (call k " ++
+        "+ whether it is issued depend on answers 0…k−1 alone). Assumed (F4; residues `os` + " ++
+        "`sys-shim`): a stable directory, cooperative writers (fvdep processes under the " ++
+        "writer lock), an atomic rename, Linux `close` (the descriptor released on every " ++
+        "return; POSIX.1-2024 lets `EINTR` keep it open), the native run issuing the policy's " ++
+        "requests in order, each answered once (row `sysNative`); with these, a process " ++
+        "stopped after k calls issued the first k calls of a complete run on the same answers " ++
+        "(F4's model step)."
     claims :=
       [(``SysClaims.replaceExact, ``FvdepAudit.Sys.Proof.replace_exact),
         (``SysClaims.replaceSingleTouch, ``FvdepAudit.Sys.Proof.replace_single_touch),
         (``SysClaims.replaceOldOrNew, ``FvdepAudit.Sys.Proof.replace_old_or_new),
-        (``SysClaims.replaceHolds, ``FvdepAudit.Sys.Proof.replace_holds)]
+        (``SysClaims.replaceHolds, ``FvdepAudit.Sys.Proof.replace_holds),
+        (``SysClaims.replaceCausal, ``FvdepAudit.Sys.Proof.replace_causal)]
     subject := ``FvdepIO.Sys.Policy.replace
     path := []
     noCaller := "U8"
-    residue := ["os", "runtime"]
+    residue := ["os", "runtime", "sys-shim"]
     unproven := [] }
 
 /-- U3 F2: the project read (U8 wires it). -/
@@ -1634,7 +1645,12 @@ def sysNativeRow : Row :=
     contract := "U3 F1–F2"
     claim :=
       "`replace`, `readFile`, `withWriterLock`, `Writer` + `syncDir` run the proven policy over " ++
-        "`syscalls` (each request → one shim export; residue `sys-shim`)."
+        "`syscalls` (each request → its one syscall export, run in the policy's order + " ++
+        "answered once; the native writer guard: `Writer.create` registers the created " ++
+        "descriptor (`writerNew`), each later `Writer` operation runs between `writerAcquire` " ++
+        "+ `writerRelease`, a guarded close marks the guard closed (`writerMarkClosed`) before " ++
+        "its one close, the guard's finalizer closes a descriptor still open; residue " ++
+        "`sys-shim`)."
     claims := []
     subject := ``FvdepIO.Sys.replace
     path := []

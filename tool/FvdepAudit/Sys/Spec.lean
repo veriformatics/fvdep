@@ -425,6 +425,19 @@ inductive Steps (payload : List UInt8) : DirState → Trace → DirState → Pro
 def InFlight (payload : List UInt8) (s : DirState) (request : Request) (s' : DirState) : Prop :=
   s' = s ∨ ∃ response, Step payload s ⟨request, response⟩ s'
 
+/-- F4's model step, policy half: `m` reads its script's answers in order — its record lists
+answers `0 … consumed − 1`; scripts agreeing on the answers it consumed give the same run; scripts
+agreeing on answers `0 … k − 1` give the same first `k + 1` requests (whether call `k` is issued +
+its request depend on the answers before it alone). -/
+structure Causal {α : Type} (m : ScriptIO α) : Prop where
+  recorded (s : Script) :
+    (m.run s).events.map Event.response = (List.range (m.run s).consumed).map s
+  settled (s s' : Script) (k : Nat) (agree : ∀ i, i < k → s i = s' i)
+    (within : (m.run s).consumed ≤ k) : m.run s' = m.run s
+  requests (s s' : Script) (k : Nat) (agree : ∀ i, i < k → s i = s' i) :
+    ((m.run s').events.take (k + 1)).map Event.request =
+      ((m.run s).events.take (k + 1)).map Event.request
+
 /-- The path text `t` holds what it held in `s₀` (absent or old bytes) or the new bytes. -/
 def OldOrNew (payload : List UInt8) (s₀ s : DirState) (t : String) : Prop :=
   s.files t = s₀.files t ∨ s.files t = some payload

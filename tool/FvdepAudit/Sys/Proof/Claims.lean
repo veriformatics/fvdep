@@ -1,3 +1,4 @@
+import FvdepAudit.Sys.Proof.Causal
 import FvdepAudit.Sys.Proof.Lock
 import FvdepAudit.Sys.Proof.Read
 import FvdepAudit.Sys.Proof.Touch
@@ -178,5 +179,9 @@ theorem lock_exact {α : Type} (dir : Path) (act : ScriptIO α) (script : Script
     ((withLock scripted dir act).run script).result = r ↔
       Lock dir act script ((withLock scripted dir act).run script).events r :=
   lock_exact_script dir act script r
+
+/-- F4's model step, policy half: a scripted `replace` reads its answers in order. -/
+theorem replace_causal (dir : Path) (name : Name) (pid size : Nat) :
+    Causal (replace scripted dir name pid size) := causal_replace dir name pid size
 
 end FvdepAudit.Sys.Proof
