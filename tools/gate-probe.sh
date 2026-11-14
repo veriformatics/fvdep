@@ -44,12 +44,13 @@ copy() {
     # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
     # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
     if [[ "${with_suites:-0}" == 1 ]]; then
-        for d in tests/codec/.lake tests/manifest/.lake tests/sha256/.build; do
+        for d in tests/codec/.lake tests/manifest/.lake tests/sha256/.build tests/sys/.lake \
+            tests/sys/.build; do
             [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
         done
     fi
     # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
-    for d in ledger-suite codec-suite manifest-suite; do
+    for d in ledger-suite codec-suite manifest-suite fuzz-replay sys-suite; do
         if [[ -f "$root/.gate/$d.green" ]]; then
             mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
         fi
@@ -441,6 +442,11 @@ plant_fuzz_panic() {
 }
 probe fuzz-replay plant_fuzz_panic "probe-planted" \
     env FVDEP_FUZZ_TARGET=json-decode bash -c 'source tools/gate.sh; fuzz_replay'
+
+# sys-suite: the dev driver naming one op's record wrong fails that op's records case, named.
+plant_sys_driver() { sed -i 's/report "syncdir"/report "syncDir"/' tool/FvdepDev/Sys.lean; }
+with_suites=1 probe sys-suite plant_sys_driver "FAIL F.records.syncdir" \
+    env FVDEP_SYS_CASE=F.records.syncdir bash -c 'source tools/gate.sh; sys_suite'
 
 # codec-suite's frozen inventories (expected values change only by their own unit): one expected
 # value flipped → the freeze guard names the breach before any case runs.

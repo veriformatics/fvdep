@@ -1039,7 +1039,13 @@ def residue : List Residue :=
           "over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake " ++
           "test` (replace over absent, present, symlink + directory targets, missing directory, " ++
           "read back, absent + empty reads, the caller's read cap, writer lock contention + " ++
-          "exception, Writer lifecycle)"
+          "exception, Writer lifecycle) + F6's blind suite (stage `sys-suite`, 2,819 credited " ++
+          "cases through the dev driver `fvdep-dev`: an LD_PRELOAD fault injector scripting " ++
+          "each syscall (every op × errno, `EINTR` budgets, short + zero reads and writes), a " ++
+          "crash cut at every syscall of a `replace`, lock contention between processes, ZFS " ++
+          "+ the gate host's filesystem, the shim + guard under gcc ASan + UBSan) + fuzz " ++
+          "target `sys-actions` (action sequences over the shim + guard; corpus replayed " ++
+          "under gcc ASan + UBSan by stage `fuzz-replay`)"
       ruling := "the persistence syscall shim + writer guard (tested)"
       boundary :=
         [``FvdepIO.Sys.Native.openFile, ``FvdepIO.Sys.Native.openDir, ``FvdepIO.Sys.Native.openRead,

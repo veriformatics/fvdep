@@ -4,7 +4,8 @@ import FvdepIO.Sys
 
 /-! Dev driver for the persistence API (contract `docs/contracts/U3-codecs.md` F6; fvapi 02d99d1
 `Fvapi.Sys.Fsync.Dev` + `replace`, `read`, `lock`, `unlock`, `wait`): `fvdep-dev sys run OP…`, one
-JSON record per op on stdout. Never shipped (lean_lib `FvdepDev`). -/
+canonical JSON record per op on stdout (`Value.object`: keys in byte order). Never shipped
+(lean_lib `FvdepDev`). -/
 
 namespace FvdepDev.Sys
 
@@ -104,18 +105,17 @@ def causeName : Cause → String
   | .tempsTaken => "tempsTaken"
   | .tooLarge => "tooLarge"
 
+/-- One secondary cause: the cleanup op + its errno. -/
+def secondaryJson (s : Op × Nat) : Value := .object [("op", .str (opName s.1)), ("errno", .int s.2)]
+
 def errorJson (e : SysError) : Value :=
-  .obj <|
+  .object <|
     [("op", .str (opName e.op)), ("cause", .str (causeName e.cause)),
         ("path", .str e.path.toString)] ++
       (match e.cause with
       | .errno n => [("errno", .int n)]
       | _ => []) ++
-      (if e.secondary.isEmpty then []
-      else
-        [("secondary",
-            .arr
-              (e.secondary.map fun s => .obj [("op", .str (opName s.1)), ("errno", .int s.2)]))]) ++
+      (if e.secondary.isEmpty then [] else [("secondary", .arr (e.secondary.map secondaryJson))]) ++
       if e.durability then [("durability", .bool true)] else []
 
 def emit (record : Value) : IO Unit := do
@@ -127,8 +127,8 @@ def report (op : String) (result : Except SysError Unit) (extra : List (String �
     IO Unit :=
   emit <|
     match result with
-    | .ok _ => .obj ([("op", .str op), ("ok", .bool true)] ++ extra)
-    | .error e => .obj [("op", .str op), ("ok", .bool false), ("error", errorJson e)]
+    | .ok _ => .object ([("op", .str op), ("ok", .bool true)] ++ extra)
+    | .error e => .object [("op", .str op), ("ok", .bool false), ("error", errorJson e)]
 
 /-- Exactly `n` bytes from stdin, `none` at an early end. -/
 def readExactly (n : Nat) : IO (Option ByteArray) := do

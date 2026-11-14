@@ -1,0 +1,8 @@
+.build/
+.results/
+.run.*/
+.lake/
+lake-manifest.json
+.lean-fmt-cache/
+*.log
+__pycache__/
