@@ -44,8 +44,8 @@ copy() {
     # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
     # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
     if [[ "${with_suites:-0}" == 1 ]]; then
-        for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake tests/sha256/.build \
-            tests/sys/.lake tests/sys/.build; do
+        for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake \
+            tests/library/conformance/.lake tests/sha256/.build tests/sys/.lake tests/sys/.build; do
             [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
         done
     fi
@@ -446,6 +446,16 @@ plant_library_reference() {
 }
 with_suites=1 probe library-suite plant_library_reference "FAIL A.b64.exhaustive.1.encode" \
     env FVDEP_LIBRARY_CASE=A.b64.exhaustive.1.encode bash -c 'source tools/gate.sh; library_suite'
+
+# library-suite's conformance trial (contract U4 A8): an axiom in a trial proof fails its build
+# (Conformance.Audit), named.
+plant_conformance_axiom() {
+    sed -i 's/^  funext encode_list$/  (fun _ => funext encode_list) trialPlant/
+s/^theorem encode_eq /axiom trialPlant : True\n\n&/' \
+        tests/library/conformance/Conformance/Proof/Encode.lean
+}
+with_suites=1 probe library-conformance plant_conformance_axiom "encode_eq rests on" \
+    env FVDEP_LIBRARY_CASE=A.b64.vector.0.std.encode bash -c 'source tools/gate.sh; library_suite'
 
 # fuzz-replay: the json target panics on one committed input ⇒ the replay aborts naming it (the
 # harness's LEAN_ABORT_ON_PANIC turns a Lean panic into the abort the engine counts).
