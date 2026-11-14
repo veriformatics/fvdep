@@ -93,6 +93,7 @@ coverage    lean
 ledger-suite lean
 codec-suite lean
 manifest-suite lean
+fuzz-replay lean
 imports     checks
 preview     checks
 spec        checks
@@ -113,12 +114,12 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite fuzz-replay'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
-TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepDev «fvdep-dev» FvdepAudit FvdepLedger «fvdep-ledger»
-    FvdepLedgerFixtures)
+TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit FvdepLedger
+    «fvdep-ledger» FvdepLedgerFixtures)
 
 # Every shard STAGES names, once each, in first-use order.
 shard_names() { awk 'NF { for (i = 2; i <= NF; i++) if (!seen[$i]++) print $i }' <<<"$STAGES"; }
@@ -187,7 +188,8 @@ closure_key() {
 
 # A blind suite with its input closure KEY: with FVDEP_REUSE=1 (the fast gate) a green verdict
 # stands while that closure stays byte-identical; the full gate always runs it. A run narrowed to
-# one case (FVDEP_LEDGER_ONLY, FVDEP_CODEC_CASE, FVDEP_MANIFEST_CASE) never vouches for the whole.
+# one case (FVDEP_LEDGER_ONLY, FVDEP_CODEC_CASE, FVDEP_MANIFEST_CASE, FVDEP_FUZZ_TARGET) never vouches
+# for the whole.
 suite() { # NAME KEY CMD…
     local name="$1" key="$2" mark=".gate/$1.green"
     shift 2
@@ -196,7 +198,8 @@ suite() { # NAME KEY CMD…
         return 0
     fi
     "$@" || return 1
-    [[ -z "${FVDEP_LEDGER_ONLY:-}${FVDEP_CODEC_CASE:-}${FVDEP_MANIFEST_CASE:-}" && -n "$key" ]] || return 0
+    [[ -z "${FVDEP_LEDGER_ONLY:-}${FVDEP_CODEC_CASE:-}${FVDEP_MANIFEST_CASE:-}${FVDEP_FUZZ_TARGET:-}" &&
+        -n "$key" ]] || return 0
     mkdir -p .gate && printf '%s\n' "$key" >"$mark"
 }
 
@@ -229,6 +232,13 @@ codec_suite() {
 manifest_suite() {
     suite manifest-suite "$(shipped_closure tests/manifest)" bash tests/manifest/run.sh \
         ${FVDEP_MANIFEST_CASE:+--case "$FVDEP_MANIFEST_CASE"}
+}
+
+# Fuzz corpora (contract U3 "Fuzz"; tools/fuzz.sh): every seed + pinned crash input through each
+# target's engine-free replay build (a Lean target's panic aborts; C targets under gcc ASan + UBSan).
+fuzz_replay() {
+    suite fuzz-replay "$(shipped_closure tests/fuzz tool/FvdepFuzz tool/FvdepFuzz.lean tools/fuzz.sh)" \
+        bash tools/fuzz.sh replay ${FVDEP_FUZZ_TARGET:+"$FVDEP_FUZZ_TARGET"}
 }
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.

@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."baode"]
+ven = "1.0.0"
+e = "fn"
+imps = ["Iml"]
+s = ["Proof"]
+impl = "Im_eq"
+
+[modules.".decode"]
+ven = "1.0.0"
+ence = "tial"
+adr = ["py3", "imp.py"]

@@ -1,0 +1,10 @@
+schema = 1
+
+[library]
+commit = "uired"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_mî"]

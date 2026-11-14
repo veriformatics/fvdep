@@ -1,0 +1,21 @@
+schema = 1
+
+[library]
+commit = ""
+pr= ""
+
+[policy]
+p = ""
+
+[modules."basde"]
+ver = "0"
+s = "fn"
+ules = ["Impl"]
+proos = ["Proof"]
+impl = "Ime"
+p = "_eq"
+
+[modules."e"]
+ion = "1"
+evce = "dial"
+ter = ["on3", "iy"]

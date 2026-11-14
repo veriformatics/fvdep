@@ -355,6 +355,8 @@ plant_vendor_upstream() {
         vendor/hacl-star/lock.json
 }
 probe deps-vendor plant_vendor_upstream "planted/vendored has no row" python3 -I tools/check-deps.py
+plant_afl_upstream() { sed -i 's#github.com/AFLplusplus/AFLplusplus/#github.com/planted/fuzzer/#' tools/afl.lock; }
+probe deps-afl plant_afl_upstream "planted/fuzzer has no row" python3 -I tools/check-deps.py
 
 # vendor: one changed byte, a locked file missing, an unlocked file beside the locked ones.
 vendor_stage() { bash -c 'source tools/gate.sh; vendor'; }
@@ -384,6 +386,11 @@ probe renovate-lake plant_lake_manager "tests/renovate/lake-manifest.json: extra
     python3 -I tools/check-renovate.py
 plant_vendor_manager() { sed -i 's/\\"commit\\"/\\"comit\\"/' renovate.json; }
 probe renovate-vendor plant_vendor_manager "vendor/hacl-star/lock.json: extracted" \
+    python3 -I tools/check-renovate.py
+plant_afl_manager() { sed -i 's/) source /) sauce /' renovate.json; }
+probe renovate-afl plant_afl_manager "tools/afl.lock: extracted" python3 -I tools/check-renovate.py
+plant_afl_halfbump() { sed -i -E 's/^(\S+) \S+ source /\1 9.99c source /' tools/afl.lock; }
+probe renovate-afl-repin plant_afl_halfbump "re-pin with tools/fuzz.sh pin 9.99c" \
     python3 -I tools/check-renovate.py
 
 # meta: version disagreement; an unquoted rule `paths:` entry; a Lake target the gate never builds.
@@ -424,6 +431,16 @@ with_suites=1 probe codec-suite plant_codec_harness "FAIL J.limits" \
 plant_manifest_driver() { sed -i 's/toJson maxBytes)\]$/toJson (maxBytes + 1))]/' tests/manifest/Driver.lean; }
 with_suites=1 probe manifest-suite plant_manifest_driver "FAIL T.maxBytes" \
     env FVDEP_MANIFEST_CASE=T.maxBytes bash -c 'source tools/gate.sh; manifest_suite'
+
+# fuzz-replay: the json target panics on one committed input ⇒ the replay aborts naming it (the
+# harness's LEAN_ABORT_ON_PANIC turns a Lean panic into the abort the engine counts).
+plant_fuzz_panic() {
+    sed -i 's/^  | .ok v =>$/  | .ok v => if v == .str "fvdep-probe" then panic! "planted" else/' \
+        tool/FvdepFuzz/Json.lean
+    printf '"fvdep-probe"' >tests/fuzz/json-decode/probe-planted
+}
+probe fuzz-replay plant_fuzz_panic "probe-planted" \
+    env FVDEP_FUZZ_TARGET=json-decode bash -c 'source tools/gate.sh; fuzz_replay'
 
 # codec-suite's frozen inventories (expected values change only by their own unit): one expected
 # value flipped → the freeze guard names the breach before any case runs.

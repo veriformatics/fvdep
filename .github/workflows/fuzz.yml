@@ -1,0 +1,64 @@
+# Campaign tier (contract docs/contracts/U3-codecs.md "Fuzz"; .claude/rules/checks.md): each fuzz
+# target's coverage-guided campaign, time-boxed (tools/fuzz.sh campaign); a crash or a hang = red +
+# its inputs kept as an artifact (pin them in tests/fuzz/<target>/ + fix in the same unit).
+# Schedule + dispatch run from the default branch alone ⇒ a `ci/fuzz**` push proves a change here
+# first, with a shorter time box.
+name: fuzz
+
+on:
+  schedule:
+    - cron: "41 4 * * 3"
+  workflow_dispatch:
+  push:
+    branches: ["ci/fuzz**"]
+
+permissions:
+  contents: read
+
+concurrency:
+  group: fuzz-${{ github.ref }}
+  cancel-in-progress: true
+
+jobs:
+  campaign:
+    name: fuzz (${{ matrix.target }})
+    strategy:
+      fail-fast: false
+      matrix:
+        target: [json-decode, lock-decode, unframe, manifest-decode, sha256, sys-actions]
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    env:
+      TARGET: ${{ matrix.target }}
+      SECONDS_BOX: ${{ github.event_name == 'push' && '300' || '1800' }}
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+
+      # Pinned elan, every download bounded + retried (tools/install-lean.sh).
+      - name: Install the Lean toolchain named in lean-toolchain
+        timeout-minutes: 10
+        run: bash tools/install-lean.sh
+
+      - name: Run the campaign
+        run: bash tools/fuzz.sh campaign "$TARGET" "$SECONDS_BOX"
+
+      # upload-artifact refuses a `:` in a file name + AFL++ names each finding `id:…,sig:…,time:…`
+      # ⇒ one tar carries them, names intact.
+      - name: Pack the crash + hang inputs
+        if: failure()
+        run: |
+          d=".gate/fuzz/out/$TARGET/default"
+          if [ -d "$d" ]; then
+            tar --ignore-failed-read -cf "fuzz-$TARGET.tar" -C "$d" crashes hangs fuzzer_stats
+          fi
+
+      - name: Keep the crash + hang inputs
+        if: failure()
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: fuzz-${{ matrix.target }}
+          path: fuzz-${{ matrix.target }}.tar
+          retention-days: 30

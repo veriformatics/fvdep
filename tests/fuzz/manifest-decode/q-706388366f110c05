@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]#d"
+
+[modules."ba.e_code"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.de"
+proof = "Proof.ee_eq"
+
+[modules."base64.oof_moof_mod66666666666666666666of_me"]
+ver = "0"
+e= "dial"
+adapter = ["pyt", "py"]

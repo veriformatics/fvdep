@@ -108,6 +108,10 @@ lean_lib FvdepDev where roots := #[`FvdepDev, `DevMain]
 
 lean_exe «fvdep-dev» where root := `DevMain
 
+/-- Fuzz targets (contract U3 "Fuzz"; `tools/fuzz.sh`): one `@[export]` entry per module, its IR C
++ import closure compiled into the engine + replay builds; never shipped (gate stage `imports`). -/
+lean_lib FvdepFuzz
+
 /-- Specs + proofs about the shipped code (contract `docs/contracts/U3-codecs.md` A): gate-only,
 imported by the ledger alone (gate stage `imports`), replayed by the ledger's kernel check. -/
 lean_lib FvdepAudit where globs := #[.andSubmodules `FvdepAudit]

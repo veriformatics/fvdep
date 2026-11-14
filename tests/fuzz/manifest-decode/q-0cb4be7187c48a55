@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "012ar567"
+
+[policy]
+f = "reqd"
+
+[modules."baode"]
+ven = "1.0.0"
+e = "fn"
+imps = ["Impl"]
+proes = ["P"]
+i= "I"
+
+[modules."basde"]
+ver = "0"
+e= "dial"
+ada = ["pyt", "py"]

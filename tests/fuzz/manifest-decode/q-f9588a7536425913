@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]#d"
+
+[modules."base64.e_code"]
+version = "1.0"
+shape = ""
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.de"
+proof = "Proof.ee_eq"
+
+[modules."base64.decod66666666666666666666676666666666e"]
+version = "1.0.0"
+evidence = "differential"
+adapter = ["pyt", "py"]

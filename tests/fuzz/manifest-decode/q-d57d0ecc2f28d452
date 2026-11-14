@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."ba.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Imtl"]
+proof_modules = ["P"]
+impl = "Impl.encode"
+proof = "Pro1.0.0code_eq"
+
+[modules."basde"]
+ver = "ial"
+ada = ["pyt", "py"]

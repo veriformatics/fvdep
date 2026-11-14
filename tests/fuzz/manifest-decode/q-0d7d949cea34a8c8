@@ -1,0 +1,20 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+proof = "required"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.encode"
+proof = "PrTof.encode_eq"
+
+[modules."base64.decode"]
+version = "1.0.0"
+evidence = "differential"
+adapter = ["python3", "impl/decode.py"]

@@ -1,0 +1,4 @@
+schema = 1
+
+[library]
+commit = "89abcdef0123456789abcdef01234567"

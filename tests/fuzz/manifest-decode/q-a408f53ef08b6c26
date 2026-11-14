@@ -1,0 +1,21 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234ab7"
+
+[policy]
+f = "reqd"
+
+[modules."base64ode"]
+ven = "1.0.0"
+e = "Zn"
+imps = ["Impl"]
+proes = ["P", "of"]
+impl = "Imp"
+pr= "Peq"
+
+[modules."base64.decode"]
+von = "1.0.0"
+evidence = ""
+p = "l"
+aer = ["p"]

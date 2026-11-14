@@ -1,0 +1,20 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["I[modumpl"]
+proof_modules = ["f"]
+impl = "Impl.de"
+proof = "Prq"
+
+[modules."basu64ode"]
+ven = "1.0.0"
+ence = "diff"
+adr = ["pyt", "py"]

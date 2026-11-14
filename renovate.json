@@ -63,6 +63,17 @@
     },
     {
       "customType": "regex",
+      "description": "The fuzz engine's source tarball (tools/afl.lock); the digest column needs tools/fuzz.sh pin",
+      "managerFilePatterns": ["/^tools/afl\\.lock$/"],
+      "matchStrings": [
+        "(?:^|\\n)\\S+ (?<currentValue>\\S+) source \\S+ https://github\\.com/(?<depName>[^/]+/[^/]+)/"
+      ],
+      "datasourceTemplate": "github-tags",
+      "extractVersionTemplate": "^v(?<version>.*)$",
+      "versioningTemplate": "regex:^(?<major>\\d+)\\.(?<minor>\\d+)c$"
+    },
+    {
+      "customType": "regex",
       "description": "Lake packages (every lake-manifest.json): git rev of a GitHub package, tracking its inputRev tag",
       "managerFilePatterns": [
         "/(^|/)lake-manifest\\.json$/"

@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."base64.encode"]
+vee = "fn"
+imps = ["Impl"]
+proes = ["P"]
+i= "Ide"
+f = "Pro"
+
+[modules."base64.decode"]
+version = "1.03456789abcdef012345.0"
+evidence = "differential"
+adapter = ["pyt", "py"]

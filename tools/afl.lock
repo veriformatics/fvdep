@@ -1,0 +1,5 @@
+# AFL++ = the fuzz engine (contract docs/contracts/U3-codecs.md "Fuzz"), built project-local by
+# tools/fuzz.sh from this source tarball (verified against its sha256 first). name version kind
+# sha256 url. Upstream publishes no release asset ⇒ the pin = the tag's generated archive (a changed
+# archive = red until re-pinned + reviewed). Re-pin: bash tools/fuzz.sh pin VERSION.
+afl++ 5.03c source 07f089e8591209862898c770a569d8e2b74b459fe967db323fc6a3924dcc82b5 https://github.com/AFLplusplus/AFLplusplus/archive/refs/tags/v5.03c.tar.gz
