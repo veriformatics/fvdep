@@ -1257,6 +1257,351 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `toml-parse` (Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message)
 
+## `FvdepIO.Sys.Types`
+
+- Contract: U3 F2 + F4
+- Claim: `tempPath`, `Path.at` + `lockPath` spell F2's names: `<dir>/.<name>.tmp-<pid>-<n>`, `<dir>/<name>`, `<dir>/.fvdep-writer.lock` (the texts the protocol claims name).
+- Subject: `FvdepIO.Sys.tempPath`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.tempPathText` (hash 0x522da8e6), proved by `FvdepAudit.Sys.Proof.tempPath_text`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name) (pid n : Nat),
+    (FvdepIO.Sys.tempPath dir name pid n).toString = FvdepAudit.Sys.Spec.tempText dir name pid n
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.atText` (hash 0xe275b308), proved by `FvdepAudit.Sys.Proof.at_text`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name),
+    (dir.at name).toString = FvdepAudit.Sys.Spec.targetText dir name
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.lockPathText` (hash 0xeab00a9e), proved by `FvdepAudit.Sys.Proof.lockPath_text`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path), (FvdepIO.Sys.lockPath dir).toString = FvdepAudit.Sys.Spec.lockText dir
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F3 + F4
+- Claim: `create` (create-exclusive, one F3 step): its result is exactly the one `Create` assigns to its calls, ok + error alike; one F3 step is at most `budget + 1` calls of one request, the 65th EINTR ending it as `retryExhausted`.
+- Subject: `FvdepIO.Sys.Policy.create`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.createExact` (hash 0x71849a77), proved by `FvdepAudit.Sys.Proof.create_exact`:
+
+  ```lean
+  ∀ (path : FvdepIO.Sys.Path) (mode : FvdepIO.Sys.Mode) (script : FvdepIO.Sys.Policy.Script)
+    (r : Except FvdepIO.Sys.SysError Nat),
+    ((FvdepIO.Sys.Policy.create FvdepIO.Sys.Policy.scripted path mode).run script).result = r ↔
+      FvdepAudit.Sys.Spec.Create path mode
+        ((FvdepIO.Sys.Policy.create FvdepIO.Sys.Policy.scripted path mode).run script).events r
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.retryBounded` (hash 0x690273fd), proved by `FvdepAudit.Sys.Proof.retry_bounded`:
+
+  ```lean
+  (∀ (request : FvdepIO.Sys.Model.Request) (budget : Nat) (events : FvdepAudit.Sys.Spec.Trace)
+      (result : Except FvdepIO.Sys.Cause Nat),
+      FvdepAudit.Sys.Spec.Retry request budget events result → List.length events ≤ budget + 1) ∧
+    (∀ (request : FvdepIO.Sys.Model.Request),
+        FvdepAudit.Sys.Spec.Retry request 64
+          (List.replicate 65 { request := request, response := Except.error 4 })
+          (Except.error FvdepIO.Sys.Cause.retryExhausted)) ∧
+      ∀ (request : FvdepIO.Sys.Model.Request) (budget : Nat) (events : FvdepAudit.Sys.Spec.Trace)
+        (result : Except FvdepIO.Sys.Cause Nat),
+        FvdepAudit.Sys.Spec.Retry request budget events result →
+          ∀ (e : FvdepIO.Sys.Model.Event), e ∈ events → e.request = request
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F3 + F4
+- Claim: `writer` (write all, fsync, one close, finalizer): its result is exactly the one `WriterOperation` assigns to its calls; a success acknowledged every byte; it uses only its descriptor, none once closed; a writer's calls (`actions`) attempt close at most once.
+- Subject: `FvdepIO.Sys.Policy.writer`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.writerExact` (hash 0xea563337), proved by `FvdepAudit.Sys.Proof.writer_exact`:
+
+  ```lean
+  ∀ (owned : FvdepIO.Sys.Model.WriterState) (action : FvdepIO.Sys.Model.WriterAction)
+    (script : FvdepIO.Sys.Policy.Script),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).events →
+      ∀ (r : Except FvdepIO.Sys.SysError Nat),
+        ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).result = r ↔
+          FvdepAudit.Sys.Spec.WriterOperation owned action
+            ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).events r
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.writeAcknowledged` (hash 0xdb88519b), proved by `FvdepAudit.Sys.Proof.write_acknowledged`:
+
+  ```lean
+  ∀ (owned : FvdepIO.Sys.Model.WriterState) (size : Nat) (script : FvdepIO.Sys.Policy.Script)
+    (n : Nat),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned
+                (FvdepIO.Sys.Model.WriterAction.write size)).run
+            script).events →
+      ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned
+                  (FvdepIO.Sys.Model.WriterAction.write size)).run
+              script).result =
+          Except.ok n →
+        FvdepAudit.Sys.Spec.acknowledged
+            ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned
+                    (FvdepIO.Sys.Model.WriterAction.write size)).run
+                script).events =
+          size
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.sameDescription` (hash 0x3db641f6), proved by `FvdepAudit.Sys.Proof.same_description`:
+
+  ```lean
+  ∀ (owned : FvdepIO.Sys.Model.WriterState) (action : FvdepIO.Sys.Model.WriterAction)
+    (script : FvdepIO.Sys.Policy.Script),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).events →
+      FvdepAudit.Sys.Spec.writerOnly owned.fd
+          ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).events ∧
+        (owned.closed = true →
+          ((FvdepIO.Sys.Policy.writer FvdepIO.Sys.Policy.scripted owned action).run script).events =
+            [])
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.closeOnceActions` (hash 0x114a3993), proved by `FvdepAudit.Sys.Proof.close_once_actions`:
+
+  ```lean
+  ∀ (owned : FvdepIO.Sys.Model.WriterState) (steps : List FvdepIO.Sys.Model.WriterAction)
+    (script : FvdepIO.Sys.Policy.Script),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.actions FvdepIO.Sys.Policy.scripted owned steps).run script).events →
+      FvdepAudit.Sys.Spec.closeCount
+          ((FvdepIO.Sys.Policy.actions FvdepIO.Sys.Policy.scripted owned steps).run script).events ≤
+        if owned.closed = true then 0 else 1
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F3 + F4
+- Claim: `directory` (`syncDir`: open, fsync, one close): its result is exactly the one `Directory` assigns to its calls; it closes the directory it opened exactly once.
+- Subject: `FvdepIO.Sys.Policy.directory`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.directoryExact` (hash 0x16dad88e), proved by `FvdepAudit.Sys.Proof.directory_exact`:
+
+  ```lean
+  ∀ (path : FvdepIO.Sys.Path) (script : FvdepIO.Sys.Policy.Script)
+    (r : Except FvdepIO.Sys.SysError Nat),
+    ((FvdepIO.Sys.Policy.directory FvdepIO.Sys.Policy.scripted path).run script).result = r ↔
+      FvdepAudit.Sys.Spec.Directory path
+        ((FvdepIO.Sys.Policy.directory FvdepIO.Sys.Policy.scripted path).run script).events r
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.closeOnceDirectory` (hash 0xa1c386e5), proved by `FvdepAudit.Sys.Proof.close_once_directory`:
+
+  ```lean
+  ∀ (path : FvdepIO.Sys.Path) (script : FvdepIO.Sys.Policy.Script),
+    FvdepAudit.Sys.Spec.closeCount
+          ((FvdepIO.Sys.Policy.directory FvdepIO.Sys.Policy.scripted path).run script).events ≤
+        1 ∧
+      ((∃ e,
+          e ∈ ((FvdepIO.Sys.Policy.directory FvdepIO.Sys.Policy.scripted path).run script).events ∧
+            ∃ fd, e.request = FvdepIO.Sys.Model.Request.openDir path ∧ e.response = Except.ok fd) →
+        FvdepAudit.Sys.Spec.closeCount
+            ((FvdepIO.Sys.Policy.directory FvdepIO.Sys.Policy.scripted path).run script).events =
+          1)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F2 + F4
+- Claim: `replace`'s calls + result follow F2's protocol written apart (temp walk, all bytes, fsync, one close, one rename step, `syncDir`; cleanup closes once, then unlinks only its own temp; causes in order; `durability`), which fixes the result; one rename step is the only call naming the target; over the directory model the target holds its old state or the new bytes after any run or interruption (new on success), which is U2 X4's `Holds` step for a present target. Assumed (F4; residue `os`): a stable directory, cooperative writers (fvdep processes under the writer lock), an atomic rename + F4's model step, carried by review, not proof: a process stopped after k calls issued the first k calls of the complete run on the same answers.
+- Subject: `FvdepIO.Sys.Policy.replace`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.replaceExact` (hash 0xa38d85f2), proved by `FvdepAudit.Sys.Proof.replace_exact`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name) (pid size : Nat)
+    (script : FvdepIO.Sys.Policy.Script) (r : Except FvdepIO.Sys.SysError Unit),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+            script).events →
+      (((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+              script).result =
+          r ↔
+        FvdepAudit.Sys.Spec.Replace dir name pid size
+          ((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+              script).events
+          r)
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.replaceSingleTouch` (hash 0x33ca720d), proved by `FvdepAudit.Sys.Proof.replace_single_touch`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name) (pid size : Nat)
+    (script : FvdepIO.Sys.Policy.Script),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+            script).events →
+      (∀ (e : FvdepIO.Sys.Model.Event),
+          e ∈
+              ((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+                  script).events →
+            ¬FvdepAudit.Sys.Spec.Names (FvdepAudit.Sys.Spec.targetText dir name) e.request) ∨
+        ∃ walk data renames rest temp target mode fd renamed,
+          ((FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid size).run
+                  script).events =
+              walk ++
+                    { request := FvdepIO.Sys.Model.Request.create temp mode,
+                        response := Except.ok fd } ::
+                      data ++
+                  renames ++
+                rest ∧
+            target.toString = FvdepAudit.Sys.Spec.targetText dir name ∧
+              FvdepAudit.Sys.Spec.Retry (FvdepIO.Sys.Model.Request.rename temp target) 64 renames
+                  renamed ∧
+                FvdepAudit.Sys.Spec.writerOnly fd data ∧
+                  (∀ (e : FvdepIO.Sys.Model.Event),
+                      e ∈ rest → ∀ (g o c : Nat), e.request ≠ FvdepIO.Sys.Model.Request.write g o c) ∧
+                    ∀ (e : FvdepIO.Sys.Model.Event),
+                      e ∈
+                          walk ++
+                              { request := FvdepIO.Sys.Model.Request.create temp mode,
+                                  response := Except.ok fd } ::
+                                data ++
+                            rest →
+                        ¬FvdepAudit.Sys.Spec.Names (FvdepAudit.Sys.Spec.targetText dir name) e.request
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.replaceOldOrNew` (hash 0x28daba6a), proved by `FvdepAudit.Sys.Proof.replace_old_or_new`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name) (pid : Nat) (payload : List UInt8)
+    (script : FvdepIO.Sys.Policy.Script) (s₀ : FvdepAudit.Sys.Spec.DirState)
+    (run : FvdepIO.Sys.Policy.Recorded (Except FvdepIO.Sys.SysError Unit)),
+    run =
+        (FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid payload.length).run
+          script →
+      FvdepAudit.Sys.Spec.Consistent run.events →
+        (∀ (s : FvdepAudit.Sys.Spec.DirState),
+            FvdepAudit.Sys.Spec.Steps payload s₀ run.events s →
+              FvdepAudit.Sys.Spec.OldOrNew payload s₀ s (FvdepAudit.Sys.Spec.targetText dir name) ∧
+                (run.result = Except.ok () →
+                    s.files (FvdepAudit.Sys.Spec.targetText dir name) = some payload) ∧
+                  (∀ (e : FvdepIO.Sys.SysError),
+                      run.result = Except.error e →
+                        e.durability = true →
+                          s.files (FvdepAudit.Sys.Spec.targetText dir name) = some payload) ∧
+                    (FvdepAudit.Sys.Spec.NoRename run.events →
+                      s.files (FvdepAudit.Sys.Spec.targetText dir name) =
+                        s₀.files (FvdepAudit.Sys.Spec.targetText dir name))) ∧
+          ∀ (done : FvdepAudit.Sys.Spec.Trace) (x : FvdepIO.Sys.Model.Event)
+            (rest : List FvdepIO.Sys.Model.Event) (s₁ s : FvdepAudit.Sys.Spec.DirState),
+            run.events = done ++ x :: rest →
+              FvdepAudit.Sys.Spec.Steps payload s₀ done s₁ →
+                FvdepAudit.Sys.Spec.InFlight payload s₁ x.request s →
+                  FvdepAudit.Sys.Spec.OldOrNew payload s₀ s
+                      (FvdepAudit.Sys.Spec.targetText dir name) ∧
+                    (FvdepAudit.Sys.Spec.NoRename (done ++ [x]) →
+                      s.files (FvdepAudit.Sys.Spec.targetText dir name) =
+                        s₀.files (FvdepAudit.Sys.Spec.targetText dir name))
+  ```
+- Statement `FvdepLedger.Rows.SysClaims.replaceHolds` (hash 0x7d1d4c59), proved by `FvdepAudit.Sys.Proof.replace_holds`:
+
+  ```lean
+  ∀ (dir : FvdepIO.Sys.Path) (name : FvdepIO.Sys.Name) (pid : Nat) (payload old : List UInt8)
+    (script : FvdepIO.Sys.Policy.Script) (s₀ : FvdepAudit.Sys.Spec.DirState)
+    (f : FvdepCore.ProjectFile)
+    (run : FvdepIO.Sys.Policy.Recorded (Except FvdepIO.Sys.SysError Unit)),
+    run =
+        (FvdepIO.Sys.Policy.replace FvdepIO.Sys.Policy.scripted dir name pid payload.length).run
+          script →
+      FvdepAudit.Sys.Spec.Consistent run.events →
+        s₀.files (FvdepAudit.Sys.Spec.targetText dir name) = some old →
+          (∀ (s : FvdepAudit.Sys.Spec.DirState),
+              FvdepAudit.Sys.Spec.Steps payload s₀ run.events s →
+                ∃ c,
+                  s.files (FvdepAudit.Sys.Spec.targetText dir name) = some c ∧
+                    (run.result = Except.ok () →
+                        FvdepCore.Status.Holds f (FvdepAudit.Sys.Spec.bytesOf old)
+                          [(FvdepCore.Eff.replace f (FvdepAudit.Sys.Spec.bytesOf payload),
+                              FvdepCore.Response.replace (Except.ok ()))]
+                          (FvdepAudit.Sys.Spec.bytesOf c)) ∧
+                      ∀ (e : FvdepIO.Sys.SysError) (msg : String),
+                        run.result = Except.error e →
+                          FvdepCore.Status.Holds f (FvdepAudit.Sys.Spec.bytesOf old)
+                            [(FvdepCore.Eff.replace f (FvdepAudit.Sys.Spec.bytesOf payload),
+                                FvdepCore.Response.replace (Except.error msg))]
+                            (FvdepAudit.Sys.Spec.bytesOf c)) ∧
+            ∀ (done : FvdepAudit.Sys.Spec.Trace) (x : FvdepIO.Sys.Model.Event)
+              (rest : List FvdepIO.Sys.Model.Event) (s₁ s : FvdepAudit.Sys.Spec.DirState)
+              (msg : String),
+              run.events = done ++ x :: rest →
+                FvdepAudit.Sys.Spec.Steps payload s₀ done s₁ →
+                  FvdepAudit.Sys.Spec.InFlight payload s₁ x.request s →
+                    ∃ c,
+                      s.files (FvdepAudit.Sys.Spec.targetText dir name) = some c ∧
+                        FvdepCore.Status.Holds f (FvdepAudit.Sys.Spec.bytesOf old)
+                          [(FvdepCore.Eff.replace f (FvdepAudit.Sys.Spec.bytesOf payload),
+                              FvdepCore.Response.replace (Except.error msg))]
+                          (FvdepAudit.Sys.Spec.bytesOf c)
+  ```
+- Uninterpreted: none
+- Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F2
+- Claim: `readFile`'s calls + result follow the protocol written apart (ENOENT = absent, reads of ≤ 2^20 bytes until 0, the caller's byte cap (`FvdepIO.Sys.readFile`'s default 2^30), one close, the close's failure as primary or secondary cause), which fixes the result.
+- Subject: `FvdepIO.Sys.Policy.readFile`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.readExact` (hash 0x38d79eac), proved by `FvdepAudit.Sys.Proof.read_exact`:
+
+  ```lean
+  ∀ (path : FvdepIO.Sys.Path) (cap : Nat) (script : FvdepIO.Sys.Policy.Script)
+    (r : Except FvdepIO.Sys.SysError (Option Nat)),
+    FvdepAudit.Sys.Spec.Consistent
+        ((FvdepIO.Sys.Policy.readFile FvdepIO.Sys.Policy.scripted path cap).run script).events →
+      (((FvdepIO.Sys.Policy.readFile FvdepIO.Sys.Policy.scripted path cap).run script).result = r ↔
+        FvdepAudit.Sys.Spec.ReadFile path cap
+          ((FvdepIO.Sys.Policy.readFile FvdepIO.Sys.Policy.scripted path cap).run script).events r)
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys.Policy`
+
+- Contract: U3 F2 + F4
+- Claim: `withLock` runs `act` exactly when the lock file's open + `flock` succeed, once, and returns its result; the description is closed on every exit after its open; a refusal (EWOULDBLOCK = `busy`) or an open failure runs nothing.
+- Subject: `FvdepIO.Sys.Policy.withLock`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SysClaims.lockExact` (hash 0xeba1de9d), proved by `FvdepAudit.Sys.Proof.lock_exact`:
+
+  ```lean
+  ∀ {α : Type} (dir : FvdepIO.Sys.Path) (act : FvdepIO.Sys.Policy.ScriptIO α)
+    (script : FvdepIO.Sys.Policy.Script) (r : Except FvdepIO.Sys.SysError α),
+    ((FvdepIO.Sys.Policy.withLock FvdepIO.Sys.Policy.scripted dir act).run script).result = r ↔
+      FvdepAudit.Sys.Spec.Lock dir act script
+        ((FvdepIO.Sys.Policy.withLock FvdepIO.Sys.Policy.scripted dir act).run script).events r
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Sys`
+
+- Contract: U3 F1–F2
+- Claim: `replace`, `readFile`, `withWriterLock`, `Writer` + `syncDir` run the proven policy over `syscalls` (each request → one shim export; residue `sys-shim`).
+- Subject: `FvdepIO.Sys.replace`
+- Path: none yet (wired by U8)
+- Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Sys.Native.read`, `FvdepIO.Sys.Native.openRead`
+- Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: request → export, the read buffer, the guard's closed mark; `withWriterLock` re-raising the act's exception after the close))
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
@@ -1264,4 +1609,5 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - `os` — OS, filesystem + process semantics: outside Lean; fvdep's effects reach them through the interpreter (ruling: "OS, filesystem + process semantics")
 - `hacl-sha256` — SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`): C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance claim); the shim + orchestration are small, reviewed + tested (FIPS 180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching) (ruling: "HACL* (verified upstream) + FFI wrapper (tested)")
 - `toml-parse` — Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message: toolchain code (Decisions: trusted); `ofLake` names any key of another shape; `fvdep.toml` ≤ 64 KiB bounds its recursion depth (T1); tested by `lake test` (a printed manifest reads back, syntax + repeated keys refuse with Lake's line, a BOM refuses first) (ruling: "Lake.Toml + Lake comparison code (toolchain)")
+- `sys-shim` — the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: request → export, the read buffer, the guard's closed mark; `withWriterLock` re-raising the act's exception after the close): C + the OS have no Lean semantics: each export is one reviewed syscall; the policy over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake test` (replace over absent, present, symlink + directory targets, missing directory, read back, absent + empty reads, the caller's read cap, writer lock contention + exception, Writer lifecycle) (ruling: "the persistence syscall shim + writer guard (tested)")
 - `literal` — literal data (the version string `Fvdep.version`): a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both lakefiles (ruling: "Literal data (the version string) is checked by the gate's `meta` stage")

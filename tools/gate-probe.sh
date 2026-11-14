@@ -303,6 +303,10 @@ probe imports-audit-shipped plant_audit_shipped "tool/FvdepCore/Json.lean:1: imp
     bash tools/check-imports.sh imports
 probe imports-audit-test plant_audit_test "tool/Tests.lean:1: import FvdepAudit.Json.Spec" \
     bash tools/check-imports.sh imports
+# The dev driver library (U3 F6) never enters a shipped module.
+plant_dev_shipped() { sed -i '1i import FvdepDev.Sys' tool/FvdepIO/Run.lean; }
+probe imports-dev-shipped plant_dev_shipped "tool/FvdepIO/Run.lean:1: import FvdepDev.Sys" \
+    bash tools/check-imports.sh imports
 probe preview plant_preview "Fvdep.lean:1: import FvdepPreview" bash tools/check-imports.sh preview
 # A module whose name only starts like an allowed root (the `\.`-in-awk-v regression).
 plant_prefix() { sed -i '1i import FvdepPlanted' FvdepPreview.lean; }
