@@ -25,7 +25,14 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        target: [json-decode, lock-decode, unframe, manifest-decode, sha256, sys-actions]
+        target:
+          - json-decode
+          - lock-decode
+          - unframe
+          - manifest-decode
+          - protocol-request
+          - sha256
+          - sys-actions
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     env:

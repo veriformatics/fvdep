@@ -7,6 +7,9 @@ import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
+import FvdepAudit.Protocol.Proof.Lines
+import FvdepAudit.Protocol.Proof.Request
+import FvdepAudit.Protocol.Proof.Sig
 import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
@@ -972,6 +975,51 @@ def lockPathText : Prop := ∀ (dir : Path), (lockPath dir).toString = lockText 
 
 end FvdepLedger.Rows.SysClaims
 
+namespace FvdepLedger.Rows.ProtocolClaims
+
+open FvdepCore.Json FvdepCore.Protocol FvdepAudit.Protocol.Spec
+
+/-- U4 B2: each value encodes to its §8 wire layout, written apart. -/
+def valLayout : Prop := ∀ (x : Val), encodeVal x = valSpec x
+
+/-- U4 B2: decoding at a type returns exactly the value of that type whose layout it is; every
+other value is refused. -/
+def valExact : Prop :=
+  ∀ (t : Ty) (v : Value) (x : Val), decodeVal t v = some x ↔ x.ty = t ∧ valSpec x = v
+
+/-- U4 B4: a value whose wire strings fit J1's bound encodes to a J1-valid value (integers, depth
++ key order hold by construction). -/
+def valValid : Prop :=
+  ∀ x : Val,
+    FvdepAudit.Json.Spec.stringsFit (valSpec x) = true → FvdepAudit.Json.Spec.Valid (encodeVal x)
+
+/-- U4 B3: a request line decodes to arguments exactly when J decodes it to the request object
+of the target's op whose arguments are their layouts, in order, typed by the signature. -/
+def requestExact : Prop :=
+  ∀ (sig : Sig) (b : ByteArray) (xs : List Val),
+    decodeRequest sig b = .ok xs ↔
+      decode b = .ok (requestLayout sig.op (xs.map valSpec)) ∧ xs.map Val.ty = sig.args
+
+/-- U4 B3: a reply line = the canonical text of its reply object (written apart) + LF. -/
+def replyExact : Prop :=
+  ∀ r : Reply, encodeReply r = (FvdepCore.Json.print (replyLayout r)).push 0x0A
+
+end FvdepLedger.Rows.ProtocolClaims
+
+namespace FvdepLedger.Rows.ProtocolClaims
+
+open FvdepCore.Protocol FvdepAudit.Protocol.Spec
+
+/-- U4 B3: the request lines = the LF-separated segments, a final empty segment dropped (EOF adds
+no line). -/
+def linesExact : Prop := ∀ (b : ByteArray), (lines b).map (·.data.toList) = linesSpec b.data.toList
+
+/-- U4 B1: `sigOf` = the type table over `Expr` shapes, written apart. -/
+def sigExact : Prop :=
+  ∀ (e : Lean.Expr) (ts : List Ty) (r : RTy), sigOf e = some (ts, r) ↔ SigIs e ts r
+
+end FvdepLedger.Rows.ProtocolClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -1664,6 +1712,42 @@ def sysNativeRow : Row :=
     residue := ["os", "runtime"]
     unproven := ["sys-shim"] }
 
+def protocolRow : Row :=
+  { component := `FvdepCore.Protocol
+    contract := "U4 B2–B4; docs/interface.md §8"
+    claim :=
+      "Each value encodes to its §8 layout; decoding at a type returns exactly the value whose " ++
+        "layout it is, refusing every other value; a value whose strings fit encodes to a valid " ++
+        "value; a request line decodes exactly when J decodes it to the target op's request " ++
+        "object with typed arguments; a reply line = its reply object's canonical text + LF; " ++
+        "the request lines = the LF-separated segments."
+    claims :=
+      [(``ProtocolClaims.valLayout, ``FvdepAudit.Protocol.Proof.val_layout),
+        (``ProtocolClaims.valExact, ``FvdepAudit.Protocol.Proof.val_exact),
+        (``ProtocolClaims.valValid, ``FvdepAudit.Protocol.Proof.val_valid),
+        (``ProtocolClaims.requestExact, ``FvdepAudit.Protocol.Proof.request_exact),
+        (``ProtocolClaims.replyExact, ``FvdepAudit.Protocol.Proof.reply_layout),
+        (``ProtocolClaims.linesExact, ``FvdepAudit.Protocol.Proof.lines_exact)]
+    subject := ``FvdepCore.Protocol.decodeRequest
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+def protocolSigRow : Row :=
+  { component := `FvdepCore.Protocol.Sig
+    contract := "U4 B1 (C's encodability rule V3)"
+    claim :=
+      "`sigOf` returns a spec type's argument + result types exactly when the type is " ++
+        "non-dependent arrows over §8's types (`Option X` result = `option`), read as `Expr` " ++
+        "shapes without reduction, metadata transparent; else `none`."
+    claims := [(``ProtocolClaims.sigExact, ``FvdepAudit.Protocol.Proof.sigOf_iff)]
+    subject := ``FvdepCore.Protocol.sigOf
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1674,7 +1758,7 @@ def ledger : Ledger :=
         jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow,
         hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
-        sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow]
+        sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow]
     residue := residue }
 
 end FvdepLedger.Rows

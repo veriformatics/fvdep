@@ -1,3 +1,3 @@
 import FvdepCore.Cli
-import FvdepCore.Hash.Frame
 import FvdepCore.Manifest
+import FvdepCore.Protocol.Sig
