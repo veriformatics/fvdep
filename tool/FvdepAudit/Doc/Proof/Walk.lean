@@ -189,7 +189,10 @@ theorem order_eq (p : List PathSeg) (xs : List Value) (o : Order) :
   | nonempty => cases xs <;> rfl
   | ascending path => exact ascending_eq p path 1 xs
   | any => rfl
-  | empty => cases xs <;> rfl
+  | ascendingEmpty =>
+    simp only [Order.check, orderSpec, orElse_eq, head?_append', ascending_eq]
+    congr 1
+    cases xs <;> rfl
   | ascendingHas
     s =>
     simp only [Order.check, orderSpec, orElse_eq, head?_append', ascending_eq, strsOf_eq_spec]

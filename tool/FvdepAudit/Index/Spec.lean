@@ -109,7 +109,8 @@ version of the same id. -/
 def NoticeRel (i : IndexFile) (n : Notice) : Prop :=
   Listed i n.id n.version ∧ ∀ v, n.replacement = some v → v ≠ n.version ∧ Listed i n.id v
 
-/-- V9: a removed record is no operation, appears before no equal record, and a notice names it. -/
+/-- V9: a removed record is no operation, no earlier record has its id + version, and a notice
+names it. -/
 def RemovedRel (i : IndexFile) (earlier : List Removed) (r : Removed) : Prop :=
   (¬∃ o ∈ i.operations, o.id = r.id ∧ o.version = r.version) ∧
     (¬∃ e ∈ earlier, e.id = r.id ∧ e.version = r.version) ∧

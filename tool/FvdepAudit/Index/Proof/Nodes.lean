@@ -54,7 +54,7 @@ theorem resolve_axioms (s : Status) :
     resolveSpec (statusText s) axiomsTy =
       .arr [.arr] labelTy labelTy
         (match s with
-        | .proven => .empty
+        | .proven => .ascendingEmpty
         | .«open» => .ascendingHas "sorryAx"
         | .trusts => .ascendingWithout "sorryAx") := by
   cases s <;> rfl
@@ -62,7 +62,7 @@ theorem resolve_axioms (s : Status) :
 theorem status_order_iff (p : List PathSeg) (s : Status) (ns : List String) :
     orderSpec p (ns.map .str)
           (match s with
-          | .proven => .empty
+          | .proven => .ascendingEmpty
           | .«open» => .ascendingHas "sorryAx"
           | .trusts => .ascendingWithout "sorryAx") =
         [] ↔
@@ -70,7 +70,7 @@ theorem status_order_iff (p : List PathSeg) (s : Status) (ns : List String) :
   cases s with
   | proven =>
     cases ns with
-    | nil => simp [orderSpec, Ascends, StatusAxioms, statusText]
+    | nil => simp [orderSpec, descentsSpec, Ascends, StatusAxioms, statusText]
     | cons n ns => simp [orderSpec, StatusAxioms, statusText]
   | «open» =>
     cases ns with

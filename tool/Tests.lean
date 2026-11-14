@@ -318,6 +318,43 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Doc
 
+/-! Index regressions (contract U4 C6 + C9): the refusal the D5 walk over `indexTy` names. -/
+
+namespace Index
+
+open FvdepCore.Index
+
+/-- `decodeIndex`'s rendered refusal of an index text whose one obligation holds `axioms` under
+`status` (`accepted` when it decodes). -/
+def refusal (axioms status : String) : String :=
+  let text :=
+    "{\"notices\":[],\"operations\":[{\"compat\":null,\"digest\":\"" ++
+      String.ofList (List.replicate 64 'a') ++
+      "\",\"id\":\"a.b\",\"obligations\":[{\"axioms\":" ++
+      axioms ++
+      ",\"name\":\"n\",\"status\":\"" ++
+      status ++
+      "\"}],\"version\":\"1.0.0\"}],\"removed\":[],\"schema\":1,\"toolchain\":\"t\"}\n"
+  match decodeIndex text.toUTF8 with
+  | .error e => e.render
+  | .ok _ => "accepted"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("index: proven + descending axioms → the descent first (C9: elements, order, then status)",
+      fun _ =>
+      refusal "[\"z\",\"a\"]" "proven" == "/operations/0/obligations/0/axioms/1 bad_value \"a\""),
+    ("index: proven + ascending nonempty axioms → the status rule's array refusal", fun _ =>
+      refusal "[\"a\"]" "proven" == "/operations/0/obligations/0/axioms bad_value [\"a\"]"),
+    ("index: open + trusts name the descent too", fun _ =>
+      refusal "[\"z\",\"a\"]" "trusts" == "/operations/0/obligations/0/axioms/1 bad_value \"a\"" &&
+        refusal "[\"sorryAx\",\"a\"]" "open" ==
+          "/operations/0/obligations/0/axioms/1 bad_value \"a\""),
+    ("index: proven + equal adjacent axioms → the repeat (strictly ascending)", fun _ =>
+      refusal "[\"a\",\"a\"]" "proven" == "/operations/0/obligations/0/axioms/1 bad_value \"a\""),
+    ("index: proven + no axioms decodes", fun _ => refusal "[]" "proven" == "accepted")]
+
+end Index
+
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
 The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
@@ -738,8 +775,9 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases ++ Doc.cases ++ Hash.cases ++ Manifest.cases).map fun c =>
-              check c.1 c.2).mapM
+            (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Hash.cases ++
+                  Manifest.cases).map
+              fun c => check c.1 c.2).mapM
         id
   let ioResults ← (Manifest.ioCases ++ Sys.ioCases).mapM fun c => checkIO c.1 c.2
   let results := results ++ ioResults

@@ -260,7 +260,8 @@ inductive Order where
   /-- Strictly ascending strings at this key path inside each element. -/
   | ascending (path : List String)
   | any
-  | empty
+  /-- Strictly ascending strings, then empty (C6 `proven`). -/
+  | ascendingEmpty
   /-- Strictly ascending strings, then empty or holding `s` (C6 `open`). -/
   | ascendingHas (s : String)
   /-- Strictly ascending strings, then nonempty without `s` (C6 `trusts`). -/
@@ -354,7 +355,9 @@ def Order.check (p : List PathSeg) (xs : List Value) : Order → Option DocError
   | .nonempty => if xs.isEmpty then some ⟨p, .badValue, some (.arr [])⟩ else none
   | .ascending path => ascendingFrom p path 1 xs
   | .any => none
-  | .empty => if xs.isEmpty then none else some ⟨p, .badValue, some (.arr xs)⟩
+  | .ascendingEmpty =>
+    (ascendingFrom p [] 1 xs).orElse fun _ =>
+      if xs.isEmpty then none else some ⟨p, .badValue, some (.arr xs)⟩
   | .ascendingHas s =>
     (ascendingFrom p [] 1 xs).orElse fun _ =>
       if xs.isEmpty || (strsOf xs).any (·.contains s) then none

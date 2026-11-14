@@ -74,7 +74,7 @@ def labelTy : Ty := .scalar [.str] .label
 def axiomsTy : Ty :=
   .byTag
     [("open", .arr [.arr] labelTy labelTy (.ascendingHas "sorryAx")),
-      ("proven", .arr [.arr] labelTy labelTy .empty),
+      ("proven", .arr [.arr] labelTy labelTy .ascendingEmpty),
       ("trusts", .arr [.arr] labelTy labelTy (.ascendingWithout "sorryAx"))]
 
 def obligationTy : Ty :=

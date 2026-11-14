@@ -252,7 +252,8 @@ def orderSpec (p : List PathSeg) (xs : List Value) : Order → List DocError
   | .nonempty => if xs = [] then [⟨p, .badValue, some (.arr [])⟩] else []
   | .ascending path => descentsSpec p path 1 xs
   | .any => []
-  | .empty => if xs = [] then [] else [⟨p, .badValue, some (.arr xs)⟩]
+  | .ascendingEmpty =>
+    descentsSpec p [] 1 xs ++ if xs = [] then [] else [⟨p, .badValue, some (.arr xs)⟩]
   | .ascendingHas s =>
     descentsSpec p [] 1 xs ++
       match xs, strsSpec xs with
