@@ -1,5 +1,6 @@
 import FvdepCore
 import FvdepIO.Sha256
+import FvdepIO.Sys
 import FvdepIO.Toml
 
 /-! `lake test` driver (contract U1 K3): PASS/FAIL per case, the slowest case, exit = failures.
@@ -21,9 +22,15 @@ def check (name : String) (ok : Unit → Bool) : IO Result := do
   IO.println s!"{if held then "PASS" else "FAIL"} {name}"
   return ⟨name, held, t1 - t0⟩
 
+/-- An exception = FAIL (its message on stderr), never an aborted run. -/
 def checkIO (name : String) (ok : IO Bool) : IO Result := do
   let t0 ← IO.monoMsNow
-  let held ← ok
+  let held ←
+    try
+      ok
+    catch e =>
+      IO.eprintln s!"{name}: {e}"
+      pure false
   let t1 ← IO.monoMsNow
   IO.println s!"{if held then "PASS" else "FAIL"} {name}"
   return ⟨name, held, t1 - t0⟩
@@ -543,6 +550,149 @@ def ioCases : List (String × IO Bool) :=
 
 end Manifest
 
+/-! ## U3 F: persistence through the shim (IO; residue `sys-shim`) -/
+
+namespace Sys
+
+open FvdepIO.Sys
+
+/-- `f` on a fresh directory (removed after). -/
+def withDir (f : Path → System.FilePath → IO Bool) : IO Bool := do
+  let d ← IO.FS.createTempDir
+  try
+    match Path.ofString? d.toString with
+    | some p =>
+      f p d
+    | none =>
+      return false
+  finally
+    IO.FS.removeDirAll d
+
+def nameOf! (s : String) :
+    Name := match Name.ofString? s with
+  | some n => n
+  | none => ⟨"x", rfl⟩
+
+def entries (d : System.FilePath) : IO (List String) := do
+  return ((← d.readDir).map (·.fileName)).toList.mergeSort (· ≤ ·)
+
+def ioCases : List (String × IO Bool) :=
+  [("sys: replace writes an absent then a present target, readFile reads each back, no temp left",
+      withDir fun dir d => do
+        let name := nameOf! "fvdep.lock"
+        let r1 ← replace dir name "one".toUTF8
+        let b1 ← readFile dir name
+        let r2 ← replace dir name "second".toUTF8
+        let b2 ← readFile dir name
+        let left ← entries d
+        return r1 matches .ok () && r2 matches .ok () &&
+            (match b1, b2 with
+            | .ok (some x), .ok (some y) => x == "one".toUTF8 && y == "second".toUTF8
+            | _, _ => false) &&
+            left == ["fvdep.lock"]),
+    ("sys: readFile: absent → none, empty file → empty bytes",
+      withDir fun dir d => do
+        let a ← readFile dir (nameOf! "absent")
+        IO.FS.writeFile (d / "empty") ""
+        let e ← readFile dir (nameOf! "empty")
+        return a matches .ok none &&
+            (match e with
+            | .ok (some b) => b.isEmpty
+            | _ => false)),
+    ("sys: readFile cap: a file of `cap` bytes reads back; one byte more → read error tooLarge",
+      withDir fun dir d => do
+        IO.FS.writeFile (d / "f") "0123456789"
+        let ok ← readFile dir (nameOf! "f") 10
+        let over ← readFile dir (nameOf! "f") 9
+        return (match ok with
+            | .ok (some b) => b == "0123456789".toUTF8
+            | _ => false) &&
+            (match over with
+            | .error e => e.op == .read && e.cause == .tooLarge && e.secondary.isEmpty
+            | .ok _ => false)),
+    ("sys: replace in a missing directory → create error ENOENT naming temp 0, nothing written",
+      withDir fun _ d => do
+        let some missing := Path.ofString? (d / "missing").toString | return false
+        let r ← replace missing (nameOf! "f") "x".toUTF8
+        let pid := (← IO.Process.getPID).toNat
+        return (match r with
+            | .error e =>
+              e.op == .create && e.cause == .errno 2 && e.secondary.isEmpty && !e.durability &&
+                e.path.toString == (d / "missing").toString ++ s!"/.f.tmp-{pid}-0"
+            | .ok _ => false) &&
+            (← entries d) == []),
+    ("sys: replace over a non-empty directory → rename error naming the target, temp unlinked",
+      withDir fun dir d => do
+        IO.FS.createDirAll (d / "t" / "inner")
+        let r ← replace dir (nameOf! "t") "x".toUTF8
+        return (match r with
+            | .error e =>
+              e.op == .rename && e.path.toString == (d / "t").toString && e.secondary.isEmpty &&
+                !e.durability
+            | .ok _ => false) &&
+            (← entries d) == ["t"]),
+    ("sys: replace swaps a symlink at the target for a regular file; the link's file is kept",
+      withDir fun dir d => do
+        IO.FS.writeFile (d / "real") "old"
+        let _ ← IO.Process.output { cmd := "ln", args := #["-s", "real", (d / "t").toString] }
+        let r ← replace dir (nameOf! "t") "new".toUTF8
+        let md ← (d / "t").symlinkMetadata
+        return r matches .ok () && md.type == .file && (← IO.FS.readFile (d / "t")) == "new" &&
+            (← IO.FS.readFile (d / "real")) == "old"),
+    ("sys: a second writer lock on the same directory → busy, its act never runs; outer act runs",
+      withDir fun dir d => do
+        let ran ← IO.mkRef false
+        let outer ←
+          withWriterLock dir do
+              let inner ← withWriterLock dir (ran.set true)
+              return inner
+        let again ← withWriterLock dir (pure 7)
+        let lockFile ← IO.FS.readFile (d / ".fvdep-writer.lock")
+        return (match outer with
+            | .ok (.error e) =>
+              e.op == .lock && e.cause == .busy &&
+                e.path.toString == (d / ".fvdep-writer.lock").toString
+            | _ => false) &&
+            !(← ran.get) &&
+            again matches .ok 7 &&
+            lockFile == "" &&
+            (← entries d) == [".fvdep-writer.lock"]),
+    ("sys: an exception in the locked act propagates after the lock's close",
+      withDir fun dir _ => do
+        let r ← (withWriterLock dir (throw (IO.userError "boom") : IO Unit)).toBaseIO
+        let again ← withWriterLock dir (pure 1)
+        return (match r with
+            | .error e => toString e == "boom"
+            | .ok _ => false) &&
+            again matches .ok 1),
+    ("sys: Writer: create-exclusive, write, sync, close; closed → alreadyClosed; then EEXIST",
+      withDir fun _ d => do
+        let some p := Path.ofString? (d / "w").toString | return false
+        match ← Writer.create p with
+        | .error _ =>
+          return false
+        | .ok w =>
+          let a ← w.write "abc".toUTF8
+          let b ← w.sync
+          let c ← w.close
+          let e ← w.write "x".toUTF8
+          let again ← Writer.create p
+          return a matches .ok () && b matches .ok () && c matches .ok () &&
+              (match e with
+              | .error x => x.cause == .alreadyClosed && x.op == .write
+              | _ => false) &&
+              (match again with
+              | .error x => x.op == .create && x.cause == .errno 17
+              | _ => false) &&
+              (← IO.FS.readFile (d / "w")) == "abc"),
+    ("sys: Name refuses empty, `.`, `..`, `/`, NUL + the lock name; accepts a plain name", do
+      return ["", ".", "..", "a/b", "/", "a\x00b", ".fvdep-writer.lock"].all
+            (fun s => (Name.ofString? s).isNone) &&
+          (Name.ofString? "fvdep.toml").isSome &&
+          (Path.ofString? "a\x00b").isNone)]
+
+end Sys
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -578,7 +728,7 @@ def main : IO UInt32 := do
             (Core.cases ++ Json.cases ++ Doc.cases ++ Hash.cases ++ Manifest.cases).map fun c =>
               check c.1 c.2).mapM
         id
-  let ioResults ← Manifest.ioCases.mapM fun c => checkIO c.1 c.2
+  let ioResults ← (Manifest.ioCases ++ Sys.ioCases).mapM fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

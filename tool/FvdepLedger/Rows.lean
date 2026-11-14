@@ -7,6 +7,7 @@ import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
+import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
 
@@ -788,6 +789,183 @@ def printDenotes : Prop :=
 
 end FvdepLedger.Rows.ManifestClaims
 
+namespace FvdepLedger.Rows.SysClaims
+
+open FvdepIO.Sys FvdepIO.Sys.Model FvdepIO.Sys.Policy FvdepAudit.Sys.Spec
+
+/-- F4 `NoFalseSuccess` + `ErrorExact` + `RetryBounded` (create): the result is exactly the one the
+protocol relation `Create` assigns to the calls (ok + error alike). -/
+def createExact : Prop :=
+  ∀ (path : Path) (mode : Mode) (script : Script) (r : Except SysError Nat),
+    ((create scripted path mode).run script).result = r ↔
+      Create path mode ((create scripted path mode).run script).events r
+
+/-- F4 `NoFalseSuccess` + `ErrorExact` + `RetryBounded` (writer calls): the result is exactly the
+one `WriterOperation` assigns to the calls. -/
+def writerExact : Prop :=
+  ∀ (owned : WriterState) (action : WriterAction) (script : Script)
+    (_hc : Consistent ((writer scripted owned action).run script).events) (r : Except SysError Nat),
+    ((writer scripted owned action).run script).result = r ↔
+      WriterOperation owned action ((writer scripted owned action).run script).events r
+
+/-- F4 `NoFalseSuccess` + `ErrorExact` + `RetryBounded` (`syncDir`): the result is exactly the one
+`Directory` assigns to the calls. -/
+def directoryExact : Prop :=
+  ∀ (path : Path) (script : Script) (r : Except SysError Nat),
+    ((directory scripted path).run script).result = r ↔
+      Directory path ((directory scripted path).run script).events r
+
+/-- F4 `NoFalseSuccess`: a successful write's calls acknowledge exactly its bytes. -/
+def writeAcknowledged : Prop :=
+  ∀ (owned : WriterState) (size : Nat) (script : Script) (n : Nat)
+    (_hc : Consistent ((writer scripted owned (.write size)).run script).events)
+    (_ok : ((writer scripted owned (.write size)).run script).result = .ok n),
+    acknowledged ((writer scripted owned (.write size)).run script).events = size
+
+/-- F4 `RetryBounded`: one F3 step = at most `budget + 1` calls of one request; with 64 retries the
+65th EINTR ends it as `retryExhausted`. -/
+def retryBounded : Prop :=
+  (∀ (request : Request) (budget : Nat) (events : Trace) (result : Except Cause Nat),
+      Retry request budget events result → events.length ≤ budget + 1) ∧
+    (∀ request : Request,
+      Retry request 64 (List.replicate 65 ⟨request, .error 4⟩) (.error .retryExhausted)) ∧
+    ∀ (request : Request) (budget : Nat) (events : Trace) (result : Except Cause Nat),
+      Retry request budget events result → ∀ e ∈ events, e.request = request
+
+/-- F4 `CloseOnce`: a writer's calls (the finalizer included) attempt close at most once, never on a
+closed writer. -/
+def closeOnceActions : Prop :=
+  ∀ (owned : WriterState) (steps : List WriterAction) (script : Script)
+    (_hc : Consistent ((actions scripted owned steps).run script).events),
+    closeCount ((actions scripted owned steps).run script).events ≤ if owned.closed then 0 else 1
+
+/-- F4 `CloseOnce`: `syncDir` attempts close at most once, exactly once after its open succeeded. -/
+def closeOnceDirectory : Prop :=
+  ∀ (path : Path) (script : Script),
+    closeCount ((directory scripted path).run script).events ≤ 1 ∧
+      ((∃ e ∈ ((directory scripted path).run script).events,
+          ∃ fd, e.request = .openDir path ∧ e.response = .ok fd) →
+        closeCount ((directory scripted path).run script).events = 1)
+
+/-- F4 `SameDescription`: a writer call uses only the writer's descriptor (write chunks ≤ 2^30
+bytes); a closed writer issues no call. -/
+def sameDescription : Prop :=
+  ∀ (owned : WriterState) (action : WriterAction) (script : Script)
+    (_hc : Consistent ((writer scripted owned action).run script).events),
+    writerOnly owned.fd ((writer scripted owned action).run script).events ∧
+      (owned.closed = true → ((writer scripted owned action).run script).events = [])
+
+/-- F4 `ReplaceExact`: `replace`'s calls + result follow F2's protocol written apart (`Replace`:
+temp walk, all bytes, fsync, one close, one rename step, `syncDir`, cleanup order + causes,
+`durability`), which fixes the result from the calls. -/
+def replaceExact : Prop :=
+  ∀ (dir : Path) (name : Name) (pid size : Nat) (script : Script) (r : Except SysError Unit)
+    (_hc : Consistent ((replace scripted dir name pid size).run script).events),
+    ((replace scripted dir name pid size).run script).result = r ↔
+      Replace dir name pid size ((replace scripted dir name pid size).run script).events r
+
+/-- F4 `ReplaceOldOrNew` over the directory model: after a complete run the target holds its old
+state or the new bytes (new on success + on a `durability` failure, old when no rename was
+attempted); the same at every interruption (the call in flight taking effect or not), absent +
+present targets alike. -/
+def replaceOldOrNew : Prop :=
+  ∀ (dir : Path) (name : Name) (pid : Nat) (payload : List UInt8) (script : Script) (s₀ : DirState)
+    (run : Recorded (Except SysError Unit))
+    (_hrun : run = (replace scripted dir name pid payload.length).run script)
+    (_hc : Consistent run.events),
+    (∀ s,
+        Steps payload s₀ run.events s →
+          OldOrNew payload s₀ s (targetText dir name) ∧
+            (run.result = .ok () → s.files (targetText dir name) = some payload) ∧
+            (∀ e,
+              run.result = .error e →
+                e.durability = true → s.files (targetText dir name) = some payload) ∧
+            (NoRename run.events →
+              s.files (targetText dir name) = s₀.files (targetText dir name))) ∧
+      ∀ done x rest s₁ s,
+        run.events = done ++ x :: rest →
+          Steps payload s₀ done s₁ →
+          InFlight payload s₁ x.request s →
+          OldOrNew payload s₀ s (targetText dir name) ∧
+            (NoRename (done ++ [x]) →
+              s.files (targetText dir name) = s₀.files (targetText dir name))
+
+/-- F4: `ReplaceOldOrNew`'s bridge to U2 X4's `Holds` for a present target: a complete success =
+`Holds`' `ok` step, a failure or an interruption (any message) = `keep` or `land`. -/
+def replaceHolds : Prop :=
+  ∀ (dir : Path) (name : Name) (pid : Nat) (payload old : List UInt8) (script : Script)
+    (s₀ : DirState) (f : FvdepCore.ProjectFile) (run : Recorded (Except SysError Unit))
+    (_hrun : run = (replace scripted dir name pid payload.length).run script)
+    (_hc : Consistent run.events) (_hold : s₀.files (targetText dir name) = some old),
+    (∀ s,
+        Steps payload s₀ run.events s →
+          ∃ c,
+            s.files (targetText dir name) = some c ∧
+              (run.result = .ok () →
+                FvdepCore.Status.Holds f (bytesOf old)
+                  [(.replace f (bytesOf payload), .replace (.ok ()))] (bytesOf c)) ∧
+              ∀ e msg,
+                run.result = .error e →
+                  FvdepCore.Status.Holds f (bytesOf old)
+                    [(.replace f (bytesOf payload), .replace (.error msg))] (bytesOf c)) ∧
+      ∀ done x rest s₁ s msg,
+        run.events = done ++ x :: rest →
+          Steps payload s₀ done s₁ →
+          InFlight payload s₁ x.request s →
+          ∃ c,
+            s.files (targetText dir name) = some c ∧
+              FvdepCore.Status.Holds f (bytesOf old)
+                [(.replace f (bytesOf payload), .replace (.error msg))] (bytesOf c)
+
+/-- F2 `readFile`: the calls + result follow the protocol written apart (`ReadFile`: ENOENT =
+absent, reads of ≤ 2^20 bytes until 0, the caller's byte cap, one close, the close's failure as
+primary or secondary cause), which fixes the result from the calls. -/
+def readExact : Prop :=
+  ∀ (path : Path) (cap : Nat) (script : Script) (r : Except SysError (Option Nat))
+    (_hc : Consistent ((readFile scripted path cap).run script).events),
+    ((readFile scripted path cap).run script).result = r ↔
+      ReadFile path cap ((readFile scripted path cap).run script).events r
+
+/-- F4 `LockExact`: `act` runs exactly when the lock file's open + `flock` succeed, once, on the
+answers that follow; its result is returned; the description is closed on every exit after its open;
+a refusal (EWOULDBLOCK = `busy`) or an open failure runs nothing. -/
+def lockExact : Prop :=
+  ∀ {α : Type} (dir : Path) (act : ScriptIO α) (script : Script) (r : Except SysError α),
+    ((withLock scripted dir act).run script).result = r ↔
+      Lock dir act script ((withLock scripted dir act).run script).events r
+
+/-- F4 `ReplaceSingleTouch`: one rename step is the only call naming the target (none when the run
+stops before it); every write, the data fsync + the temp's close use the descriptor the temp's
+create returned; nothing after the rename writes. -/
+def replaceSingleTouch : Prop :=
+  ∀ (dir : Path) (name : Name) (pid size : Nat) (script : Script)
+    (_hc : Consistent ((replace scripted dir name pid size).run script).events),
+    (∀ e ∈ ((replace scripted dir name pid size).run script).events,
+        ¬Names (targetText dir name) e.request) ∨
+      ∃ (walk data renames rest : Trace) (temp target : Path) (mode : Mode) (fd : Nat) (renamed :
+        Except Cause Nat),
+        ((replace scripted dir name pid size).run script).events =
+            walk ++ ⟨.create temp mode, .ok fd⟩ :: data ++ renames ++ rest ∧
+          target.toString = targetText dir name ∧
+          Retry (.rename temp target) 64 renames renamed ∧
+          writerOnly fd data ∧
+          (∀ e ∈ rest, ∀ g o c, e.request ≠ .write g o c) ∧
+          ∀ e ∈ walk ++ ⟨.create temp mode, .ok fd⟩ :: data ++ rest,
+            ¬Names (targetText dir name) e.request
+
+/-- F2: attempt `n`'s temp = `<dir>/.<name>.tmp-<pid>-<n>` (the text the protocol claims name). -/
+def tempPathText : Prop :=
+  ∀ (dir : Path) (name : Name) (pid n : Nat),
+    (tempPath dir name pid n).toString = tempText dir name pid n
+
+/-- F2: the target = `<dir>/<name>`. -/
+def atText : Prop := ∀ (dir : Path) (name : Name), (dir.at name).toString = targetText dir name
+
+/-- F2: the writer lock = `<dir>/.fvdep-writer.lock`. -/
+def lockPathText : Prop := ∀ (dir : Path), (lockPath dir).toString = lockText dir
+
+end FvdepLedger.Rows.SysClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -835,6 +1013,28 @@ def residue : List Residue :=
           "BOM refuses first)"
       ruling := "Lake.Toml + Lake comparison code (toolchain)"
       boundary := [``Lake.Toml.loadToml] },
+    { id := "sys-shim"
+      what :=
+        "the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: " ++
+          "the open variants, read, write, fsync, close, rename, unlink, flock) + its native " ++
+          "writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s " ++
+          "instantiation of the proven policy (`syscalls`: request → export, the read buffer, " ++
+          "the guard's closed mark; `withWriterLock` re-raising the act's exception after the " ++
+          "close)"
+      reason :=
+        "C + the OS have no Lean semantics: each export is one reviewed syscall; the policy " ++
+          "over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake " ++
+          "test` (replace over absent, present, symlink + directory targets, missing directory, " ++
+          "read back, absent + empty reads, the caller's read cap, writer lock contention + " ++
+          "exception, Writer lifecycle)"
+      ruling := "the persistence syscall shim + writer guard (tested)"
+      boundary :=
+        [``FvdepIO.Sys.Native.openFile, ``FvdepIO.Sys.Native.openDir, ``FvdepIO.Sys.Native.openRead,
+          ``FvdepIO.Sys.Native.openLock, ``FvdepIO.Sys.Native.write, ``FvdepIO.Sys.Native.read,
+          ``FvdepIO.Sys.Native.sync, ``FvdepIO.Sys.Native.close, ``FvdepIO.Sys.Native.rename,
+          ``FvdepIO.Sys.Native.unlink, ``FvdepIO.Sys.Native.lock, ``FvdepIO.Sys.Native.writerNew,
+          ``FvdepIO.Sys.Native.writerAcquire, ``FvdepIO.Sys.Native.writerMarkClosed,
+          ``FvdepIO.Sys.Native.writerRelease] },
     { id := "literal"
       what := "literal data (the version string `Fvdep.version`)"
       reason :=
@@ -1294,6 +1494,146 @@ def tomlReadRow : Row :=
     residue := ["runtime"]
     unproven := ["toml-parse"] }
 
+/-- U3 F2: the names the protocol claims spell as text. -/
+def sysNamesRow : Row :=
+  { component := `FvdepIO.Sys.Types
+    contract := "U3 F2 + F4"
+    claim :=
+      "`tempPath`, `Path.at` + `lockPath` spell F2's names: `<dir>/.<name>.tmp-<pid>-<n>`, " ++
+        "`<dir>/<name>`, `<dir>/.fvdep-writer.lock` (the texts the protocol claims name)."
+    claims :=
+      [(``SysClaims.tempPathText, ``FvdepAudit.Sys.Proof.tempPath_text),
+        (``SysClaims.atText, ``FvdepAudit.Sys.Proof.at_text),
+        (``SysClaims.lockPathText, ``FvdepAudit.Sys.Proof.lockPath_text)]
+    subject := ``FvdepIO.Sys.tempPath
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F3 + F4 (fvapi's port): create-exclusive over every syscall script. -/
+def sysCreateRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F3 + F4"
+    claim :=
+      "`create` (create-exclusive, one F3 step): its result is exactly the one `Create` assigns " ++
+        "to its calls, ok + error alike; one F3 step is at most `budget + 1` calls of one " ++
+        "request, the 65th EINTR ending it as `retryExhausted`."
+    claims :=
+      [(``SysClaims.createExact, ``FvdepAudit.Sys.Proof.create_exact),
+        (``SysClaims.retryBounded, ``FvdepAudit.Sys.Proof.retry_bounded)]
+    subject := ``FvdepIO.Sys.Policy.create
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F3 + F4 (fvapi's port): a writer's calls. -/
+def sysWriterRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F3 + F4"
+    claim :=
+      "`writer` (write all, fsync, one close, finalizer): its result is exactly the one " ++
+        "`WriterOperation` assigns to its calls; a success acknowledged every byte; it uses " ++
+        "only its descriptor, none once closed; a writer's calls (`actions`) attempt close at " ++
+        "most once."
+    claims :=
+      [(``SysClaims.writerExact, ``FvdepAudit.Sys.Proof.writer_exact),
+        (``SysClaims.writeAcknowledged, ``FvdepAudit.Sys.Proof.write_acknowledged),
+        (``SysClaims.sameDescription, ``FvdepAudit.Sys.Proof.same_description),
+        (``SysClaims.closeOnceActions, ``FvdepAudit.Sys.Proof.close_once_actions)]
+    subject := ``FvdepIO.Sys.Policy.writer
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F3 + F4 (fvapi's port): `syncDir`. -/
+def sysDirectoryRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F3 + F4"
+    claim :=
+      "`directory` (`syncDir`: open, fsync, one close): its result is exactly the one " ++
+        "`Directory` assigns to its calls; it closes the directory it opened exactly once."
+    claims :=
+      [(``SysClaims.directoryExact, ``FvdepAudit.Sys.Proof.directory_exact),
+        (``SysClaims.closeOnceDirectory, ``FvdepAudit.Sys.Proof.close_once_directory)]
+    subject := ``FvdepIO.Sys.Policy.directory
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F2 + F4: the durable replace (U8 wires it for every project write). -/
+def sysReplaceRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F2 + F4"
+    claim :=
+      "`replace`'s calls + result follow F2's protocol written apart (temp walk, all bytes, " ++
+        "fsync, one close, one rename step, `syncDir`; cleanup closes once, then unlinks only " ++
+        "its own temp; causes in order; `durability`), which fixes the result; one rename step " ++
+        "is the only call naming the target; over the directory model the target holds its " ++
+        "old state or the new bytes after any run or interruption (new on success), which is " ++
+        "U2 X4's `Holds` step for a present target. Assumed (F4; residue `os`): a stable " ++
+        "directory, cooperative writers (fvdep processes under the writer lock), an atomic " ++
+        "rename + F4's model step, carried by review, not proof: a process stopped after k " ++
+        "calls issued the first k calls of the complete run on the same answers."
+    claims :=
+      [(``SysClaims.replaceExact, ``FvdepAudit.Sys.Proof.replace_exact),
+        (``SysClaims.replaceSingleTouch, ``FvdepAudit.Sys.Proof.replace_single_touch),
+        (``SysClaims.replaceOldOrNew, ``FvdepAudit.Sys.Proof.replace_old_or_new),
+        (``SysClaims.replaceHolds, ``FvdepAudit.Sys.Proof.replace_holds)]
+    subject := ``FvdepIO.Sys.Policy.replace
+    path := []
+    noCaller := "U8"
+    residue := ["os", "runtime"]
+    unproven := [] }
+
+/-- U3 F2: the project read (U8 wires it). -/
+def sysReadRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F2"
+    claim :=
+      "`readFile`'s calls + result follow the protocol written apart (ENOENT = absent, reads " ++
+        "of ≤ 2^20 bytes until 0, the caller's byte cap (`FvdepIO.Sys.readFile`'s default " ++
+        "2^30), one close, the close's failure as primary or secondary cause), which fixes the " ++
+        "result."
+    claims := [(``SysClaims.readExact, ``FvdepAudit.Sys.Proof.read_exact)]
+    subject := ``FvdepIO.Sys.Policy.readFile
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F2 + F4: the writer lock (U8 decides which commands hold it). -/
+def sysLockRow : Row :=
+  { component := `FvdepIO.Sys.Policy
+    contract := "U3 F2 + F4"
+    claim :=
+      "`withLock` runs `act` exactly when the lock file's open + `flock` succeed, once, and " ++
+        "returns its result; the description is closed on every exit after its open; a refusal " ++
+        "(EWOULDBLOCK = `busy`) or an open failure runs nothing."
+    claims := [(``SysClaims.lockExact, ``FvdepAudit.Sys.Proof.lock_exact)]
+    subject := ``FvdepIO.Sys.Policy.withLock
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U3 F1–F2: the policy in `IO` over the shim (tested residue `sys-shim`). -/
+def sysNativeRow : Row :=
+  { component := `FvdepIO.Sys
+    contract := "U3 F1–F2"
+    claim :=
+      "`replace`, `readFile`, `withWriterLock`, `Writer` + `syncDir` run the proven policy over " ++
+        "`syscalls` (each request → one shim export; residue `sys-shim`)."
+    claims := []
+    subject := ``FvdepIO.Sys.replace
+    path := []
+    noCaller := "U8"
+    residue := ["os", "runtime"]
+    unproven := ["sys-shim"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1303,7 +1643,8 @@ def ledger : Ledger :=
       [cliRow, planRow, interpreterRow, versionRow, idsRow, evidenceRow, statusRow, jsonValueRow,
         jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow,
         hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
-        manifestPrintRow, tomlReadRow]
+        manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
+        sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow]
     residue := residue }
 
 end FvdepLedger.Rows
