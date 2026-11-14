@@ -3,7 +3,8 @@
 # Idempotent: each piece missing or off its stated state is set + printed; the rest stays as is.
 # Host maintenance ⇒ announce it to the fvapi session first (CLAUDE.local.md).
 # - ZFS dataset data/fvdep at /srv/data/fvdep (child of the encrypted pool `data`, under its key),
-#   quota 64G = fvdep's bound on the pool it shares with fvapi; growth/ = eturkes 0750.
+#   quota 64G = fvdep's bound on the pool it shares with fvapi; growth/ = eturkes 0750; sys-test/ =
+#   eturkes 0700, the ZFS root of tests/sys (case F.filesystem.zfs; runs without sudo).
 # - System user fvdep-agent (no home, nologin) = the drafting agent's UID: same-UID processes can
 #   read a unit's credentials + /proc/<pid>/environ ⇒ the subscription token never reaches an
 #   eturkes process.
@@ -41,6 +42,7 @@ fi
     [ "$(zfs get -H -o value mounted data/fvdep)" = yes ] ||
     { say 'data/fvdep is not mounted at /srv/data/fvdep'; exit 1; }
 install -d -o eturkes -g eturkes -m 0750 /srv/data/fvdep/growth
+install -d -o eturkes -g eturkes -m 0700 /srv/data/fvdep/sys-test
 if ! id -u fvdep-agent >/dev/null 2>&1; then
     useradd --system --user-group --no-create-home --home-dir /nonexistent \
         --shell /usr/sbin/nologin fvdep-agent
@@ -68,6 +70,7 @@ if [ ! -f "$bin" ] || [ "$(sha256sum <"$bin" | cut -d ' ' -f 1)" != "$sha" ]; th
     say "installed claude $version at $bin"
 fi
 say "data/fvdep quota $(zfs get -H -o value quota data/fvdep), used $(zfs get -H -o value used data/fvdep);" \
+    "$(stat -c '%n %U:%G %a' /srv/data/fvdep/growth /srv/data/fvdep/sys-test | paste -sd ';');" \
     "fvdep-agent uid $(id -u fvdep-agent); claude $version SHA-256 verified;" \
     "token $([ -s "$token" ] && echo present || echo absent) at $token"
 REMOTE
