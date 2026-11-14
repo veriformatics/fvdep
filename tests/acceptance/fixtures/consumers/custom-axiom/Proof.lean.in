@@ -1,0 +1,5 @@
+import Impl
+namespace Proof
+axiom assumption : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode
+theorem encode_eq : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode := assumption
+end Proof

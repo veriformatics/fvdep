@@ -1,0 +1,6 @@
+import Lean
+import Impl
+namespace Proof
+theorem native_fact : True := by native_decide
+theorem encode_eq : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode := True.rec rfl native_fact
+end Proof

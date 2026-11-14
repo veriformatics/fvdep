@@ -1,0 +1,15 @@
+schema = 1
+
+[library]
+commit = "@LIBRARY_COMMIT@"
+
+[policy]
+proof = "@POLICY@"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Acme.Core", "Acme.Export"]
+proof_modules = ["Acme.Proofs"]
+impl = "Acme.Export.encode"
+proof = "Acme.Proofs.correct"

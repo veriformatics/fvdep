@@ -1,0 +1,14 @@
+import Fvdep.Base64.Encode.V1_0_0
+import Fvdep.Base64.Decode.V1_0_0
+import Fvdep.Base64.EncodeUrl.V1_0_0
+import Fvdep.Base64.DecodeUrl.V1_0_0
+import Fvdep.Semver.Parse.V1_0_0
+import Fvdep.Semver.Compare.V1_0_0
+namespace Impl
+def encode := Fvdep.Base64.Encode.V1_0_0.encode
+def decode := Fvdep.Base64.Decode.V1_0_0.decode
+def encodeUrl := Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl
+def decodeUrl := Fvdep.Base64.DecodeUrl.V1_0_0.decodeUrl
+def parse := Fvdep.Semver.Parse.V1_0_0.parse
+def compare := Fvdep.Semver.Compare.V1_0_0.compare
+end Impl

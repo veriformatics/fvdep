@@ -1,0 +1,55 @@
+schema = 1
+
+[library]
+commit = "@LIBRARY_COMMIT@"
+
+[policy]
+proof = "@POLICY@"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.encode"
+proof = "Proof.encode_eq"
+
+[modules."base64.decode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.decode"
+proof = "Proof.decode_eq"
+
+[modules."base64.encode_url"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.encodeUrl"
+proof = "Proof.encodeUrl_eq"
+
+[modules."base64.decode_url"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.decodeUrl"
+proof = "Proof.decodeUrl_eq"
+
+[modules."semver.parse"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.parse"
+proof = "Proof.parse_eq"
+
+[modules."semver.compare"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.compare"
+proof = "Proof.compare_eq"

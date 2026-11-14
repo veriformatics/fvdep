@@ -1,0 +1,224 @@
+id	unit	source	predicate	kind	status
+invocation.broken-pipe.help	U1	interface §2 (LEAD-DIRECTIVES D2)	A broken help stdout pipe exits 2 without a stderr message	example	merged
+invocation.broken-pipe.stderr	U1	interface §2 (LEAD-DIRECTIVES D2)	A broken usage stderr pipe exits 2 and keeps stdout empty	example	merged
+invocation.broken-pipe.version	U1	interface §2 (LEAD-DIRECTIVES D2)	A broken version stdout pipe exits 2 without a stderr message	example	merged
+invocation.empty	U1	interface §1; U1 K2	empty emits usage on stderr alone and exits 2	example	merged
+invocation.help	U1	interface §1; U1 K2	help emits usage on stdout alone	example	merged
+invocation.help-extra	U1	interface §1; U1 K2	help-extra emits usage on stderr alone and exits 2	example	merged
+invocation.help-flag	U1	interface §1; U1 K2	help-flag emits usage on stdout alone	example	merged
+invocation.help-help	U1	interface §1; U1 K2	help-help emits usage on stdout alone	example	merged
+invocation.help-option	U1	interface §1; U1 K2	help-option emits usage on stdout alone	example	merged
+invocation.help-unrecognized	U1	interface §1; U1 K2	help-unrecognized emits usage on stderr alone and exits 2	example	merged
+invocation.help-unrecognized-option	U1	interface §1; U1 K2	help-unrecognized-option emits usage on stderr alone and exits 2	example	merged
+invocation.output-io.help	U1	interface §2 (LEAD-DIRECTIVES D1)	A failed help stdout write exits 2 and diagnoses the failed output	example	merged
+invocation.output-io.stderr	U1	interface §2 (LEAD-DIRECTIVES D1)	A failed usage stderr write stays exit 2 and never spills usage onto stdout	example	merged
+invocation.output-io.version	U1	interface §2 (LEAD-DIRECTIVES D1)	A failed version stdout write exits 2 and diagnoses the failed output	example	merged
+invocation.unrecognized-command	U1	interface §1; U1 K2	unrecognized-command emits usage on stderr alone and exits 2	example	merged
+invocation.unrecognized-option	U1	interface §1; U1 K2	unrecognized-option emits usage on stderr alone and exits 2	example	merged
+invocation.version	U1	interface §1; U1 K2	Version uses stdout alone and exactly one LF	example	merged
+invocation.version-extra	U1	interface §1; U1 K2	version-extra emits usage on stderr alone and exits 2	example	merged
+library.identity-proof-exclusion	U4	Decisions Library layout + identity; library Registry (identity)	Changing proof bytes alone leaves the entry identity unchanged	property	unmerged
+library.identity-source-sensitive	U4	Decisions Library layout + identity; library Registry (identity)	Changing any sampled source-closure byte changes the entry digest	property	unmerged
+library.identity-unrelated-entry	U4	library Registry (identity); Decisions Spec modularity	Adding a separately versioned entry leaves the original identity unchanged	property	unmerged
+library.index-drift	U4	interface §3 index	index --check reports byte drift without rewriting the committed index	example	unmerged
+library.index-pure	U4	Decisions Library layout + identity; library Registry; interface §3	Index generation is byte-idempotent and --check is read-only	property	unmerged
+oracle.base64.decode.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
+oracle.base64.decode_url.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode_url accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
+oracle.base64.encode.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode agrees with an independent bit-level encoder over seeded byte strings	property	unmerged
+oracle.base64.encode_url.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode_url agrees with an independent bit-level encoder over seeded byte strings	property	unmerged
+oracle.base64.round-trip	U4	library Operations; RFC 4648 §3.5	Decode after encode returns every sampled input for both alphabets	property	unmerged
+oracle.protocol.ident-tags	U4	interface §8; library Shared type	num and alnum identifiers never share an encoding	example	unmerged
+oracle.protocol.integer-boundaries	U4	interface §8	Large Nat uses a canonical decimal string; in-range strings and noncanonical values are invalid	example	unmerged
+oracle.protocol.recovery	U4	interface §8	Malformed requests produce invalid and the oracle continues to a valid request	example	unmerged
+oracle.protocol.scalar-values	U4	interface §8; Decisions Data formats	An escaped lone surrogate is invalid; a nonalphabet Unicode scalar is a decode rejection	example	unmerged
+oracle.protocol.string-limit	U4	interface §8; Decisions Data formats	The differential codec accepts the 64-KiB string boundary and refuses the next byte	example	unmerged
+oracle.semver.compare.preorder	U4	library Shared type obligations	Compare is antisymmetric in ordering, transitive, and ignores build metadata	property	unmerged
+oracle.semver.compare.reference	U4	library Shared type; SemVer 2.0.0 §11	Compare follows the whole-type reference including arbitrary tagged identifiers	property	unmerged
+oracle.semver.parse.reference	U4	library Shared type; SemVer 2.0.0 §§2/9/10	SemVer parse matches the independent grammar including large numeric components	property	unmerged
+oracle.unknown-target	U4	interface §§2–3	An absent oracle target exits 2 rather than serving another operation	example	unmerged
+library.admit-mutated-published	U7	Decisions Retraction; Library layout + identity; library Registry	Admission refuses a byte edit to a published source closure	example	unmerged
+library.admit-read-only	U7	Decisions Automation; library Registry; interface §3 admit	Admission of an already valid library reports results without changing its working tree	example	unmerged
+library.admit-wrong-compat	U7	Decisions Module updates; library Registry (proof registry)	A tagged theorem of True cannot certify the new=old compatibility statement	example	unmerged
+adapter.partial-unsupported	U8	interface §8	Unsupported requests are skipped when other requests match	example	unmerged
+adapter.reject.crash	U8	interface §§2/8	Adapter mode crash produces exit 2 without updating either project file	example	unmerged
+adapter.reject.extra	U8	interface §§2/8	Adapter mode extra produces exit 2 without updating either project file	example	unmerged
+adapter.reject.invalid	U8	interface §§2/8	Adapter mode invalid produces exit 2 without updating either project file	example	unmerged
+adapter.reject.mismatch	U8	interface §§2/8	Adapter mode mismatch produces exit 1 without updating either project file	example	unmerged
+adapter.reject.missing	U8	interface §§2/8	Adapter mode missing produces exit 2 without updating either project file	example	unmerged
+adapter.reject.not-json	U8	interface §§2/8	Adapter mode not-json produces exit 2 without updating either project file	example	unmerged
+adapter.reject.unsupported	U8	interface §§2/8	Adapter mode unsupported produces exit 2 without updating either project file	example	unmerged
+adapter.reject.wrong-error	U8	interface §§2/8	Adapter mode wrong-error produces exit 1 without updating either project file	example	unmerged
+adapter.rejection-text-ignored	U8	interface §8	Decode rejection text is never compared with the oracle's rejection text	example	unmerged
+conformance.honest-abi	U8	Decisions C-library delivery; library C ABI shapes	ABI encoder and decoder proofs use the exact lifted statements	example	unmerged
+conformance.honest-fn	U8	Decisions Conformance method; library Operations	honest-fn proves the trusted equality over its declared closure	example	unmerged
+conformance.honest-launch	U8	Decisions Launch set; library Operations	All six launch operations accept honest aliases and independent proof modules	example	unmerged
+conformance.no-differential-fallback	U8	interface §5; Decisions Proof policy	Development policy never turns a failed proof into matching test evidence	example	unmerged
+conformance.reject.custom-axiom	U8	Decisions Conformance method; Verification profile; interface §§4/6	custom-axiom cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.forged-kernel	U8	Decisions Conformance method; Verification profile; interface §§4/6	forged-kernel cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.macro-statement	U8	Decisions Conformance method; Verification profile; interface §§4/6	macro-statement cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.native-decide	U8	Decisions Conformance method; Verification profile; interface §§4/6	native-decide cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.sorry	U8	Decisions Conformance method; Verification profile; interface §§4/6	sorry cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.tampered-vendor	U8	Decisions Conformance method; Verification profile; interface §§4/6	tampered-vendor cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.wrong-implementation	U8	Decisions Conformance method; Verification profile; interface §§4/6	wrong-implementation cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.reject.wrong-statement	U8	Decisions Conformance method; Verification profile; interface §§4/6	wrong-statement cannot supply proof evidence for the trusted challenge	example	unmerged
+conformance.renamed-multimodule	U8	Decisions Conformance method; library Operations	renamed-multimodule proves the trusted equality over its declared closure	example	unmerged
+conformance.text-block	U8	interface §4; Decisions Readings	A proven text verdict states the trusted base and lifecycle snapshot	example	unmerged
+environment.cache-precedence	U8	interface §1	FVDEP_CACHE overrides XDG_CACHE_HOME and confines fvdep state to the test cache	example	unmerged
+environment.cache-xdg-default	U8	interface §1	Without FVDEP_CACHE the state directory is XDG_CACHE_HOME/fvdep	example	unmerged
+environment.consumer-lake-pin-warning	U8	interface §1; Decisions Conformance method	A different consumer Lake requirement emits the exact warning but cannot change a verdict	example	unmerged
+environment.library-offline-fallback	U8	interface §1 (library-reading commands)	An offline library report uses its previously fetched head	example	unmerged
+environment.library-offline-no-head	U8	interface §1 (library-reading commands)	An unreachable library without a cached head is a fetch failure	example	unmerged
+invocation.command-help.admit	U8	interface §1	admit --help needs no project or library	example	unmerged
+invocation.command-help.brief	U8	interface §1	brief --help needs no project or library	example	unmerged
+invocation.command-help.build-lib	U8	interface §1	build-lib --help needs no project or library	example	unmerged
+invocation.command-help.check	U8	interface §1	check --help needs no project or library	example	unmerged
+invocation.command-help.diff	U8	interface §1	diff --help needs no project or library	example	unmerged
+invocation.command-help.fetch	U8	interface §1	fetch --help needs no project or library	example	unmerged
+invocation.command-help.index	U8	interface §1	index --help needs no project or library	example	unmerged
+invocation.command-help.init	U8	interface §1	init --help needs no project or library	example	unmerged
+invocation.command-help.list	U8	interface §1	list --help needs no project or library	example	unmerged
+invocation.command-help.lock	U8	interface §1	lock --help needs no project or library	example	unmerged
+invocation.command-help.oracle	U8	interface §1	oracle --help needs no project or library	example	unmerged
+invocation.command-help.outdated	U8	interface §1	outdated --help needs no project or library	example	unmerged
+invocation.command-help.profile	U8	interface §1	profile --help needs no project or library	example	unmerged
+invocation.command-help.scan	U8	interface §1	scan --help needs no project or library	example	unmerged
+invocation.command-help.show	U8	interface §1	show --help needs no project or library	example	unmerged
+invocation.command-help.status	U8	interface §1	status --help needs no project or library	example	unmerged
+invocation.command-help.trust	U8	interface §1	trust --help needs no project or library	example	unmerged
+invocation.command-help.upgrade	U8	interface §1	upgrade --help needs no project or library	example	unmerged
+invocation.explicit-project	U8	interface §1	--project overrides the working directory	example	unmerged
+invocation.nearest-project	U8	interface §1	Commands find the nearest ancestor manifest	example	unmerged
+invocation.no-project.build-lib	U8	interface §1	build-lib without a project gives the exact recovery diagnostic	example	unmerged
+invocation.no-project.check	U8	interface §1	check without a project gives the exact recovery diagnostic	example	unmerged
+invocation.no-project.lock	U8	interface §1	lock without a project gives the exact recovery diagnostic	example	unmerged
+invocation.no-project.outdated	U8	interface §1	outdated without a project gives the exact recovery diagnostic	example	unmerged
+invocation.no-project.status	U8	interface §1	status without a project gives the exact recovery diagnostic	example	unmerged
+invocation.no-project.upgrade	U8	interface §1	upgrade without a project gives the exact recovery diagnostic	example	unmerged
+invocation.trust-offline	U8	interface §1; Decisions Self-verification scope	trust reads no library and names the verification profile and residual trust	example	unmerged
+library.brief	U8	interface §3; Decisions Conformance method	brief supplies the statement, profile rules, proof freedom, manifest entry, and check command	example	unmerged
+library.latest-numeric-version	U8	library Naming; interface §3 list	Operation entry versions sort numerically rather than as strings	example	unmerged
+library.launch-list	U8	Decisions Launch set; Library API v1; interface §§3/6	The launch set has six operation versions and every obligation is proven	example	unmerged
+library.project-snapshot	U8	interface §1; Decisions Spec modularity	Library reports inside a project use its pinned source snapshot, not the feed head	example	unmerged
+library.show-operation	U8	interface §3; library Operations	show exposes the operation version, statement, and obligation status	example	unmerged
+library.unrecognized.brief	U8	interface §§2–3	brief refuses a target absent from the selected snapshot	example	unmerged
+library.unrecognized.diff	U8	interface §§2–3	diff refuses a target absent from the selected snapshot	example	unmerged
+library.unrecognized.profile	U8	interface §§2–3	profile refuses a target absent from the selected snapshot	example	unmerged
+library.unrecognized.show	U8	interface §§2–3	show refuses a target absent from the selected snapshot	example	unmerged
+policy.differential.absent-default	U8	Decisions Guarantee; Proof policy; interface §5	Matching test evidence under absent-default is never delivered and obeys saved policy	example	unmerged
+policy.differential.development	U8	Decisions Guarantee; Proof policy; interface §5	Matching test evidence under development is never delivered and obeys saved policy	example	unmerged
+policy.differential.required	U8	Decisions Guarantee; Proof policy; interface §5	Matching test evidence under required is never delivered and obeys saved policy	example	unmerged
+policy.exit-precedence	U8	interface §2; Decisions Public interface	Module mixes return max(2,1,0) independently of manifest order	property	unmerged
+profile.comments-not-constructs	U8	Decisions Conformance method (syntax kinds)	Forbidden words inside comments do not become forbidden syntax constructs	example	unmerged
+profile.reject.extern	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses extern and names its original source location	example	unmerged
+profile.reject.implemented-by	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses implemented_by and names its original source location	example	unmerged
+profile.reject.import-lake	U8	Decisions Conformance method (imports)	Implementation imports cannot include Lake	example	unmerged
+profile.reject.import-lean	U8	Decisions Conformance method (imports)	Implementation imports cannot include Lean	example	unmerged
+profile.reject.initialize	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses initialize and names its original source location	example	unmerged
+profile.reject.metaprogram	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses macro and names its original source location	example	unmerged
+profile.reject.opaque	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses opaque and names its original source location	example	unmerged
+profile.reject.partial	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses partial and names its original source location	example	unmerged
+profile.reject.reserved-module	U8	Decisions Conformance method; library Naming	An implementation cannot shadow the trusted spec module	example	unmerged
+profile.reject.run-cmd	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses run_cmd and names its original source location	example	unmerged
+profile.reject.skip-kernel-option	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses skipKernelTC and names its original source location	example	unmerged
+profile.reject.unsafe	U8	Decisions Conformance method (implementation profile)	The positive allowlist refuses unsafe and names its original source location	example	unmerged
+profile.reserved-name-boundary	U8	library Naming (LEAD-DIRECTIVES D4a)	Reserved roots are exact Init/Std/Lean/Lake or any first component starting Fvdep	property	unmerged
+profile.walks-whole-tree	U8	Decisions Conformance method (whole tree)	A forbidden construct in an unused implementation declaration is refused	example	unmerged
+sandbox.consumer-lakefile-ignored	U8	Decisions Conformance method (fvdep-written build config); interface §1	Consumer build hooks never run during a conformance check	example	unmerged
+sandbox.proof-link-plant	U8	Decisions Conformance method (link plant acceptance)	A symlink planted by proof build code cannot become a trusted supervisor output	example	unmerged
+sandbox.proof-network-confined	U8	Decisions Conformance method (no network)	Proof build code cannot reach a listening host socket	example	unmerged
+sandbox.proof-write-confined	U8	Decisions Conformance method (sandbox + supervisor isolation)	Arbitrary proof build code cannot change an existing file outside the sandbox	example	unmerged
+sandbox.snapshot-fifo-refused	U8	Decisions Conformance method (snapshots refuse special files)	A snapshot refuses a FIFO promptly instead of blocking while reading it	example	unmerged
+sandbox.snapshot-link-refused	U8	Decisions Conformance method (snapshots refuse links)	A snapshot refuses a consumer symlink without following or modifying its target	example	unmerged
+schema.evidence.argv-type	U8	interface §7	Evidence entry argv-type cannot cross the proof/differential schema boundary	example	unmerged
+schema.evidence.empty-argv	U8	interface §7	Evidence entry empty-argv cannot cross the proof/differential schema boundary	example	unmerged
+schema.evidence.forbidden-proof-field	U8	interface §7	Evidence entry forbidden-proof-field cannot cross the proof/differential schema boundary	example	unmerged
+schema.evidence.forbidden-shape	U8	interface §7	Evidence entry forbidden-shape cannot cross the proof/differential schema boundary	example	unmerged
+schema.evidence.missing-argv	U8	interface §7	Evidence entry missing-argv cannot cross the proof/differential schema boundary	example	unmerged
+schema.evidence.proof-forbidden-evidence	U8	interface §7	Evidence entry proof-forbidden-evidence cannot cross the proof/differential schema boundary	example	unmerged
+schema.lock.duplicate-key	U8	Decisions Data formats; interface §6	Lock defect duplicate-key is refused with exit 2 without overwriting its bytes	example	unmerged
+schema.lock.schema-version	U8	Decisions Data formats; interface §6	Lock defect schema-version is refused with exit 2 without overwriting its bytes	example	unmerged
+schema.lock.unknown-field	U8	Decisions Data formats; interface §6	Lock defect unknown-field is refused with exit 2 without overwriting its bytes	example	unmerged
+schema.manifest-printer-round-trip	U8	Decisions Data formats; interface §§3/7	Canonical init manifests round-trip through the public TOML reader for both policies	property	unmerged
+schema.manifest.duplicate-key	U8	Decisions Data formats; interface §7	Manifest defect duplicate-key is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.empty-impl-modules	U8	Decisions Data formats; interface §7	Manifest defect empty-impl-modules is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.empty-proof-modules	U8	Decisions Data formats; interface §7	Manifest defect empty-proof-modules is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.extra-library	U8	Decisions Data formats; interface §7	Manifest defect extra-library is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.extra-module-key	U8	Decisions Data formats; interface §7	Manifest defect extra-module-key is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.extra-root	U8	Decisions Data formats; interface §7	Manifest defect extra-root is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.missing-library	U8	Decisions Data formats; interface §7	Manifest defect missing-library is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.missing-proof	U8	Decisions Data formats; interface §7	Manifest defect missing-proof is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.module-build	U8	Decisions Data formats; interface §7	Manifest defect module-build is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.module-prerelease	U8	Decisions Data formats; interface §7	Manifest defect module-prerelease is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.module-version	U8	Decisions Data formats; interface §7	Manifest defect module-version is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.overlap-modules	U8	Decisions Data formats; interface §7	Manifest defect overlap-modules is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.policy-type	U8	Decisions Data formats; interface §7	Manifest defect policy-type is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.policy-value	U8	Decisions Data formats; interface §7	Manifest defect policy-value is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.repeat-impl-module	U8	Decisions Data formats; interface §7	Manifest defect repeat-impl-module is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.schema-type	U8	Decisions Data formats; interface §7	Manifest defect schema-type is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.schema-version	U8	Decisions Data formats; interface §7	Manifest defect schema-version is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.shape	U8	Decisions Data formats; interface §7	Manifest defect shape is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.short-commit	U8	Decisions Data formats; interface §7	Manifest defect short-commit is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.uppercase-commit	U8	Decisions Data formats; interface §7	Manifest defect uppercase-commit is named, refused with exit 2, and read-only	example	unmerged
+schema.manifest.wrong-module-list-type	U8	Decisions Data formats; interface §7	Manifest defect wrong-module-list-type is named, refused with exit 2, and read-only	example	unmerged
+schema.unrecognized-operation	U8	interface §§2/7	A nonexistent manifest operation is refused instead of checking a same-shaped operation	example	unmerged
+updates.toolchain-refusal	U8	interface §1; Decisions Lifecycle + profile evolution	A library on another Lean toolchain is refused before a project write	example	unmerged
+workflow.check-absent-module	U8	interface §2	Checking a module absent from the manifest is exit 2 and read-only	example	unmerged
+workflow.check-subset	U8	interface §3 check	A subset check reports only requested manifest modules and writes no files	example	unmerged
+workflow.commit-io-old-or-new	U8	interface §2; Decisions Data formats	A denied lock commit exits 2 with commit_io and leaves complete old bytes	example	unmerged
+workflow.development-lock-not-delivered	U8	Decisions Guarantee; interface §5	Development receipts meet policy but status still says NOT DELIVERED	example	unmerged
+workflow.init-development	U8	interface §§3/5	init --development saves test-evidence policy and never calls it delivered	example	unmerged
+workflow.init-existing	U8	interface §§2–3	init never overwrites an existing manifest	example	unmerged
+workflow.init-required	U8	interface §§3/5/7	init creates a schema-1 empty manifest pinned to the library head with proof required	example	unmerged
+workflow.lock-json-round-trip	U8	Decisions Data formats; interface §6	A schema lock survives a JSON decode/encode cycle and the product rereads the same receipts	property	unmerged
+workflow.no-lock-status	U8	interface §§3–4	A fresh valid proof is not delivered without a lock receipt	example	unmerged
+workflow.proof-lock-delivery	U8	Decisions Proof policy; Data formats; interface §§3–4/6	Only a current proof receipt yields DELIVERED and lock stores no delivered bit	example	unmerged
+workflow.refusal-byte-identity	U8	Decisions Proof policy; Data formats; interface §2	Every sampled pre-commit refusal preserves manifest and existing-or-absent lock byte for byte	property	unmerged
+workflow.stale.adapter	U8	Decisions Proof policy; Lifecycle + profile evolution; interface §3	A changed adapter makes a saved receipt stale without rebuilding	example	unmerged
+workflow.stale.implementation	U8	Decisions Proof policy; Lifecycle + profile evolution; interface §3	A changed implementation makes a saved receipt stale without rebuilding	example	unmerged
+workflow.stale.proof	U8	Decisions Proof policy; Lifecycle + profile evolution; interface §3	A changed proof makes a saved receipt stale without rebuilding	example	unmerged
+workflow.stale.verification-profile	U8	Decisions Proof policy; Lifecycle + profile evolution; interface §3	A changed verification-profile makes a saved receipt stale without rebuilding	example	unmerged
+workflow.status-no-rebuild	U8	interface §3 status	status can report current delivery without running Lean or Lake	example	unmerged
+build-lib.artifacts-and-receipt	U9	Decisions C-library delivery; interface §§3/6; library C ABI shapes	build-lib emits hashed artifacts and a record extending the delivered ABI receipt without changing project files	example	unmerged
+build-lib.cache-miss-digest-mismatch	U9	interface §3 build-lib; Decisions C-library delivery	A reconstructed export that disagrees with the receipt is not shipped	example	unmerged
+build-lib.cache-miss-reconstruction	U9	Decisions C-library delivery; interface §3 build-lib	Losing cached phase-1 outputs triggers an isolated rebuild with the same receipt digest	example	unmerged
+build-lib.default-output	U9	interface §3 build-lib	The default C output directory is fvdep-build and project persistence is read-only	example	unmerged
+build-lib.refuse.no-lock	U9	Decisions C-library delivery; interface §3	build-lib refuses no-lock rather than treating it as C delivery	example	unmerged
+build-lib.refuse.test-evidence	U9	Decisions C-library delivery; interface §3	build-lib refuses test-evidence rather than treating it as C delivery	example	unmerged
+build-lib.refuse.wrong-shape	U9	Decisions C-library delivery; interface §3	build-lib refuses wrong-shape rather than treating it as C delivery	example	unmerged
+library.launch-profile-identities	U10	Decisions Launch set; library Profiles	All four package identities remain visible in published or preview areas	example	unmerged
+library.preview-separate	U10	Decisions Preview area; Profile shape; library Profiles; interface §6	Preview operations stay outside the published list and have explicit per-operation status	example	unmerged
+updates.default-skips-retracted-latest	U11	interface §3 upgrade	The default upgrade target is the latest nonretracted version at the feed head	example	unmerged
+updates.development-retracted-proof	U11	interface §5	Development policy accepts a retracted proof but still never delivers it	example	unmerged
+updates.diff-compat	U11	interface §3; Decisions Module updates	diff reports the proven compatibility relation without changing the consumer	example	unmerged
+updates.fetch-before-first-success	U11	interface §3 fetch; Decisions Updates	An unreachable feed reports failure and never instead of claiming up to date	example	unmerged
+updates.fetch-failed-keeps-last-time	U11	interface §§3/6; Decisions Lifecycle + profile evolution	A failed fetch retains the last successful status snapshot and reports exit 2	example	unmerged
+updates.missing-lifecycle-schema	U11	Decisions Lifecycle + profile evolution (lifecycle-v<N>)	A missing lifecycle-v1 feed is a fetch failure, not an empty status	example	unmerged
+updates.observed-retraction-persists	U11	Decisions Lifecycle + profile evolution	A feed rollback cannot erase an already observed retraction	example	unmerged
+updates.outdated.proven-major	U11	Decisions Module updates; interface §§3/6	proven-major compatibility follows the proven relation rather than version labels	example	unmerged
+updates.outdated.unstated-major	U11	Decisions Module updates; interface §§3/6	unstated-major compatibility follows the proven relation rather than version labels	example	unmerged
+updates.outdated.unstated-minor	U11	Decisions Module updates; interface §§3/6	unstated-minor compatibility follows the proven relation rather than version labels	example	unmerged
+updates.pin-move-rechecks-all	U11	Decisions Public interface; interface §3 upgrade	A moved pin rechecks nontarget modules before committing anything	example	unmerged
+updates.retraction.no-replacement	U11	Decisions Retraction; Lifecycle + profile evolution; interface §§3–6	A retraction with no-replacement preserves proof validity but removes delivery	example	unmerged
+updates.retraction.replacement	U11	Decisions Retraction; Lifecycle + profile evolution; interface §§3–6	A retraction with replacement preserves proof validity but removes delivery	example	unmerged
+updates.status-global-disagreement-first	U11	interface §§2–3 status (LEAD-DIRECTIVES D4c)	An interrupted lock-before-manifest upgrade makes every module not delivered until repaired	example	unmerged
+updates.status-test-evidence-before-retraction	U11	interface §3 status (LEAD-DIRECTIVES D4c)	Test-only evidence is the single status reason before a simultaneous retraction	example	unmerged
+updates.upgrade-compat-pin-move	U11	Decisions Module updates; Public interface; interface §§3/6	Proven compatibility transports the proof, moves the pin, and commits lock before manifest	example	unmerged
+updates.upgrade-refusal-byte-identity	U11	Decisions Proof policy; Data formats; interface §§2–3	An incompatible target cannot change the manifest or lock	example	unmerged
+scan.configuration-not-assumed	U12	Decisions Scan; library Profiles	A crate lock lacking base64 engine configuration cannot claim unconditional coverage	example	unmerged
+scan.exact-version-property	U12	Decisions Scan	Coverage never transfers from the profiled version to generated different versions	property	unmerged
+scan.no-lockfile	U12	interface §3 scan	An empty scan directory is exit 2 rather than an empty coverage success	example	unmerged
+scan.other-version-is-suggestion	U12	Decisions Scan; interface §3	A different package version can only suggest a profile and never counts as covered	example	unmerged
+scan.refuse.malformed	U12	interface §3 scan; Decisions Self-verification scope	malformed lock input is refused with exit 2 naming its file	example	unmerged
+scan.refuse.unsupported	U12	interface §3 scan; Decisions Self-verification scope	unsupported lock input is refused with exit 2 naming its file	example	unmerged
+scan.resolved-scope.cargo	U12	Decisions Scan; interface §§3/6	cargo distinguishes exact direct and indirect versions without resolving a range	example	unmerged
+scan.resolved-scope.lake	U12	Decisions Scan; interface §§3/6	lake distinguishes exact direct and indirect versions without resolving a range	example	unmerged
+scan.resolved-scope.npm	U12	Decisions Scan; interface §§3/6	npm distinguishes exact direct and indirect versions without resolving a range	example	unmerged
+scan.resolved-scope.pnpm	U12	Decisions Scan; interface §§3/6	pnpm distinguishes exact direct and indirect versions without resolving a range	example	unmerged
+scan.resolved-scope.uv	U12	Decisions Scan; interface §§3/6	uv distinguishes exact direct and indirect versions without resolving a range	example	unmerged
+scan.unresolved-range	U12	Decisions Scan; interface §§3/6	An unresolved range is printed as unresolved, never as an exact covered version	example	unmerged
+growth.queue-add-pinned	U13	interface §9	The user queue persists an exact package version in its isolated growth state	example	unmerged
+growth.queue-add-unpinned	U13	interface §9	The user queue accepts a package without inventing an exact resolved version	example	unmerged
+growth.usage.bad-target	U13	interface §§2/9	Growth invocation bad-target is usage failure rather than an attempt or admission	example	unmerged
+growth.usage.extra-argument	U13	interface §§2/9	Growth invocation extra-argument is usage failure rather than an attempt or admission	example	unmerged
+growth.usage.missing-target	U13	interface §§2/9	Growth invocation missing-target is usage failure rather than an attempt or admission	example	unmerged
+growth.usage.no-command	U13	interface §§2/9	Growth invocation no-command is usage failure rather than an attempt or admission	example	unmerged

@@ -1,0 +1,15 @@
+schema = 1
+
+[library]
+commit = "@LIBRARY_COMMIT@"
+
+[policy]
+proof = "@POLICY@"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Fvdep.Base64.Encode.V1_0_0"]
+proof_modules = ["Proof"]
+impl = "Fvdep.Base64.Encode.V1_0_0.encode"
+proof = "Proof.encode_eq"
