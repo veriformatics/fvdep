@@ -11,6 +11,7 @@ import FvdepAudit.Manifest.Proof.Text
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
+import FvdepAudit.Registry.Proof.Claims
 import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
@@ -1105,6 +1106,39 @@ def indexBytesText : Prop :=
 
 end FvdepLedger.Rows.IndexClaims
 
+namespace FvdepLedger.Rows.RegistryClaims
+
+open Lean FvdepCore.Index.Registry FvdepAudit.Registry.Spec
+
+/-- U4 C2 + C8 `RegistryDecodeExact`: the walk reads `e` as `f` (under `let` values `env`, unfolding
+`p`) to `v` exactly when the accepted-forms relation, written apart, relates them. -/
+def registryDecodeExact : Prop :=
+  ∀ (F : Facts) (f : Form) (e : Expr) (env : List Expr) (p : List Name) (v : Val),
+    decode F f e env p = .ok v ↔ Denotes F f e env p v
+
+/-- U4 C2: `readRegistry` returns `r` exactly when the four registry list constants denote `r`'s
+records (their layouts, written apart; `profiles` = its length). -/
+def registryReadExact : Prop :=
+  ∀ (F : Facts) (r : Lists), readRegistry F = .ok r ↔ RegistryDenotes F r
+
+/-- U4 C2 + C5: `readProofs` returns `pr` exactly when the proof registry constant denotes `pr`'s
+layout. -/
+def registryProofsExact : Prop :=
+  ∀ (F : Facts) (c : Name) (pr : Proofs), readProofs F c = .ok pr ↔ ProofsAt F c pr
+
+/-- U4 C2: the shipped record forms = `Fvdep.Registry.Types.V1`'s field order, written apart. -/
+def registryFormsExact : Prop :=
+  moduleForm = moduleFormSpec ∧
+    noticeForm = noticeFormSpec ∧ removedForm = removedFormSpec ∧ proofsForm = proofsFormSpec
+
+/-- U4 C2 + C8 `ReencodeExact`: a list literal the certificate writes decodes back to the values
+written (any form without `entry`/`any`, values of its shape). -/
+def registryReencodeExact : Prop :=
+  ∀ (F : Facts) (f : Form) (vs : List Val) (env : List Expr) (p : List Name) (_hp : Plain f)
+    (_hv : ∀ v ∈ vs, Fits f v), decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs)
+
+end FvdepLedger.Rows.RegistryClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -1881,6 +1915,53 @@ def indexEncodeRow : Row :=
     residue := []
     unproven := [] }
 
+def registryReadRow : Row :=
+  { component := `FvdepCore.Index.Registry
+    contract := "U4 C2 + C8"
+    claim :=
+      "Registry reading: the walk (`decode` + its list loop `spine`) reads an `Expr` exactly as " ++
+        "the accepted-forms relation, written apart, relates it (metadata, `let`/`have`, root " ++
+        "registry module constants, `<M>.entry` references, `List.nil`/`List.cons`/the standard " ++
+        "`++`, constructor applications over string + name literals, `Option`, enumerations); " ++
+        "`readRegistry` returns exactly the records the four list constants denote; the shipped " ++
+        "record forms = the registry types' field order."
+    claims :=
+      [(``RegistryClaims.registryDecodeExact, ``FvdepAudit.Registry.Proof.registry_decode),
+        (``RegistryClaims.registryReadExact, ``FvdepAudit.Registry.Proof.registry_read),
+        (``RegistryClaims.registryFormsExact, ``FvdepAudit.Registry.Proof.registry_forms)]
+    subject := ``FvdepCore.Index.Registry.readRegistry
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def registryProofsRow : Row :=
+  { component := `FvdepCore.Index.Registry
+    contract := "U4 C2 + C5"
+    claim :=
+      "`readProofs` returns exactly the obligation → theorem map (+ compat theorem) the proof " ++
+        "registry constant denotes."
+    claims := [(``RegistryClaims.registryProofsExact, ``FvdepAudit.Registry.Proof.registry_proofs)]
+    subject := ``FvdepCore.Index.Registry.readProofs
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def registryLiteralRow : Row :=
+  { component := `FvdepCore.Index.Registry
+    contract := "U4 C2 + C8"
+    claim :=
+      "`listLiteral` (the certificate's literal of a registry list: constructor applications in " ++
+        "field order) decodes back to exactly the values written."
+    claims :=
+      [(``RegistryClaims.registryReencodeExact, ``FvdepAudit.Registry.Proof.registry_reencode)]
+    subject := ``FvdepCore.Index.Registry.listLiteral
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1892,7 +1973,7 @@ def ledger : Ledger :=
         hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
-        indexDecodeRow, indexEncodeRow]
+        indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow]
     residue := residue }
 
 end FvdepLedger.Rows

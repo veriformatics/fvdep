@@ -355,6 +355,140 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Index
 
+/-! Compiled-code smoke for registry reading (contract U4 C2): the proofs cover the definitions,
+these run the compiled C — a 10^6-element list (the loop: no stack per element), Lean's `have`
+chunks of a long list literal, root-constant + entry-reference reads, refusals + their constant. -/
+
+namespace Registry
+
+open Lean FvdepCore.Index.Registry
+
+def strE (s : String) : Expr := .lit (.strVal s)
+
+def consE (T h t : Expr) : Expr := .app (.app (.app (.const ``List.cons [.zero]) T) h) t
+
+def nilE (T : Expr) : Expr := .app (.const ``List.nil [.zero]) T
+
+def strT : Expr := .const ``String []
+
+def nameT : Expr := .const ``Lean.Name []
+
+/-- A cons spine of `n` string literals, built in a loop. -/
+def spineOf (n : Nat) : Expr := n.fold (fun _ _ acc => consE strT (strE "x") acc) (nilE strT)
+
+/-- `Name.mkStrN s₁ … sₙ` (n ≤ 8), as Lean elaborates a double-backtick name. -/
+def mkStrE (parts : List String) : Expr :=
+  parts.foldl (fun acc s => .app acc (strE s))
+    (.const (mkStrN.getD (parts.length - 1) .anonymous) [])
+
+def moduleT : Expr := .const `Fvdep.Registry.Types.V1.Module []
+
+def moduleMk (id ver : String) : Expr :=
+  [strE id, strE ver, mkStrE ["Fvdep", "Base64", "Encode", "V1_0_0", "encode"],
+        consE nameT (mkStrE ["Fvdep", "Base64", "Encode", "V1_0_0", "bits"]) (nilE nameT),
+        .app (.const ``Option.none [.zero]) nameT, .app (.const ``Option.none [.zero]) strT].foldl
+    .app (.const `Fvdep.Registry.Types.V1.Module.mk [])
+
+def appendE (T xs ys : Expr) : Expr :=
+  let l := .app (.const ``List [.zero]) T
+  .app
+    (.app
+      (.app (.app (.app (.app (.const ``HAppend.hAppend [.zero, .zero, .zero]) l) l) l)
+        (.app (.app (.const ``instHAppendOfAppend [.zero]) l)
+          (.app (.const ``List.instAppend [.zero]) T)))
+      xs)
+    ys
+
+def entryName : Name := `Fvdep.Registry.Base64.Encode.V1_0_0.entry
+
+def decl (n m : Name) (v : Expr) : Decl := ⟨n, m, .defn, some v⟩
+
+/-- A registry: `modules` = a root-module chunk constant `++ []`; the chunk = one entry
+reference. -/
+def facts (modules notices : Expr) (extra : List Decl := []) : Facts :=
+  {
+    decls :=
+      [decl entryName `Fvdep.Registry.Base64.Encode.V1_0_0 (moduleMk "base64.encode" "1.0.0"),
+          decl `Fvdep.Registry.part `Fvdep.Registry
+            (consE moduleT (.const entryName []) (nilE moduleT)),
+          decl `Fvdep.Registry.modules `Fvdep.Registry modules,
+          decl `Fvdep.Registry.profiles `Fvdep.Registry (nilE (.const `P [])),
+          decl `Fvdep.Registry.notices `Fvdep.Registry.Notices notices,
+          decl `Fvdep.Registry.removed `Fvdep.Registry.Removed (nilE (.const `R []))] ++
+        extra }
+
+def okModules : Expr := appendE moduleT (.const `Fvdep.Registry.part []) (nilE moduleT)
+
+def okNotices : Expr := nilE (.const `N [])
+
+def refused (F : Facts) : Option Name :=
+  match readRegistry F with
+  | .error n => some n
+  | .ok _ => none
+
+def cases : List (String × (Unit → Bool)) :=
+  [("registry: a 10^6-element cons spine decodes in a loop", fun _ =>
+      match decode ⟨[]⟩ (.list .str) (spineOf 1000000) [] [`t] with
+      | .ok v => v.elems.length == 1000000
+      | .error _ => false),
+    ("registry: Lean's `have` chunks of a long list literal (tail = a let-bound chunk)", fun _ =>
+      let chunk := consE strT (strE "d") (consE strT (strE "e") (nilE strT))
+      let body := consE strT (strE "a") (consE strT (strE "b") (.bvar 0))
+      match decode ⟨[]⟩ (.list .str) (.letE `y strT chunk body true) [] [`t] with
+      | .ok v => v.elems.map Val.strD == ["a", "b", "d", "e"]
+      | .error _ => false),
+    ("registry: root-module chunk `++` + an entry reference → the entry + its module", fun _ =>
+      match readRegistry (facts okModules okNotices) with
+      | .ok r =>
+        r.entries.length == 1 && r.profiles == 0 &&
+          r.entries.all fun e =>
+            e.module == `Fvdep.Registry.Base64.Encode.V1_0_0 && e.id == "base64.encode" &&
+              e.version == "1.0.0" &&
+              e.spec == `Fvdep.Base64.Encode.V1_0_0.encode &&
+              e.obligations == [`Fvdep.Base64.Encode.V1_0_0.bits] &&
+              e.abi.isNone &&
+              e.compat.isNone
+      | .error _ => false),
+    ("registry: an inline record in `modules` → unreadable, naming `modules`", fun _ =>
+      refused (facts (consE moduleT (moduleMk "base64.encode" "1.0.0") (nilE moduleT)) okNotices) ==
+        some `Fvdep.Registry.modules),
+    ("registry: a helper constant outside the root module → unreadable, naming the list", fun _ =>
+      refused
+          (facts okModules (.const `Fvdep.Registry.helper [])
+            [decl `Fvdep.Registry.helper `Fvdep.Registry.Notices okNotices]) ==
+        some `Fvdep.Registry.notices),
+    ("registry: read order — `modules` before `notices`", fun _ =>
+      refused (facts (strE "x") (strE "y")) == some `Fvdep.Registry.modules),
+    ("registry: name literals (mkStr1, mkStr5, a 9-component `Name.str` chain); `Name.num` refused",
+      fun _ =>
+      let nine :=
+        ["A", "B", "C", "D", "E", "F", "G", "H", "I"].foldl
+          (fun acc s => .app (.app (.const ``Name.str []) acc) (strE s))
+          (.const ``Name.anonymous [])
+      nameLit? (mkStrE ["Nat"]) == some `Nat &&
+        nameLit? (mkStrE ["Fvdep", "Base64", "Encode", "V1_0_0", "encode"]) ==
+          some `Fvdep.Base64.Encode.V1_0_0.encode &&
+        nameLit? nine == some `A.B.C.D.E.F.G.H.I &&
+        nameLit?
+            (.app (.app (.const ``Name.num []) (.const ``Name.anonymous [])) (.lit (.natVal 1))) ==
+          none &&
+        nameLit? (.app (.const ``Name.mkStr2 []) (strE "a")) == none &&
+        nameLit? (.app (.const `Foo []) (strE "a")) == none),
+    ("registry: a certificate list literal decodes back to the values written", fun _ =>
+      let n (r : String) (repl : Val) : Val :=
+        .app
+          (.app
+            (.app (.app (.const `Fvdep.Registry.Types.V1.Notice.mk) (.str "a.b")) (.str "1.0.0"))
+            (.str r))
+          repl
+      let n₁ := n "r1" (.some (.str "1.0.1"))
+      let n₂ := n "r2" .none
+      match decode ⟨[]⟩ (.list noticeForm) (listLiteral noticeForm [n₁, n₂]) [] [`t] with
+      | .ok v => v == .cons n₁ (.cons n₂ .nil)
+      | .error _ => false)]
+
+end Registry
+
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
 The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
@@ -775,7 +909,7 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Hash.cases ++
+            (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++ Hash.cases ++
                   Manifest.cases).map
               fun c => check c.1 c.2).mapM
         id

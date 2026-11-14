@@ -1810,6 +1810,75 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Registry`
+
+- Contract: U4 C2 + C8
+- Claim: Registry reading: the walk (`decode` + its list loop `spine`) reads an `Expr` exactly as the accepted-forms relation, written apart, relates it (metadata, `let`/`have`, root registry module constants, `<M>.entry` references, `List.nil`/`List.cons`/the standard `++`, constructor applications over string + name literals, `Option`, enumerations); `readRegistry` returns exactly the records the four list constants denote; the shipped record forms = the registry types' field order.
+- Subject: `FvdepCore.Index.Registry.readRegistry`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RegistryClaims.registryDecodeExact` (hash 0x46236c70), proved by `FvdepAudit.Registry.Proof.registry_decode`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (f : FvdepCore.Index.Registry.Form) (e : Lean.Expr)
+    (env : List Lean.Expr) (p : List Lean.Name) (v : FvdepCore.Index.Registry.Val),
+    FvdepCore.Index.Registry.decode F f e env p = Except.ok v ↔
+      FvdepAudit.Registry.Spec.Denotes F f e env p v
+  ```
+- Statement `FvdepLedger.Rows.RegistryClaims.registryReadExact` (hash 0xb1e4ae6f), proved by `FvdepAudit.Registry.Proof.registry_read`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (r : FvdepCore.Index.Registry.Lists),
+    FvdepCore.Index.Registry.readRegistry F = Except.ok r ↔
+      FvdepAudit.Registry.Spec.RegistryDenotes F r
+  ```
+- Statement `FvdepLedger.Rows.RegistryClaims.registryFormsExact` (hash 0x1edf7149), proved by `FvdepAudit.Registry.Proof.registry_forms`:
+
+  ```lean
+  FvdepCore.Index.Registry.moduleForm = FvdepAudit.Registry.Spec.moduleFormSpec ∧
+    FvdepCore.Index.Registry.noticeForm = FvdepAudit.Registry.Spec.noticeFormSpec ∧
+      FvdepCore.Index.Registry.removedForm = FvdepAudit.Registry.Spec.removedFormSpec ∧
+        FvdepCore.Index.Registry.proofsForm = FvdepAudit.Registry.Spec.proofsFormSpec
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Registry`
+
+- Contract: U4 C2 + C5
+- Claim: `readProofs` returns exactly the obligation → theorem map (+ compat theorem) the proof registry constant denotes.
+- Subject: `FvdepCore.Index.Registry.readProofs`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RegistryClaims.registryProofsExact` (hash 0x7e509209), proved by `FvdepAudit.Registry.Proof.registry_proofs`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (c : Lean.Name) (pr : FvdepCore.Index.Registry.Proofs),
+    FvdepCore.Index.Registry.readProofs F c = Except.ok pr ↔ FvdepAudit.Registry.Spec.ProofsAt F c pr
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Registry`
+
+- Contract: U4 C2 + C8
+- Claim: `listLiteral` (the certificate's literal of a registry list: constructor applications in field order) decodes back to exactly the values written.
+- Subject: `FvdepCore.Index.Registry.listLiteral`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RegistryClaims.registryReencodeExact` (hash 0x8b9a0d5b), proved by `FvdepAudit.Registry.Proof.registry_reencode`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (f : FvdepCore.Index.Registry.Form)
+    (vs : List FvdepCore.Index.Registry.Val) (env : List Lean.Expr) (p : List Lean.Name),
+    FvdepAudit.Registry.Spec.Plain f →
+      (∀ (v : FvdepCore.Index.Registry.Val), v ∈ vs → FvdepAudit.Registry.Spec.Fits f v) →
+        FvdepCore.Index.Registry.decode F f.list (FvdepCore.Index.Registry.listLiteral f vs) env p =
+          Except.ok (FvdepAudit.Registry.Spec.listVal vs)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
