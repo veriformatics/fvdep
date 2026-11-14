@@ -1609,6 +1609,75 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close))
 
+## `FvdepCore.Protocol`
+
+- Contract: U4 B2–B4; docs/interface.md §8
+- Claim: Each value encodes to its §8 layout; decoding at a type returns exactly the value whose layout it is, refusing every other value; a value whose strings fit encodes to a valid value; a request line decodes exactly when J decodes it to the target op's request object with typed arguments; a reply line = its reply object's canonical text + LF; the request lines = the LF-separated segments.
+- Subject: `FvdepCore.Protocol.decodeRequest`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.ProtocolClaims.valLayout` (hash 0x7d7d3d77), proved by `FvdepAudit.Protocol.Proof.val_layout`:
+
+  ```lean
+  ∀ (x : FvdepCore.Protocol.Val), FvdepCore.Protocol.encodeVal x = FvdepAudit.Protocol.Spec.valSpec x
+  ```
+- Statement `FvdepLedger.Rows.ProtocolClaims.valExact` (hash 0x2213adae), proved by `FvdepAudit.Protocol.Proof.val_exact`:
+
+  ```lean
+  ∀ (t : FvdepCore.Protocol.Ty) (v : FvdepCore.Json.Value) (x : FvdepCore.Protocol.Val),
+    FvdepCore.Protocol.decodeVal t v = some x ↔ x.ty = t ∧ FvdepAudit.Protocol.Spec.valSpec x = v
+  ```
+- Statement `FvdepLedger.Rows.ProtocolClaims.valValid` (hash 0x60d52114), proved by `FvdepAudit.Protocol.Proof.val_valid`:
+
+  ```lean
+  ∀ (x : FvdepCore.Protocol.Val),
+    FvdepAudit.Json.Spec.stringsFit (FvdepAudit.Protocol.Spec.valSpec x) = true →
+      FvdepAudit.Json.Spec.Valid (FvdepCore.Protocol.encodeVal x)
+  ```
+- Statement `FvdepLedger.Rows.ProtocolClaims.requestExact` (hash 0x592d399b), proved by `FvdepAudit.Protocol.Proof.request_exact`:
+
+  ```lean
+  ∀ (sig : FvdepCore.Protocol.Sig) (b : ByteArray) (xs : List FvdepCore.Protocol.Val),
+    FvdepCore.Protocol.decodeRequest sig b = Except.ok xs ↔
+      FvdepCore.Json.decode b =
+          Except.ok
+            (FvdepAudit.Protocol.Spec.requestLayout sig.op
+              (List.map FvdepAudit.Protocol.Spec.valSpec xs)) ∧
+        List.map FvdepCore.Protocol.Val.ty xs = sig.args
+  ```
+- Statement `FvdepLedger.Rows.ProtocolClaims.replyExact` (hash 0x2471d081), proved by `FvdepAudit.Protocol.Proof.reply_layout`:
+
+  ```lean
+  ∀ (r : FvdepCore.Protocol.Reply),
+    FvdepCore.Protocol.encodeReply r =
+      (FvdepCore.Json.print (FvdepAudit.Protocol.Spec.replyLayout r)).push 10
+  ```
+- Statement `FvdepLedger.Rows.ProtocolClaims.linesExact` (hash 0x6fc5ebb), proved by `FvdepAudit.Protocol.Proof.lines_exact`:
+
+  ```lean
+  ∀ (b : ByteArray),
+    List.map (fun x => x.data.toList) (FvdepCore.Protocol.lines b) =
+      FvdepAudit.Protocol.Spec.linesSpec b.data.toList
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Protocol.Sig`
+
+- Contract: U4 B1 (C's encodability rule V3)
+- Claim: `sigOf` returns a spec type's argument + result types exactly when the type is non-dependent arrows over §8's types (`Option X` result = `option`), read as `Expr` shapes without reduction, metadata transparent; else `none`.
+- Subject: `FvdepCore.Protocol.sigOf`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.ProtocolClaims.sigExact` (hash 0xe82c66dd), proved by `FvdepAudit.Protocol.Proof.sigOf_iff`:
+
+  ```lean
+  ∀ (e : Lean.Expr) (ts : List FvdepCore.Protocol.Ty) (r : FvdepCore.Protocol.RTy),
+    FvdepCore.Protocol.sigOf e = some (ts, r) ↔ FvdepAudit.Protocol.Spec.SigIs e ts r
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

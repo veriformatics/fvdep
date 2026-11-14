@@ -1,0 +1,615 @@
+case	clause	domain
+A.b64.vector.0.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.0.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.0.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.0.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.1.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.1.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.1.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.1.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.2.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.2.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.2.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.2.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.3.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.3.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.3.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.3.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.4.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.4.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.4.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.4.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.5.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.5.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.5.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.5.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.6.std.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.6.std.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.6.url.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.vector.6.url.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	RFC4648 §10 vector
+A.b64.exhaustive.1.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 256 1-byte inputs
+A.b64.exhaustive.1.encodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 256 1-byte inputs
+A.b64.exhaustive.1.roundtrip	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 256 1-byte inputs
+A.b64.exhaustive.1.roundtripUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 256 1-byte inputs
+A.b64.exhaustive.2.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 65536 2-byte inputs
+A.b64.exhaustive.2.encodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 65536 2-byte inputs
+A.b64.exhaustive.2.roundtrip	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 65536 2-byte inputs
+A.b64.exhaustive.2.roundtripUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 65536 2-byte inputs
+A.b64.generated.encode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded 136 inputs; lengths 0..129 + block boundaries
+A.b64.generated.encodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded 136 inputs; lengths 0..129 + block boundaries
+A.b64.refuse.decode.length1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.length2	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.length3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.length5	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding2	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding4	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding3only	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding5	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-tail-missing	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-after-full	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-interior	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-interior3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-double-group	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.padding-then-char	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.space	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.tab	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.lf	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.crlf	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.space-around	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.nul	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.del	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.nonascii-latin	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.nonascii-bmp	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.nonascii-nonbmp	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.nonascii-fullwidth	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.bits-one-byte	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.bits-two-byte	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.foreign0	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decode.foreign1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.filling-bits.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 108 nonzero low 4/2-bit tails
+A.b64.padding-masks.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 272 '=' position masks at 4/8 characters
+A.b64.ascii-domain.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	every ASCII character in each of four positions (512 inputs)
+A.b64.generated.inverse.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded independent encoder inverse
+A.b64.generated.canonical.decode	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded canonical/refusal differential; independent bit decoder
+A.b64.refuse.decodeUrl.length1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.length2	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.length3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.length5	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding2	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding4	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding3only	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding5	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-tail-missing	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-after-full	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-interior	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-interior3	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-double-group	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.padding-then-char	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.space	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.tab	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.lf	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.crlf	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.space-around	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.nul	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.del	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.nonascii-latin	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.nonascii-bmp	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.nonascii-nonbmp	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.nonascii-fullwidth	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.bits-one-byte	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.bits-two-byte	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.foreign0	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.refuse.decodeUrl.foreign1	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	named example
+A.b64.filling-bits.decodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 108 nonzero low 4/2-bit tails
+A.b64.padding-masks.decodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	all 272 '=' position masks at 4/8 characters
+A.b64.ascii-domain.decodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	every ASCII character in each of four positions (512 inputs)
+A.b64.generated.inverse.decodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded independent encoder inverse
+A.b64.generated.canonical.decodeUrl	U4 A4/A5; RFC4648 §§3.2–3.5,4,5,10	seeded canonical/refusal differential; independent bit decoder
+A.semver.parse.accept.00	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '0.0.0'
+A.semver.render.00	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.01	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.2.3'
+A.semver.render.01	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.02	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-0'
+A.semver.render.02	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.03	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-1'
+A.semver.render.03	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.04	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-alpha'
+A.semver.render.04	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.05	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-alpha.1'
+A.semver.render.05	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.06	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-0A'
+A.semver.render.06	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.07	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-a-'
+A.semver.render.07	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.08	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0--'
+A.semver.render.08	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.09	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0---'
+A.semver.render.09	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.10	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-123a'
+A.semver.render.10	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.11	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-a.0.9.z'
+A.semver.render.11	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.12	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0+0'
+A.semver.render.12	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.13	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0+001'
+A.semver.render.13	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.14	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0+-'
+A.semver.render.14	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.15	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0+foo-bar'
+A.semver.render.15	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.16	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-alpha+001.x-'
+A.semver.render.16	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.17	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-a-b+c-d.e'
+A.semver.render.17	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.18	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-01a'
+A.semver.render.18	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.19	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '9999999999999999999999999999999999999999999999999999999'
+A.semver.render.19	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.20	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '0.88888888888888888888888888888888888888888888888888888'
+A.semver.render.20	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.21	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '0.0.777777777777777777777777777777777777777777777777777'
+A.semver.render.21	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.22	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '0.0.0-6666666666666666666666666666666666666666666666666'
+A.semver.render.22	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.23	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '0.0.0+0000000000000000000000000000000000000000000000000'
+A.semver.render.23	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.accept.24	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar witness '1.0.0-Z.a.A.9.10'
+A.semver.render.24	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	canonical rendering witness
+A.semver.parse.refuse.00	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal ''
+A.semver.parse.refuse.01	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1'
+A.semver.parse.refuse.02	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2'
+A.semver.parse.refuse.03	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3.4'
+A.semver.parse.refuse.04	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '.1.2'
+A.semver.parse.refuse.05	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1..2'
+A.semver.parse.refuse.06	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.'
+A.semver.parse.refuse.07	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '01.2.3'
+A.semver.parse.refuse.08	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.02.3'
+A.semver.parse.refuse.09	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.03'
+A.semver.parse.refuse.10	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '00.0.0'
+A.semver.parse.refuse.11	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '+1.2.3'
+A.semver.parse.refuse.12	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '-1.2.3'
+A.semver.parse.refuse.13	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal 'v1.2.3'
+A.semver.parse.refuse.14	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal 'V1.2.3'
+A.semver.parse.refuse.15	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal ' 1.2.3'
+A.semver.parse.refuse.16	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3 '
+A.semver.parse.refuse.17	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3\n'
+A.semver.parse.refuse.18	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3\t'
+A.semver.parse.refuse.19	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-'
+A.semver.parse.refuse.20	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+'
+A.semver.parse.refuse.21	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-.a'
+A.semver.parse.refuse.22	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a.'
+A.semver.parse.refuse.23	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a..b'
+A.semver.parse.refuse.24	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+.a'
+A.semver.parse.refuse.25	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+a.'
+A.semver.parse.refuse.26	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+a..b'
+A.semver.parse.refuse.27	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-01'
+A.semver.parse.refuse.28	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-00'
+A.semver.parse.refuse.29	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a.01'
+A.semver.parse.refuse.30	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+foo+bar'
+A.semver.parse.refuse.31	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a+b+c'
+A.semver.parse.refuse.32	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a_b'
+A.semver.parse.refuse.33	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+a_b'
+A.semver.parse.refuse.34	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-α'
+A.semver.parse.refuse.35	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3+é'
+A.semver.parse.refuse.36	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '１.2.3'
+A.semver.parse.refuse.37	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.٢.3'
+A.semver.parse.refuse.38	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-٠'
+A.semver.parse.refuse.39	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a b'
+A.semver.parse.refuse.40	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-a/b'
+A.semver.parse.refuse.41	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3\x00'
+A.semver.parse.refuse.42	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	grammar refusal '1.2.3-😀'
+A.semver.precedence-chain	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	all 64 ordered pairs in SemVer §11 chain
+A.semver.whole-type.00	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.01	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.02	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.03	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.04	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.05	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.06	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.07	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.08	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.09	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.10	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.whole-type.11	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	whole-type witness
+A.semver.generated.render	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	256 grammar-valid generated values
+A.semver.generated.render-roundtrip	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	256 Valid values; parse(render(v)) = v
+A.semver.property.swap	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	320 seeded whole-type triples incl. invalid alnum/build
+A.semver.property.trans	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	320 seeded whole-type triples incl. invalid alnum/build
+A.semver.property.eqIff	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	320 seeded whole-type triples incl. invalid alnum/build
+A.semver.property.precedence	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	320 seeded whole-type triples incl. invalid alnum/build
+A.semver.property.build-ignored	U4 A4/A5; SemVer2 §§2,9,10,11; library whole-type compare	64 arbitrary whole-type versions
+B.value.encode.bytes.0	U4 B1/B2; interface §8	named example
+B.value.decode.bytes.0	U4 B1/B2; interface §8	named example
+B.value.encode.bytes.1	U4 B1/B2; interface §8	named example
+B.value.decode.bytes.1	U4 B1/B2; interface §8	named example
+B.value.encode.bytes.2	U4 B1/B2; interface §8	named example
+B.value.decode.bytes.2	U4 B1/B2; interface §8	named example
+B.value.encode.bytes.3	U4 B1/B2; interface §8	named example
+B.value.decode.bytes.3	U4 B1/B2; interface §8	named example
+B.value.encode.bytes.4	U4 B1/B2; interface §8	named example
+B.value.decode.bytes.4	U4 B1/B2; interface §8	named example
+B.value.encode.text.empty	U4 B1/B2; interface §8	named example
+B.value.decode.text.empty	U4 B1/B2; interface §8	named example
+B.value.encode.text.ascii	U4 B1/B2; interface §8	named example
+B.value.decode.text.ascii	U4 B1/B2; interface §8	named example
+B.value.encode.text.controls	U4 B1/B2; interface §8	named example
+B.value.decode.text.controls	U4 B1/B2; interface §8	named example
+B.value.encode.text.unicode	U4 B1/B2; interface §8	named example
+B.value.decode.text.unicode	U4 B1/B2; interface §8	named example
+B.value.encode.text.cap-ascii	U4 B1/B2; interface §8	named example
+B.value.decode.text.cap-ascii	U4 B1/B2; interface §8	named example
+B.value.encode.text.cap-utf8	U4 B1/B2; interface §8	named example
+B.value.decode.text.cap-utf8	U4 B1/B2; interface §8	named example
+B.value.encode.text.cap-nonbmp	U4 B1/B2; interface §8	named example
+B.value.decode.text.cap-nonbmp	U4 B1/B2; interface §8	named example
+B.value.encode.utf16.0	U4 B1/B2; interface §8	named example
+B.value.decode.utf16.0	U4 B1/B2; interface §8	named example
+B.value.encode.utf16.1	U4 B1/B2; interface §8	named example
+B.value.decode.utf16.1	U4 B1/B2; interface §8	named example
+B.value.encode.utf16.2	U4 B1/B2; interface §8	named example
+B.value.decode.utf16.2	U4 B1/B2; interface §8	named example
+B.value.encode.utf16.3	U4 B1/B2; interface §8	named example
+B.value.decode.utf16.3	U4 B1/B2; interface §8	named example
+B.value.encode.nat.0	U4 B1/B2; interface §8	named example
+B.value.decode.nat.0	U4 B1/B2; interface §8	named example
+B.value.encode.nat.1	U4 B1/B2; interface §8	named example
+B.value.decode.nat.1	U4 B1/B2; interface §8	named example
+B.value.encode.nat.2	U4 B1/B2; interface §8	named example
+B.value.decode.nat.2	U4 B1/B2; interface §8	named example
+B.value.encode.nat.3	U4 B1/B2; interface §8	named example
+B.value.decode.nat.3	U4 B1/B2; interface §8	named example
+B.value.encode.nat.4	U4 B1/B2; interface §8	named example
+B.value.decode.nat.4	U4 B1/B2; interface §8	named example
+B.value.encode.nat.5	U4 B1/B2; interface §8	named example
+B.value.decode.nat.5	U4 B1/B2; interface §8	named example
+B.value.encode.nat.6	U4 B1/B2; interface §8	named example
+B.value.decode.nat.6	U4 B1/B2; interface §8	named example
+B.value.encode.int.0	U4 B1/B2; interface §8	named example
+B.value.decode.int.0	U4 B1/B2; interface §8	named example
+B.value.encode.int.1	U4 B1/B2; interface §8	named example
+B.value.decode.int.1	U4 B1/B2; interface §8	named example
+B.value.encode.int.2	U4 B1/B2; interface §8	named example
+B.value.decode.int.2	U4 B1/B2; interface §8	named example
+B.value.encode.int.3	U4 B1/B2; interface §8	named example
+B.value.decode.int.3	U4 B1/B2; interface §8	named example
+B.value.encode.int.4	U4 B1/B2; interface §8	named example
+B.value.decode.int.4	U4 B1/B2; interface §8	named example
+B.value.encode.int.5	U4 B1/B2; interface §8	named example
+B.value.decode.int.5	U4 B1/B2; interface §8	named example
+B.value.encode.int.6	U4 B1/B2; interface §8	named example
+B.value.decode.int.6	U4 B1/B2; interface §8	named example
+B.value.encode.int.7	U4 B1/B2; interface §8	named example
+B.value.decode.int.7	U4 B1/B2; interface §8	named example
+B.value.encode.int.8	U4 B1/B2; interface §8	named example
+B.value.decode.int.8	U4 B1/B2; interface §8	named example
+B.value.encode.int.9	U4 B1/B2; interface §8	named example
+B.value.decode.int.9	U4 B1/B2; interface §8	named example
+B.value.encode.int.10	U4 B1/B2; interface §8	named example
+B.value.decode.int.10	U4 B1/B2; interface §8	named example
+B.value.encode.ordering.lt	U4 B1/B2; interface §8	named example
+B.value.decode.ordering.lt	U4 B1/B2; interface §8	named example
+B.value.encode.ordering.eq	U4 B1/B2; interface §8	named example
+B.value.decode.ordering.eq	U4 B1/B2; interface §8	named example
+B.value.encode.ordering.gt	U4 B1/B2; interface §8	named example
+B.value.decode.ordering.gt	U4 B1/B2; interface §8	named example
+B.value.encode.version.0	U4 B1/B2; interface §8	named example
+B.value.decode.version.0	U4 B1/B2; interface §8	named example
+B.value.encode.version.1	U4 B1/B2; interface §8	named example
+B.value.decode.version.1	U4 B1/B2; interface §8	named example
+B.value.encode.version.2	U4 B1/B2; interface §8	named example
+B.value.decode.version.2	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.0	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.1	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.2	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.3	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.4	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.5	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.6	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.7	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.8	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.9	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.10	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.11	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.0	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.1	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.2	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.3	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.4	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.5	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.6	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.7	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.8	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.9	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.10	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.11	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.12	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.13	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.14	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.15	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.decimal.16	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.integer-range.0	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.integer-range.1	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.0	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.1	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.2	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.3	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.4	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.5	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.6	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.7	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.8	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.9	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.10	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.11	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.12	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.13	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.14	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.15	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.16	U4 B1/B2; interface §8	named example
+B.value.refuse.int.decimal.17	U4 B1/B2; interface §8	named example
+B.value.refuse.int.integer-range.0	U4 B1/B2; interface §8	named example
+B.value.refuse.int.integer-range.1	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.negative	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.0	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.1	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.2	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.3	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.4	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.5	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.codeunit.6	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.0	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.1	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.2	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.3	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.4	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.bytes.kind.4	U4 B1/B2; interface §8	named example
+B.value.refuse.text.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.text.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.text.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.text.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.text.kind.4	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.utf16.kind.4	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.nat.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.int.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.int.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.int.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.int.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.ordering.kind.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.kind.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.kind.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.kind.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.kind.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.kind.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.missing.build	U4 B1/B2; interface §8	named example
+B.value.refuse.version.missing.major	U4 B1/B2; interface §8	named example
+B.value.refuse.version.missing.minor	U4 B1/B2; interface §8	named example
+B.value.refuse.version.missing.patch	U4 B1/B2; interface §8	named example
+B.value.refuse.version.missing.pre	U4 B1/B2; interface §8	named example
+B.value.refuse.version.extra	U4 B1/B2; interface §8	named example
+B.value.refuse.version.major.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.major.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.major.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.major.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.major.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.minor.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.minor.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.minor.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.minor.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.minor.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.patch.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.patch.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.patch.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.patch.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.patch.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.5	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.6	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.7	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.8	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.9	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.10	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.11	U4 B1/B2; interface §8	named example
+B.value.refuse.version.pre.12	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.0	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.1	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.2	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.3	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.4	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.5	U4 B1/B2; interface §8	named example
+B.value.refuse.version.build.6	U4 B1/B2; interface §8	named example
+B.value.property.encode-layout	U4 B1/B2; interface §8	160 seeded typed values across all seven Ty constructors
+B.value.property.decode-encode	U4 B1/B2; interface §8	160 independent layout round trips
+B.request.empty-text	U4 B3; U3 J1–J3; interface §8	line bytes=25
+B.request.unicode	U4 B3; U3 J1–J3; interface §8	line bytes=43
+B.request.order-whitespace	U4 B3; U3 J1–J3; interface §8	line bytes=39
+B.request.escape-pair	U4 B3; U3 J1–J3; interface §8	line bytes=37
+B.request.escaped-keys	U4 B3; U3 J1–J3; interface §8	line bytes=36
+B.request.slash	U4 B3; U3 J1–J3; interface §8	line bytes=29
+B.request.cap-ascii	U4 B3; U3 J1–J3; interface §8	line bytes=65561
+B.request.cap-multibyte	U4 B3; U3 J1–J3; interface §8	line bytes=65561
+B.request.empty-line	U4 B3; U3 J1–J3; interface §8	line bytes=0
+B.request.whitespace	U4 B3; U3 J1–J3; interface §8	line bytes=3
+B.request.malformed	U4 B3; U3 J1–J3; interface §8	line bytes=1
+B.request.null	U4 B3; U3 J1–J3; interface §8	line bytes=4
+B.request.array	U4 B3; U3 J1–J3; interface §8	line bytes=2
+B.request.string	U4 B3; U3 J1–J3; interface §8	line bytes=7
+B.request.missing-op	U4 B3; U3 J1–J3; interface §8	line bytes=14
+B.request.missing-args	U4 B3; U3 J1–J3; interface §8	line bytes=13
+B.request.extra	U4 B3; U3 J1–J3; interface §8	line bytes=32
+B.request.op-kind	U4 B3; U3 J1–J3; interface §8	line bytes=21
+B.request.args-kind	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.wrong-op	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.zero-arity	U4 B3; U3 J1–J3; interface §8	line bytes=23
+B.request.two-arity	U4 B3; U3 J1–J3; interface §8	line bytes=30
+B.request.wrong-arg	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.duplicate-op	U4 B3; U3 J1–J3; interface §8	line bytes=38
+B.request.duplicate-escaped	U4 B3; U3 J1–J3; interface §8	line bytes=43
+B.request.lone-high	U4 B3; U3 J1–J3; interface §8	line bytes=31
+B.request.lone-low	U4 B3; U3 J1–J3; interface §8	line bytes=31
+B.request.high-then-text	U4 B3; U3 J1–J3; interface §8	line bytes=32
+B.request.encoded-surrogate	U4 B3; U3 J1–J3; interface §8	line bytes=28
+B.request.utf8-overlong	U4 B3; U3 J1–J3; interface §8	line bytes=27
+B.request.utf8-stray	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.utf8-high	U4 B3; U3 J1–J3; interface §8	line bytes=29
+B.request.bom	U4 B3; U3 J1–J3; interface §8	line bytes=29
+B.request.raw-control	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.cap-plus-one	U4 B3; U3 J1–J3; interface §8	line bytes=65562
+B.request.cap-multibyte-plus	U4 B3; U3 J1–J3; interface §8	line bytes=65562
+B.request.depth33	U4 B3; U3 J1–J3; interface §8	line bytes=86
+B.request.depth-priority	U4 B3; U3 J1–J3; interface §8	line bytes=34
+B.request.trailing	U4 B3; U3 J1–J3; interface §8	line bytes=27
+B.request.trailing-json	U4 B3; U3 J1–J3; interface §8	line bytes=30
+B.request.trailing-comma	U4 B3; U3 J1–J3; interface §8	line bytes=27
+B.request.typed.bytes.accept	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.typed.bytes.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.typed.bytes.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=23
+B.request.typed.bytes.refuse.2	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.bytes.refuse.3	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.typed.utf16.accept	U4 B3; U3 J1–J3; interface §8	line bytes=35
+B.request.typed.utf16.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.utf16.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=27
+B.request.typed.utf16.refuse.2	U4 B3; U3 J1–J3; interface §8	line bytes=26
+B.request.typed.utf16.refuse.3	U4 B3; U3 J1–J3; interface §8	line bytes=25
+B.request.typed.nat.accept	U4 B3; U3 J1–J3; interface §8	line bytes=38
+B.request.typed.nat.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.typed.nat.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=38
+B.request.typed.nat.refuse.2	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.nat.refuse.3	U4 B3; U3 J1–J3; interface §8	line bytes=36
+B.request.typed.int.accept	U4 B3; U3 J1–J3; interface §8	line bytes=39
+B.request.typed.int.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=39
+B.request.typed.int.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.int.refuse.2	U4 B3; U3 J1–J3; interface §8	line bytes=39
+B.request.typed.int.refuse.3	U4 B3; U3 J1–J3; interface §8	line bytes=37
+B.request.typed.ordering.accept	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.ordering.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.ordering.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=21
+B.request.typed.ordering.refuse.2	U4 B3; U3 J1–J3; interface §8	line bytes=24
+B.request.typed.version.accept	U4 B3; U3 J1–J3; interface §8	line bytes=83
+B.request.typed.version.refuse.0	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.typed.version.refuse.1	U4 B3; U3 J1–J3; interface §8	line bytes=92
+B.request.json-number.0	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.json-number.1	U4 B3; U3 J1–J3; interface §8	line bytes=23
+B.request.json-number.2	U4 B3; U3 J1–J3; interface §8	line bytes=23
+B.request.json-number.3	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.json-number.4	U4 B3; U3 J1–J3; interface §8	line bytes=22
+B.request.json-number.5	U4 B3; U3 J1–J3; interface §8	line bytes=36
+B.request.two-args.accept	U4 B3; U3 J1–J3; interface §8	line bytes=28
+B.request.two-args.wrong-order	U4 B3; U3 J1–J3; interface §8	line bytes=28
+B.reply.ok.00	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; bytes value
+B.reply.ok.01	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; text value
+B.reply.ok.02	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; text value
+B.reply.ok.03	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; utf16 value
+B.reply.ok.04	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; nat value
+B.reply.ok.05	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; nat value
+B.reply.ok.06	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; int value
+B.reply.ok.07	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; ordering value
+B.reply.ok.08	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; version value
+B.reply.ok.09	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; bytes value
+B.reply.ok.10	U4 B3/B4 ReplyLayout; U3 J4	canonical bytes + LF; text value
+B.reply.none	U4 B3/B4 ReplyLayout; U3 J4	named example
+B.reply.invalid.0	U4 B3/B4 ReplyLayout; U3 J4	free-text invalid reason; canonical total printer
+B.reply.invalid.1	U4 B3/B4 ReplyLayout; U3 J4	free-text invalid reason; canonical total printer
+B.reply.invalid.2	U4 B3/B4 ReplyLayout; U3 J4	free-text invalid reason; canonical total printer
+B.reply.invalid.3	U4 B3/B4 ReplyLayout; U3 J4	free-text invalid reason; canonical total printer
+B.lines.00	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.01	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.02	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.03	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.04	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.05	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.06	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.07	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.08	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.09	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.10	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.11	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.12	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.13	U4 B3 lines	byte LF framing; EOF adds no request
+B.lines.property.framing	U4 B3 lines	128 arbitrary byte streams; includes empty LF lines + final fragment
+B.sig.launch.0	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.launch.1	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.launch.2	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.launch.3	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.launch.4	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.launch.5	U4 B1/B4 SigExact	six launch signature shapes (encode/decode repeated for URL)
+B.sig.table.bytes-list.plain	U4 B1/B4 SigExact	named example
+B.sig.table.bytes-list.option	U4 B1/B4 SigExact	named example
+B.sig.table.bytes-array.plain	U4 B1/B4 SigExact	named example
+B.sig.table.bytes-array.option	U4 B1/B4 SigExact	named example
+B.sig.table.text.plain	U4 B1/B4 SigExact	named example
+B.sig.table.text.option	U4 B1/B4 SigExact	named example
+B.sig.table.utf16.plain	U4 B1/B4 SigExact	named example
+B.sig.table.utf16.option	U4 B1/B4 SigExact	named example
+B.sig.table.nat.plain	U4 B1/B4 SigExact	named example
+B.sig.table.nat.option	U4 B1/B4 SigExact	named example
+B.sig.table.int.plain	U4 B1/B4 SigExact	named example
+B.sig.table.int.option	U4 B1/B4 SigExact	named example
+B.sig.table.ordering.plain	U4 B1/B4 SigExact	named example
+B.sig.table.ordering.option	U4 B1/B4 SigExact	named example
+B.sig.table.version.plain	U4 B1/B4 SigExact	named example
+B.sig.table.version.option	U4 B1/B4 SigExact	named example
+B.sig.multiple	U4 B1/B4 SigExact	named example
+B.sig.option-utf16	U4 B1/B4 SigExact	named example
+B.sig.mdata.codomain-arrow	U4 B1/B4 SigExact	regression: metadata transparent (reviewer-5 S7)
+B.sig.mdata.list-arg	U4 B1/B4 SigExact	regression: metadata transparent (reviewer-5 S7)
+B.sig.refuse.00	U4 B1/B4 SigExact	named example
+B.sig.refuse.01	U4 B1/B4 SigExact	named example
+B.sig.refuse.02	U4 B1/B4 SigExact	named example
+B.sig.refuse.03	U4 B1/B4 SigExact	named example
+B.sig.refuse.04	U4 B1/B4 SigExact	named example
+B.sig.refuse.05	U4 B1/B4 SigExact	named example
+B.sig.refuse.06	U4 B1/B4 SigExact	named example
+B.sig.refuse.07	U4 B1/B4 SigExact	named example
+B.sig.refuse.08	U4 B1/B4 SigExact	named example
+B.sig.refuse.09	U4 B1/B4 SigExact	named example
+B.sig.refuse.10	U4 B1/B4 SigExact	named example
+B.sig.refuse.11	U4 B1/B4 SigExact	named example
+B.sig.refuse.12	U4 B1/B4 SigExact	named example
+B.sig.refuse.13	U4 B1/B4 SigExact	named example
+B.sig.refuse.14	U4 B1/B4 SigExact	named example
+B.sig.refuse.15	U4 B1/B4 SigExact	named example
+B.cli.target.base64.encode	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.target.base64.encode_url	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.target.base64.decode	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.target.base64.decode_url	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.target.semver.parse	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.target.semver.compare	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.empty-eof	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.crlf	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.final-fragment	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.final-lf	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.none-result	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.empty-result	U4 B5; interface §8	exact stdout bytes + exit 0
+B.cli.recovery	U4 B5; interface §8	six lines; empty/malformed/wrong-op interleaved with valid
+B.cli.usage.0	U4 B5; interface §8	argv=[]; exit 2 + stderr
+B.cli.usage.1	U4 B5; interface §8	argv=['base64.encode@1.0.0', 'extra']; exit 2 + stderr
+B.cli.usage.2	U4 B5; interface §8	argv=['--unknown']; exit 2 + stderr
+B.cli.usage.3	U4 B5; interface §8	argv=['base64.encode']; exit 2 + stderr
+B.cli.usage.4	U4 B5; interface §8	argv=['base64.encode@1']; exit 2 + stderr
+B.cli.usage.5	U4 B5; interface §8	argv=['@1.0.0']; exit 2 + stderr
+B.cli.unknown-stdin-unread	U4 B5; interface §8	unknown target with finite pipe; exact marker remains unread
+B.cli.maximal-expansion	U4 B5; interface §8	65536-char request → 98304-char hex payload; full stdout compared
+B.cli.maximal-expansion-url	U4 B5; interface §8	URL; final fragment; reply larger than request cap

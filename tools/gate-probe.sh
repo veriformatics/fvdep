@@ -44,13 +44,13 @@ copy() {
     # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
     # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
     if [[ "${with_suites:-0}" == 1 ]]; then
-        for d in tests/codec/.lake tests/manifest/.lake tests/sha256/.build tests/sys/.lake \
-            tests/sys/.build; do
+        for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake tests/sha256/.build \
+            tests/sys/.lake tests/sys/.build; do
             [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
         done
     fi
     # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
-    for d in ledger-suite codec-suite manifest-suite fuzz-replay sys-suite acceptance; do
+    for d in ledger-suite codec-suite manifest-suite library-suite fuzz-replay sys-suite acceptance; do
         if [[ -f "$root/.gate/$d.green" ]]; then
             mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
         fi
@@ -438,6 +438,14 @@ with_suites=1 probe codec-suite plant_codec_harness "FAIL J.limits" \
 plant_manifest_driver() { sed -i 's/toJson maxBytes)\]$/toJson (maxBytes + 1))]/' tests/manifest/Driver.lean; }
 with_suites=1 probe manifest-suite plant_manifest_driver "FAIL T.maxBytes" \
     env FVDEP_MANIFEST_CASE=T.maxBytes bash -c 'source tools/gate.sh; manifest_suite'
+
+# library-suite: its reference encoder dropping the padding fails the 1-byte encodings, named (the
+# RFC 4648 vectors are literals: a reference plant reaches the exhaustive + generated cases alone).
+plant_library_reference() {
+    sed -i 's/^    chars += \["="\] \* ((-len(chars)) % 4)$/    chars += []/' tests/library/reference.py
+}
+with_suites=1 probe library-suite plant_library_reference "FAIL A.b64.exhaustive.1.encode" \
+    env FVDEP_LIBRARY_CASE=A.b64.exhaustive.1.encode bash -c 'source tools/gate.sh; library_suite'
 
 # fuzz-replay: the json target panics on one committed input ⇒ the replay aborts naming it (the
 # harness's LEAN_ABORT_ON_PANIC turns a Lean panic into the abort the engine counts).
