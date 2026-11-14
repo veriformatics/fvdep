@@ -21,4 +21,4 @@ paths:
 - `cases` takes comma-separated targets: inside `⟨fun x => by cases x, …⟩` the comma reads as a second target ⇒ parenthesize every `fun … => by …` field.
 - Name constructor implicits with `| @ctor a b h =>`; `rename_i` renames the most recent inaccessibles, often anonymous proofs.
 - Formal premises that stay visible by ruling are theorem arguments, never axioms or `sorry`.
-- Compiled allocation hides in runtime primitives: a `Nat` literal ≥ 2^32 (also a folded def such as `2 ^ 53 - 1`) compiles to a GMP parse at every evaluation; `String.toList` builds a C++ vector ⇒ a cost model reads the compiled C (`.lake/build/ir/**.c`), never the Lean source alone.
+- Compiled allocation hides in runtime primitives: a `Nat` literal ≥ 2^32 (also a folded def such as `2 ^ 53 - 1`, inlined at each use) compiles to a GMP parse at every evaluation — `@[noinline]` on such a constant keeps its uses on the global, initialized once (an attribute: proofs + statements untouched; `FvdepCore.Json.maxInt`); `String.toList` builds a C++ vector ⇒ a cost model reads the compiled C (`.lake/build/ir/**.c`), never the Lean source alone.

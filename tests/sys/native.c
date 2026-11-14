@@ -108,9 +108,7 @@ static int guard_test(const char *mode, const char *root) {
     if (!join_path(file, root, "guard") || !join_path(second, root, "reused")) return 2;
     int fd = (int)syscall(SYS_openat, AT_FDCWD, file, O_WRONLY | O_CREAT | O_EXCL | O_CLOEXEC, 0600);
     if (fd < 0) return 2;
-    lean_object *path = lean_mk_string(file);
-    lean_object *writer = take_io(fvdep_sys_writer_new((uint32_t)fd, path));
-    lean_dec(path);
+    lean_object *writer = take_io(fvdep_sys_writer_new((uint32_t)fd));
     if (!writer) { (void)syscall(SYS_close, fd); goto done; }
     if (!strcmp(mode, "guard-live")) {
         lean_dec(writer);
