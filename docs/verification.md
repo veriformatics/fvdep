@@ -1862,7 +1862,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepCore.Index.Registry`
 
 - Contract: U4 C2 + C8
-- Claim: `listLiteral` (the certificate's literal of a registry list: constructor applications in field order) decodes back to exactly the values written.
+- Claim: `listLiteral` (a registry list's literal: constructor applications in field order) decodes back to exactly the values written, for plain forms (no `entry` or `any` position) + values of their shape — the certificate's lists among them.
 - Subject: `FvdepCore.Index.Registry.listLiteral`
 - Path: none yet (wired by U4)
 - Statement `FvdepLedger.Rows.RegistryClaims.registryReencodeExact` (hash 0x8b9a0d5b), proved by `FvdepAudit.Registry.Proof.registry_reencode`:
@@ -1874,6 +1874,38 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
       (∀ (v : FvdepCore.Index.Registry.Val), v ∈ vs → FvdepAudit.Registry.Spec.Fits f v) →
         FvdepCore.Index.Registry.decode F f.list (FvdepCore.Index.Registry.listLiteral f vs) env p =
           Except.ok (FvdepAudit.Registry.Spec.listVal vs)
+  ```
+- Statement `FvdepLedger.Rows.RegistryClaims.registryCertificateExact` (hash 0x15a832c6), proved by `FvdepAudit.Registry.Proof.registry_certificate`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (r : FvdepCore.Index.Registry.RawLists)
+    (env : List Lean.Expr) (p : List Lean.Name),
+    FvdepCore.Index.Registry.readRaw F = Except.ok r →
+      ∀ (c : Lean.Name) (f : FvdepCore.Index.Registry.Form) (vs : List FvdepCore.Index.Registry.Val),
+        (c, f, vs) ∈ FvdepCore.Index.Registry.certificate r →
+          FvdepCore.Index.Registry.decode F f.list (FvdepCore.Index.Registry.listLiteral f vs) env p =
+            Except.ok (FvdepAudit.Registry.Spec.listVal vs)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Registry`
+
+- Contract: U4 C2 + C8
+- Claim: `certificate` (the lists C-command's kernel check compares with the registry constants: `modules`' records with their entry annotations dropped, `profiles` while empty, `notices`, `removed`) writes values whose literals decode back to exactly those values.
+- Subject: `FvdepCore.Index.Registry.certificate`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RegistryClaims.registryCertificateExact` (hash 0x15a832c6), proved by `FvdepAudit.Registry.Proof.registry_certificate`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (r : FvdepCore.Index.Registry.RawLists)
+    (env : List Lean.Expr) (p : List Lean.Name),
+    FvdepCore.Index.Registry.readRaw F = Except.ok r →
+      ∀ (c : Lean.Name) (f : FvdepCore.Index.Registry.Form) (vs : List FvdepCore.Index.Registry.Val),
+        (c, f, vs) ∈ FvdepCore.Index.Registry.certificate r →
+          FvdepCore.Index.Registry.decode F f.list (FvdepCore.Index.Registry.listLiteral f vs) env p =
+            Except.ok (FvdepAudit.Registry.Spec.listVal vs)
   ```
 - Uninterpreted: none
 - Residue: none

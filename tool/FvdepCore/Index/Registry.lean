@@ -1,3 +1,4 @@
+import Fvdep.Registry.ProfileTypes.V1
 import Fvdep.Registry.Types.V1
 import Lean.Expr
 
@@ -541,6 +542,23 @@ def Lists.ofRaw (r : RawLists) : Lists :=
 
 /-- C2: the registry lists' records. -/
 def readRegistry (F : Facts) : Except Name Lists := (readRaw F).map Lists.ofRaw
+
+/-- An entry reference's record, its annotation dropped (the certificate writes it inline). -/
+def Val.payload : Val → Val
+  | .entry _ v => v
+  | v => v
+
+/-- The profile record (`profiles`' element type; its fields are U10's: elements stay unread). -/
+def profileForm : Form := .ctor ``Fvdep.Registry.ProfileTypes.V1.Profile.mk
+
+/-- C2's certificate input: per registry list, its constant, element form (its `tyOf` = the list's
+element type) + the values its literal writes back — `modules`' records (entry annotations dropped),
+`profiles` while empty, `notices`, `removed`; C-command type-checks each literal + compares it with
+the constant (kernel). -/
+def certificate (r : RawLists) : List (Name × Form × List Val) :=
+  [(modulesName, moduleForm, r.modules.map Val.payload)] ++
+    (if r.profiles.isEmpty then [(profilesName, profileForm, [])] else []) ++
+    [(noticesName, noticeForm, r.notices), (removedName, removedForm, r.removed)]
 
 /-- C5: a proof registry's map (`<P>.proofs`); unreadable → the caller's warning. -/
 def readProofs (F : Facts) (c : Name) : Except Name Proofs :=

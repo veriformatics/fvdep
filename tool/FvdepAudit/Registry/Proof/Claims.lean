@@ -1,7 +1,7 @@
 import FvdepAudit.Registry.Proof.Read
 
-/-! The registry-reading claims (contract U4 C8 `RegistryDecodeExact`, `ReencodeExact`), headers =
-the ledger statements. -/
+/-! The registry-reading claims (contract U4 C8 `RegistryDecodeExact`, `ReencodeExact` + the
+certificate's lists), headers = the ledger statements. -/
 
 namespace FvdepAudit.Registry.Proof
 
@@ -25,5 +25,11 @@ theorem registry_reencode (F : Facts) (f : Form) (vs : List Val) (env : List Exp
     (hp : Plain f) (hv : ∀ v ∈ vs, Fits f v) :
     decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs) :=
   listLiteral_exact F f vs env p hp hv
+
+theorem registry_certificate (F : Facts) (r : RawLists) (env : List Expr) (p : List Name)
+    (h : readRaw F = .ok r) (c : Name) (f : Form) (vs : List Val)
+    (hc : (c, f, vs) ∈ certificate r) :
+    decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs) :=
+  certificate_exact F r env p h c f vs hc
 
 end FvdepAudit.Registry.Proof

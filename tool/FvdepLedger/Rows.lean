@@ -1131,11 +1131,19 @@ def registryFormsExact : Prop :=
   moduleForm = moduleFormSpec ∧
     noticeForm = noticeFormSpec ∧ removedForm = removedFormSpec ∧ proofsForm = proofsFormSpec
 
-/-- U4 C2 + C8 `ReencodeExact`: a list literal the certificate writes decodes back to the values
-written (any form without `entry`/`any`, values of its shape). -/
+/-- U4 C2 + C8 `ReencodeExact`: a list literal decodes back to the values written, over plain forms
+(no `entry`/`any` position: `Plain`) + values of their shape (`Fits`). -/
 def registryReencodeExact : Prop :=
   ∀ (F : Facts) (f : Form) (vs : List Val) (env : List Expr) (p : List Name) (_hp : Plain f)
     (_hv : ∀ v ∈ vs, Fits f v), decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs)
+
+/-- U4 C2 + C8 `ReencodeExact` (the certificate): every list `certificate` writes back — `modules`'
+records (entry annotations dropped), `profiles` while empty, `notices`, `removed` — decodes from its
+literal to exactly the values written. -/
+def registryCertificateExact : Prop :=
+  ∀ (F : Facts) (r : RawLists) (env : List Expr) (p : List Name) (_h : readRaw F = .ok r) (c : Name)
+    (f : Form) (vs : List Val) (_hc : (c, f, vs) ∈ certificate r),
+    decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs)
 
 end FvdepLedger.Rows.RegistryClaims
 
@@ -1952,11 +1960,30 @@ def registryLiteralRow : Row :=
   { component := `FvdepCore.Index.Registry
     contract := "U4 C2 + C8"
     claim :=
-      "`listLiteral` (the certificate's literal of a registry list: constructor applications in " ++
-        "field order) decodes back to exactly the values written."
+      "`listLiteral` (a registry list's literal: constructor applications in field order) " ++
+        "decodes back to exactly the values written, for plain forms (no `entry` or `any` " ++
+        "position) + values of their shape — the certificate's lists among them."
     claims :=
-      [(``RegistryClaims.registryReencodeExact, ``FvdepAudit.Registry.Proof.registry_reencode)]
+      [(``RegistryClaims.registryReencodeExact, ``FvdepAudit.Registry.Proof.registry_reencode),
+        (``RegistryClaims.registryCertificateExact,
+          ``FvdepAudit.Registry.Proof.registry_certificate)]
     subject := ``FvdepCore.Index.Registry.listLiteral
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def registryCertificateRow : Row :=
+  { component := `FvdepCore.Index.Registry
+    contract := "U4 C2 + C8"
+    claim :=
+      "`certificate` (the lists C-command's kernel check compares with the registry constants: " ++
+        "`modules`' records with their entry annotations dropped, `profiles` while empty, " ++
+        "`notices`, `removed`) writes values whose literals decode back to exactly those values."
+    claims :=
+      [(``RegistryClaims.registryCertificateExact,
+          ``FvdepAudit.Registry.Proof.registry_certificate)]
+    subject := ``FvdepCore.Index.Registry.certificate
     path := []
     noCaller := "U4"
     residue := []
@@ -1973,7 +2000,8 @@ def ledger : Ledger :=
         hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
-        indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow]
+        indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
+        registryCertificateRow]
     residue := residue }
 
 end FvdepLedger.Rows

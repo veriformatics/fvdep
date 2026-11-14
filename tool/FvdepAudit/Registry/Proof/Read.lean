@@ -503,4 +503,60 @@ theorem listLiteral_exact (F : Facts) (f : Form) (vs : List Val) (env : List Exp
   rw [listLiteral_eq]
   exact (reencode_exact F (fits_of_elems hv) hp).1 env p
 
+theorem fits_payload {f : Form} {v : Val} (h : Fits (.entry f) v) : Fits f v.payload := by
+  cases h with
+  | entry hv => exact hv
+
+theorem listLiteral_nil (F : Facts) (f : Form) (env : List Expr) (p : List Name) :
+    decode F (.list f) (listLiteral f []) env p = .ok (listVal []) :=
+  (decode_exact F _ _ env p _).mpr Denotes.nil
+
+theorem plain_forms : Plain moduleForm ∧ Plain noticeForm ∧ Plain removedForm := by
+  simp [Plain, moduleForm, noticeForm, removedForm, kindForm]
+
+/-- C2's certificate: every list it writes back decodes from its literal to exactly the values
+written. -/
+theorem certificate_exact (F : Facts) (r : RawLists) (env : List Expr) (p : List Name)
+    (h : readRaw F = .ok r) (c : Name) (f : Form) (vs : List Val)
+    (hc : (c, f, vs) ∈ certificate r) :
+    decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs) := by
+  unfold readRaw at h
+  cases hm : listOf F (.entry moduleForm) modulesName with
+  | error n => simp [hm, bind, Except.bind] at h
+  | ok ms =>
+    cases hp : listOf F .any profilesName with
+    | error n => simp [hm, hp, bind, Except.bind] at h
+    | ok ps =>
+      cases hn : listOf F noticeForm noticesName with
+      | error n => simp [hm, hp, hn, bind, Except.bind] at h
+      | ok ns =>
+        cases hr : listOf F removedForm removedName with
+        | error n => simp [hm, hp, hn, hr, bind, Except.bind] at h
+        | ok
+          rs =>
+          simp only [hm, hp, hn, hr, bind, Except.bind, pure, Except.pure, Except.ok.injEq] at h
+          subst h
+          have hM := fits_of_listAt ((listOf_exact F _ _ ms).mp hm)
+          have hN := fits_of_listAt ((listOf_exact F _ _ ns).mp hn)
+          have hR := fits_of_listAt ((listOf_exact F _ _ rs).mp hr)
+          obtain ⟨pM, pN, pR⟩ := plain_forms
+          unfold certificate at hc
+          rcases List.mem_append.mp hc with hc | hc
+          · rcases List.mem_append.mp hc with hc | hc
+            · simp only [List.mem_singleton, Prod.mk.injEq] at hc
+              obtain ⟨-, rfl, rfl⟩ := hc
+              exact
+                listLiteral_exact F _ _ env p pM fun v hv => by
+                  obtain ⟨w, hw, rfl⟩ := List.mem_map.mp hv
+                  exact fits_payload (hM w hw)
+            · split at hc
+              · simp only [List.mem_singleton, Prod.mk.injEq] at hc
+                obtain ⟨-, rfl, rfl⟩ := hc
+                exact listLiteral_nil F _ env p
+              · simp at hc
+          · simp only [List.mem_cons, Prod.mk.injEq, List.not_mem_nil, or_false] at hc
+            rcases hc with ⟨-, rfl, rfl⟩ | ⟨-, rfl, rfl⟩
+            · exact listLiteral_exact F _ _ env p pN hN
+            · exact listLiteral_exact F _ _ env p pR hR
+
 end FvdepAudit.Registry.Proof

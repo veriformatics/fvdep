@@ -485,6 +485,35 @@ def cases : List (String × (Unit → Bool)) :=
       let n₂ := n "r2" .none
       match decode ⟨[]⟩ (.list noticeForm) (listLiteral noticeForm [n₁, n₂]) [] [`t] with
       | .ok v => v == .cons n₁ (.cons n₂ .nil)
+      | .error _ => false),
+    ("registry: the certificate's lists (`modules` records without entry annotations, " ++
+        "`profiles` while empty) decode back from their literals",
+      fun _ =>
+      let F := facts okModules okNotices
+      match readRaw F with
+      | .ok r =>
+        let cs := certificate r
+        cs.map (·.1) == [modulesName, profilesName, noticesName, removedName] &&
+          cs.all fun x =>
+            (match decode F (.list x.2.1) (listLiteral x.2.1 x.2.2) [] [x.1] with
+              | .ok v => v.elems == x.2.2
+              | .error _ => false) &&
+              x.2.2.all fun v =>
+                match v with
+                | .entry _ _ => false
+                | _ => true
+      | .error _ => false),
+    ("registry: a nonempty `profiles` is not certified", fun _ =>
+      let F := facts okModules okNotices
+      let ps := consE (.const `P []) (strE "p") (nilE (.const `P []))
+      let F' :=
+        { F with
+          decls :=
+            F.decls.map fun d => if d.name == profilesName then { d with value := some ps } else d }
+      match readRaw F' with
+      | .ok r =>
+        r.profiles.length == 1 &&
+          (certificate r).map (·.1) == [modulesName, noticesName, removedName]
       | .error _ => false)]
 
 end Registry
