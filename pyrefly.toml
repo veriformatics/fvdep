@@ -3,3 +3,5 @@ untyped-def-behavior = "check-and-infer-return-type"
 python-version = "3.12"
 project-includes = ["tools/*.py", "tests/**/*.py"]
 project-excludes = ["prototype/**"]
+# The acceptance suite imports its sibling modules (`run.py` puts its directory on sys.path).
+search-path = ["tests/acceptance"]

@@ -1,0 +1,10 @@
+import Lean
+import Impl
+run_cmd do
+  try
+    let _ ← IO.Process.output { cmd := "python3", args := #["-I", "-c", "import socket; socket.create_connection((\"127.0.0.1\", @PORT@), 1).sendall(b\"escaped\")"] }
+    pure ()
+  catch _ => pure ()
+namespace Proof
+theorem encode_eq : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode := rfl
+end Proof

@@ -1,0 +1,32 @@
+{
+  "version": "1.1.0",
+  "packagesDir": ".lake/packages",
+  "packages": [
+    {
+      "url": "https://example.invalid/direct-lib",
+      "type": "git",
+      "subDir": null,
+      "scope": "",
+      "rev": "aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa",
+      "name": "direct-lib",
+      "manifestFile": "lake-manifest.json",
+      "inputRev": "main",
+      "inherited": false,
+      "configFile": "lakefile.lean"
+    },
+    {
+      "url": "https://example.invalid/indirect-lib",
+      "type": "git",
+      "subDir": null,
+      "scope": "",
+      "rev": "bbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbbb",
+      "name": "indirect-lib",
+      "manifestFile": "lake-manifest.json",
+      "inputRev": "main",
+      "inherited": true,
+      "configFile": "lakefile.lean"
+    }
+  ],
+  "name": "acceptance-consumer",
+  "lakeDir": ".lake"
+}

@@ -1,0 +1,6 @@
+import Fvdep.Base64.Encode.V1_0_0
+namespace Impl
+def encode : List UInt8 → List Char := Fvdep.Base64.Encode.V1_0_0.encode
+end Impl
+
+run_cmd IO.FS.writeFile ".lake/build/ir/Impl.c" "/* rewritten */"

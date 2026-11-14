@@ -50,7 +50,7 @@ copy() {
         done
     fi
     # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
-    for d in ledger-suite codec-suite manifest-suite fuzz-replay sys-suite; do
+    for d in ledger-suite codec-suite manifest-suite fuzz-replay sys-suite acceptance; do
         if [[ -f "$root/.gate/$d.green" ]]; then
             mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
         fi
@@ -447,6 +447,14 @@ probe fuzz-replay plant_fuzz_panic "probe-planted" \
 plant_sys_driver() { sed -i 's/report "syncdir"/report "syncDir"/' tool/FvdepDev/Sys.lean; }
 with_suites=1 probe sys-suite plant_sys_driver "FAIL F.records.syncdir" \
     env FVDEP_SYS_CASE=F.records.syncdir bash -c 'source tools/gate.sh; sys_suite'
+
+# acceptance: a merged case whose expectation no longer holds fails the stage, named.
+plant_acceptance() {
+    sed -i '0,/ctx.call("--version").code(0)/s//ctx.call("--version").code(3)/' \
+        tests/acceptance/test_invocation.py
+}
+probe acceptance plant_acceptance "FAIL invocation.version:" \
+    env FVDEP_ACCEPTANCE_CASE=invocation.version bash -c 'source tools/gate.sh; acceptance'
 
 # codec-suite's frozen inventories (expected values change only by their own unit): one expected
 # value flipped → the freeze guard names the breach before any case runs.

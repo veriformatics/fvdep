@@ -1,0 +1,5 @@
+import Impl
+macro:max "@Impl.encode" : term => `(@Fvdep.Base64.Encode.V1_0_0.encode)
+namespace Proof
+theorem encode_eq : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode := rfl
+end Proof

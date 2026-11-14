@@ -95,6 +95,7 @@ codec-suite lean
 manifest-suite lean
 fuzz-replay lean
 sys-suite   lean
+acceptance  lean
 imports     checks
 preview     checks
 spec        checks
@@ -115,7 +116,7 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite fuzz-replay sys-suite'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite fuzz-replay sys-suite acceptance'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
@@ -251,6 +252,14 @@ sys_suite() {
     key="$(shipped_closure tests/sys tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
     suite sys-suite "$key" "${FVDEP_SYS_CASE:-}" bash tests/sys/run.sh \
         ${FVDEP_SYS_CASE:+--case "$FVDEP_SYS_CASE"}
+}
+
+# The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the
+# gate (MANIFEST status `merged`) through the built `fvdep`; the rest wait for their units.
+acceptance() {
+    suite acceptance "$(shipped_closure tests/acceptance tool/Main.lean)" \
+        "${FVDEP_ACCEPTANCE_CASE:-}" env FVDEP_BIN="$root/tool/.lake/build/bin/fvdep" \
+        python3 -I tests/acceptance/run.py --merged ${FVDEP_ACCEPTANCE_CASE:+-k "$FVDEP_ACCEPTANCE_CASE"}
 }
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.

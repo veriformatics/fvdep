@@ -1,0 +1,4 @@
+import Lake
+open Lake DSL
+run_cmd IO.FS.writeFile "@OUTSIDE@" "consumer build hook ran"
+package consumer

@@ -1,0 +1,17 @@
+import Lean
+import Impl
+open Lean in
+set_option debug.skipKernelTC true in
+run_cmd do
+  let encodeType : Expr := .forallE `xs
+    (mkApp (mkConst ``List [.zero]) (mkConst ``UInt8))
+    (mkApp (mkConst ``List [.zero]) (mkConst ``Char)) .default
+  let impl := mkConst ``Impl.encode
+  let spec := mkConst ``Fvdep.Base64.Encode.V1_0_0.encode
+  let equation := mkApp3 (mkConst ``Eq [.succ .zero]) encodeType impl spec
+  let falseProof := mkApp2 (mkConst ``Eq.refl [.succ .zero]) encodeType impl
+  Elab.Command.liftCoreM <| addDecl (.thmDecl {
+    name := `Proof.encode_eq
+    levelParams := []
+    type := equation
+    value := falseProof })

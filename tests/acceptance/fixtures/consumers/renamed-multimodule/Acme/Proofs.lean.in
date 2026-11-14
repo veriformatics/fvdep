@@ -1,0 +1,4 @@
+import Acme.Export
+namespace Acme.Proofs
+theorem correct : @Acme.Export.encode = @Fvdep.Base64.Encode.V1_0_0.encode := rfl
+end Acme.Proofs

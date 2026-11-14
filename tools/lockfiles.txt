@@ -7,3 +7,12 @@ prototype/fvdep/impls/rust/base64-ffi/Cargo.lock
 prototype/fvdep/packages/crates-base64/Cargo.lock
 prototype/fvdep/packages/npm-base64-js/pnpm-lock.yaml
 prototype/fvdep/packages/npm-semver/pnpm-lock.yaml
+fixture tests/acceptance/fixtures/scan/cargo/Cargo.lock
+fixture tests/acceptance/fixtures/scan/malformed/pnpm-lock.yaml
+fixture tests/acceptance/fixtures/scan/npm-other-version/package-lock.json
+fixture tests/acceptance/fixtures/scan/npm-unresolved/package-lock.json
+fixture tests/acceptance/fixtures/scan/npm/package-lock.json
+fixture tests/acceptance/fixtures/scan/pnpm/pnpm-lock.yaml
+fixture tests/acceptance/fixtures/scan/unsupported/package-lock.json
+fixture tests/acceptance/fixtures/scan/uv/uv.lock
+fixture tests/acceptance/fixtures/scan/lake/lake-manifest.json

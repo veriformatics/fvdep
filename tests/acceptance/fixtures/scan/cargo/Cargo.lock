@@ -1,0 +1,19 @@
+version = 4
+
+[[package]]
+name = "acceptance-consumer"
+version = "0.1.0"
+dependencies = ["base64"]
+
+[[package]]
+name = "base64"
+version = "0.22.1"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "0000000000000000000000000000000000000000000000000000000000000000"
+dependencies = ["semver"]
+
+[[package]]
+name = "semver"
+version = "1.0.27"
+source = "registry+https://github.com/rust-lang/crates.io-index"
+checksum = "1111111111111111111111111111111111111111111111111111111111111111"

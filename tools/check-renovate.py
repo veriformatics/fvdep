@@ -86,7 +86,12 @@ def main() -> int:
     if got != want:
         errors.append(f"tools/tools.lock: extracted {got}, want {want}")
 
-    manifests = tracked("lake-manifest.json", "*/lake-manifest.json")
+    # `fixture <path>` lines of tools/lockfiles.txt = test inputs (scan fixtures), never pins.
+    fixtures = {line.removeprefix("fixture ").strip()
+                for line in (ROOT / "tools/lockfiles.txt").read_text(encoding="utf-8").splitlines()
+                if line.startswith("fixture ")}
+    manifests = [m for m in tracked("lake-manifest.json", "*/lake-manifest.json")
+                 if m not in fixtures]
     if FIXTURE not in manifests:
         errors.append(f"{FIXTURE}: missing")
     for rel in manifests:

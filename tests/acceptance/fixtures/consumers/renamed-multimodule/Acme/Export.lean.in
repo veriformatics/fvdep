@@ -1,0 +1,4 @@
+import Acme.Core
+namespace Acme.Export
+def encode : List UInt8 → List Char := Acme.Core.encode
+end Acme.Export

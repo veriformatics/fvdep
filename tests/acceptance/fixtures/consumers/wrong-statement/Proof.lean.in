@@ -1,0 +1,4 @@
+import Impl
+namespace Proof
+theorem encode_eq : True := True.intro
+end Proof

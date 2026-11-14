@@ -1,0 +1,15 @@
+schema = 1
+
+[library]
+commit = "@LIBRARY_COMMIT@"
+
+[policy]
+proof = "@POLICY@"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Impl.encode"
+proof = "Proof.encode_eq"

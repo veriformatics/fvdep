@@ -1,0 +1,5 @@
+import Impl
+namespace Proof
+theorem encode_eq : @Impl.encode = Fvdep.Abi.V1_0_0.encoder @Fvdep.Base64.Encode.V1_0_0.encode := rfl
+theorem decode_eq : @Impl.decode = Fvdep.Abi.V1_0_0.decoder @Fvdep.Base64.Decode.V1_0_0.decode := rfl
+end Proof

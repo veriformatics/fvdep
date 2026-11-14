@@ -1,0 +1,9 @@
+import Impl
+namespace Proof
+theorem encode_eq : @Impl.encode = @Fvdep.Base64.Encode.V1_0_0.encode := rfl
+theorem decode_eq : @Impl.decode = @Fvdep.Base64.Decode.V1_0_0.decode := rfl
+theorem encodeUrl_eq : @Impl.encodeUrl = @Fvdep.Base64.EncodeUrl.V1_0_0.encodeUrl := rfl
+theorem decodeUrl_eq : @Impl.decodeUrl = @Fvdep.Base64.DecodeUrl.V1_0_0.decodeUrl := rfl
+theorem parse_eq : @Impl.parse = @Fvdep.Semver.Parse.V1_0_0.parse := rfl
+theorem compare_eq : @Impl.compare = @Fvdep.Semver.Compare.V1_0_0.compare := rfl
+end Proof

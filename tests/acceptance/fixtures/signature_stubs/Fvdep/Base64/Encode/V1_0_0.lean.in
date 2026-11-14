@@ -1,0 +1,4 @@
+namespace Fvdep.Base64.Encode.V1_0_0
+-- Signature only; distinct from Impl's [] so the forged equation is false by reduction.
+def encode : List UInt8 → List Char := fun _ => ['x']
+end Fvdep.Base64.Encode.V1_0_0

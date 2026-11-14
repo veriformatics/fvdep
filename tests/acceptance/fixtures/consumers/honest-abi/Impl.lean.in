@@ -1,0 +1,7 @@
+import Fvdep.Base64.Encode.V1_0_0
+import Fvdep.Base64.Decode.V1_0_0
+import Fvdep.Abi.V1_0_0
+namespace Impl
+def encode := Fvdep.Abi.V1_0_0.encoder Fvdep.Base64.Encode.V1_0_0.encode
+def decode := Fvdep.Abi.V1_0_0.decoder Fvdep.Base64.Decode.V1_0_0.decode
+end Impl
