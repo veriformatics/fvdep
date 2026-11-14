@@ -59,9 +59,10 @@ engine() {
             die "$url: sha256 $(sha "$tarball.part") differs from tools/afl.lock"
         mv "$tarball.part" "$tarball"
     fi
-    src="$(mktemp -d)"
-    # shellcheck disable=SC2064 # the path is fixed now; expanding it at trap time is the intent
-    trap "rm -rf -- '$src'" RETURN
+    # Scratch stays under .gate (ignored): a failed step leaves nothing outside the workspace.
+    src="$out/afl-src.$$"
+    rm -rf -- "$src"
+    mkdir -p "$src"
     tar -xzf "$tarball" -C "$src" --strip-components=1
     # The engine never runs AFL++'s own instrumenting compilers: its install paths stay unset.
     local defs=(-DAFL_PATH='"/nonexistent"' -DBIN_PATH='"/nonexistent"' -DDOC_PATH='"/nonexistent"')
@@ -75,6 +76,7 @@ engine() {
         gcc -O3 -fPIC -Iinclude -c instrumentation/afl-compiler-rt.o.c -o "$afl/afl-rt.o"
         gcc -O3 -fPIC -Iinclude -c utils/aflpp_driver/aflpp_driver.c -o "$afl/afl-driver.o"
     ) >&2 || die "engine build failed"
+    rm -rf -- "$src"
     printf 'fuzz: AFL++ %s built\n' "$version" >&2
 }
 
@@ -169,7 +171,9 @@ cov_c() {
     [[ $# -gt 0 ]] && shift
     toolchain
     engine
-    tmp="$(mktemp -d)"
+    tmp="$out/cov-obj/${bin##*/}.$$"
+    rm -rf -- "$tmp"
+    mkdir -p "$tmp"
     for s in "${srcs[@]}"; do
         "$tc/bin/leanc" -std=gnu11 -O2 -isystem /usr/include/x86_64-linux-gnu \
             -isystem /usr/include "${flags[@]}" "-fsanitize-coverage=trace-pc-guard,trace-cmp" \
@@ -241,7 +245,8 @@ corpus() { git ls-files -co --exclude-standard -- "tests/fuzz/$1/" | sort; }
 replay() {
     local targets=("$@") t bin rc=0 n log
     [[ ${#targets[@]} -gt 0 ]] || targets=("${TARGETS[@]}")
-    log="$(mktemp)"
+    mkdir -p "$out"
+    log="$out/replay.log"
     for t in "${targets[@]}"; do
         mapfile -t inputs < <(corpus "$t")
         if [[ ${#inputs[@]} -eq 0 ]]; then
@@ -317,7 +322,8 @@ cmin() {
 
 pin() {
     local v="$1" tmp line
-    tmp="$(mktemp)"
+    mkdir -p "$out"
+    tmp="$out/pin-$v.tar.gz"
     line="https://github.com/AFLplusplus/AFLplusplus/archive/refs/tags/v$v.tar.gz"
     curl -fsSL --max-time 300 -o "$tmp" "$line" || die "fetch $line failed"
     printf 'afl++ %s source %s %s\n' "$v" "$(sha "$tmp")" "$line"

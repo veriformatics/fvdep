@@ -7,7 +7,10 @@ keys (+ their site) and member order. Proven exact against `FvdepAudit.Json.Spec
 
 namespace FvdepCore.Json
 
-/-- Largest integer magnitude: |n| ≤ 2^53 − 1 (J1). -/
+/-- Largest integer magnitude: |n| ≤ 2^53 − 1 (J1). `@[noinline]`: each use reads the global, else
+the folded literal compiles to a GMP parse per evaluation (per digit here, per integer in
+`Doc.fits`). -/
+@[noinline]
 def maxInt : Nat := 2 ^ 53 - 1
 
 /-- Largest string or key, in UTF-8 bytes. -/

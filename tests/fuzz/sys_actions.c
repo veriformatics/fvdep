@@ -165,7 +165,7 @@ int LLVMFuzzerTestOneInput(const uint8_t *data, size_t size) {
         case 10: (void)take(fvdep_sys_lock(fd_of(s)), 0, 0); break;
         case 11:
             if (fds[s] >= 0 && writers[w] == NULL) {
-                lean_object *r = fvdep_sys_writer_new((uint32_t)fds[s], paths[n]);
+                lean_object *r = fvdep_sys_writer_new((uint32_t)fds[s]);
                 if (!lean_io_result_is_ok(r)) abort();
                 writers[w] = lean_io_result_get_value(r);
                 lean_inc(writers[w]);

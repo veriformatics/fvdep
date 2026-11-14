@@ -48,7 +48,7 @@ opaque unlink (path : @& String) : IO Response
 opaque lock (fd : UInt32) : IO Response
 
 @[extern "fvdep_sys_writer_new"]
-opaque writerNew (fd : UInt32) (path : @& String) : IO Writer
+opaque writerNew (fd : UInt32) : IO Writer
 
 @[extern "fvdep_sys_writer_acquire"]
 opaque writerAcquire (writer : @& Writer) : IO (Nat × Bool)
@@ -103,7 +103,7 @@ def create (path : Path) (mode : Mode := Mode.default) : IO (Except SysError Wri
   | .error e =>
     return .error e
   | .ok fd =>
-    return .ok ⟨← Native.writerNew fd.toUInt32 path.toString, path⟩
+    return .ok ⟨← Native.writerNew fd.toUInt32, path⟩
 
 private def run (writer : Writer) (action : WriterAction) (bytes : ByteArray := .empty) :
     IO (Except SysError Unit) := do

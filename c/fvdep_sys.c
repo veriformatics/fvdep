@@ -1,6 +1,7 @@
 /* Persistence shim (docs/contracts/U3-codecs.md F1; port of fvapi 02d99d1 c/fvapi_fsync.c): policy
  * stays in Lean; each syscall export issues exactly one libc call (dynamic symbols: an LD_PRELOAD
- * interposer sees them) and returns errno at once, no retry. */
+ * interposer sees them) and returns errno at once, no retry. The guard keeps no path: fvapi's copy
+ * was never read. */
 #define _GNU_SOURCE
 #include <errno.h>
 #include <fcntl.h>
@@ -9,7 +10,6 @@
 #include <stdint.h>
 #include <stdio.h>
 #include <stdlib.h>
-#include <string.h>
 #include <sys/file.h>
 #include <unistd.h>
 
@@ -101,7 +101,6 @@ typedef struct {
     pthread_mutex_t guard;
     int fd;
     bool closed;
-    char *path;
 } fvdep_writer;
 
 static void fvdep_guard_check(int result) {
@@ -119,7 +118,6 @@ static void fvdep_writer_finalize(void *data) {
     }
     fvdep_guard_check(pthread_mutex_unlock(&writer->guard));
     fvdep_guard_check(pthread_mutex_destroy(&writer->guard));
-    free(writer->path);
     free(writer);
 }
 
@@ -135,18 +133,12 @@ static void fvdep_register_writer(void) {
     fvdep_writer_class = lean_register_external_class(fvdep_writer_finalize, fvdep_writer_foreach);
 }
 
-LEAN_EXPORT lean_obj_res fvdep_sys_writer_new(uint32_t fd, b_lean_obj_arg path) {
+LEAN_EXPORT lean_obj_res fvdep_sys_writer_new(uint32_t fd) {
     fvdep_guard_check(pthread_once(&fvdep_writer_once, fvdep_register_writer));
     fvdep_writer *writer = malloc(sizeof(*writer));
     if (writer == NULL) {
         (void)close((int)fd);
         lean_internal_panic("fvdep sys: native writer allocation failed");
-    }
-    writer->path = strdup(lean_string_cstr(path));
-    if (writer->path == NULL) {
-        free(writer);
-        (void)close((int)fd);
-        lean_internal_panic("fvdep sys: native writer path allocation failed");
     }
     writer->fd = (int)fd;
     writer->closed = false;

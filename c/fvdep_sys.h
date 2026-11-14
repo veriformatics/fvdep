@@ -35,7 +35,7 @@ LEAN_EXPORT lean_obj_res fvdep_sys_lock(uint32_t fd);
 
 /* Writer guard: new (takes ownership of fd), acquire (locks the guard; → (fd, closed)), mark_closed
  * (under the guard), release (unlocks). The finalizer closes the fd once if still open. */
-LEAN_EXPORT lean_obj_res fvdep_sys_writer_new(uint32_t fd, b_lean_obj_arg path);
+LEAN_EXPORT lean_obj_res fvdep_sys_writer_new(uint32_t fd);
 LEAN_EXPORT lean_obj_res fvdep_sys_writer_acquire(b_lean_obj_arg writer);
 LEAN_EXPORT lean_obj_res fvdep_sys_writer_mark_closed(b_lean_obj_arg writer);
 LEAN_EXPORT lean_obj_res fvdep_sys_writer_release(b_lean_obj_arg writer);
