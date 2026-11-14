@@ -12,6 +12,7 @@ Binding source = `.agent/spec.md` `Decisions` (Public interface, Data formats, L
 - Library-reading commands without a project (`list`, `show`, `diff`, `brief`, `oracle`, `scan`, `profile`) read the project's snapshot inside a project, else the source's `main` head (fetched into fvdep's cache; unreachable source → the last fetched head; none → `Fetch failed …` (§3 `fetch`), exit 2). `trust` reads no library; `admit` + `index` act on a library working copy.
 - One fvdep version checks library snapshots of one Lean toolchain (its verification profile). A snapshot pinning another toolchain → stderr `Library commit <sha> uses Lean <x>; this fvdep checks Lean <y>. Install the matching fvdep or change the library pin.`, exit 2.
 - stdout = results; stderr = progress + diagnostics. `--json` (where listed) replaces stdout with one JSON document (§6); stderr unchanged.
+- Line rule: every text line fvdep writes (stdout + stderr; JSON output — documents + protocol lines — keeps J4's escaping) is one line without a raw control character: each Unicode `Cc` character (U+0000–U+001F, U+007F–U+009F) inside it — from a file name, key, id, reason or a tool's output (fvdep relays a tool's lines one by one through the rule) — is written `\t` (TAB), `\n` (LF), `\r` (CR), else `\u00XX` (2 uppercase hex digits, e.g. ESC → `\u001B`); nothing else is escaped (a literal `\n` in the text prints the same). Reason: a line-oriented reader + a terminal see one message per line and no control sequence (`FvdepCore.Doc.escapeControls`).
 
 ## 2 Exit codes (every command)
 

@@ -72,18 +72,6 @@ def ReadError.code : ReadError → PublicCode
   | .parse (.key _) => .internal
   | _ => .schema
 
-/-- A message with its control characters escaped (`\n`, `\t`, `\r`, else `\u00XX`). -/
-def escapeControls (s : String) : String :=
-  String.ofList <|
-    s.toList.flatMap fun c =>
-      match c.toNat with
-      | 0x09 => ['\\', 't']
-      | 0x0A => ['\\', 'n']
-      | 0x0D => ['\\', 'r']
-      | n =>
-        if n < 0x20 || n == 0x7F then ['\\', 'u', '0', '0', hexUpper (n / 16), hexUpper (n % 16)]
-        else [c]
-
 /-- The refusal text (presentation): Lake's position as `line:column` (both 1-based). -/
 def ReadError.detail : ReadError → String
   | .text e => e.detail

@@ -135,6 +135,60 @@ def isProfileId (s : String) : Bool :=
 def isArg (first : Bool) (s : String) : Bool :=
   (!first || 1 ≤ s.utf8ByteSize) && s.utf8ByteSize ≤ 65536 && !s.toList.contains '\x00'
 
+/-- Unicode `Cc`: U+0000–U+001F, U+007F–U+009F. -/
+def isControl (c : Char) : Bool := c.toNat < 32 || (127 ≤ c.toNat && c.toNat ≤ 159)
+
+/-- An uppercase hex digit of `n < 16`. -/
+def hexUpper (n : Nat) : Char := if n < 10 then Char.ofNat (48 + n) else Char.ofNat (55 + n)
+
+/-- A message line (interface §1 line rule): each `isControl` character escaped — `\t`, `\n`, `\r`,
+else `\u00XX` — every other character as is ⇒ one line, no terminal control sequence. -/
+def escapeControls (s : String) : String :=
+  String.ofList <|
+    s.toList.flatMap fun c =>
+      match c.toNat with
+      | 0x09 => ['\\', 't']
+      | 0x0A => ['\\', 'n']
+      | 0x0D => ['\\', 'r']
+      | n =>
+        if isControl c then ['\\', 'u', '0', '0', hexUpper (n / 16), hexUpper (n % 16)] else [c]
+
+/-- A text of 1 to `cap` UTF-8 bytes without a control character (contract U4 C6). -/
+def isText (cap : Nat) (s : String) : Bool :=
+  1 ≤ s.utf8ByteSize && s.utf8ByteSize ≤ cap && !s.toList.any isControl
+
+/-- Strictly ascending (sorted, no repeat). -/
+def ascendingStrs : List String → Bool
+  | a :: b :: rest => decide (a < b) && ascendingStrs (b :: rest)
+  | _ => true
+
+/-- C6 status consistency: `proven` with `[]`; `open` with `[]` or a list holding `sorryAx`;
+`trusts` with a nonempty list without `sorryAx`. -/
+def statusAxiomsOk (st : String) (axs : List String) : Bool :=
+  match st with
+  | "proven" => axs.isEmpty
+  | "open" => axs.isEmpty || axs.contains "sorryAx"
+  | "trusts" => !axs.isEmpty && !axs.contains "sorryAx"
+  | _ => false
+
+/-- Every element a string. -/
+def strsOf : List Value → Option (List String)
+  | [] => some []
+  | .str s :: xs => (strsOf xs).map (s :: ·)
+  | _ :: _ => none
+
+/-- C6 `compat` members: exactly `axioms` (names, strictly ascending, consistent with `status`),
+`status`, `version` (canonical). -/
+def compatOk : List (String × Value) → Bool
+  | [("axioms", .arr axs), ("status", .str st), ("version", .str ver)] =>
+    match strsOf axs with
+    | some ns =>
+      ns.all (isText 1024) && ascendingStrs ns && statusAxiomsOk st ns &&
+        (EntryVersion.parse ver).isSome &&
+        ver.utf8ByteSize ≤ 65536
+    | none => false
+  | _ => false
+
 /-! ## D5 schema syntax + walk -/
 
 /-- A JSON value's kind (D5: a field's general type = a list of kinds). -/
@@ -168,6 +222,10 @@ inductive Rule where
   | profile
   | oneOf (xs : List String)
   | arg (first : Bool)
+  | label
+  | reason
+  | versionOrNull
+  | compat
   deriving DecidableEq, Repr
 
 def Rule.check : Rule → Value → Bool
@@ -181,6 +239,12 @@ def Rule.check : Rule → Value → Bool
   | .profile, .str s => isProfileId s
   | .oneOf xs, .str s => xs.contains s
   | .arg first, .str s => isArg first s
+  | .label, .str s => isText 1024 s
+  | .reason, .str s => isText 65536 s
+  | .versionOrNull, .null => true
+  | .versionOrNull, .str s => (EntryVersion.parse s).isSome && s.utf8ByteSize ≤ 65536
+  | .compat, .null => true
+  | .compat, .obj ms => compatOk ms
   | _, _ => false
 
 /-- An object's discriminator (D5 (a)): its key + the values it accepts; a string discriminator
@@ -195,6 +259,16 @@ inductive Order where
   | nonempty
   /-- Strictly ascending strings at this key path inside each element. -/
   | ascending (path : List String)
+  | any
+  | empty
+  /-- Strictly ascending strings, then empty or holding `s` (C6 `open`). -/
+  | ascendingHas (s : String)
+  /-- Strictly ascending strings, then nonempty without `s` (C6 `trusts`). -/
+  | ascendingWithout (s : String)
+  /-- No string at this key path repeats an earlier element's. -/
+  | unique (path : List String)
+  /-- Strictly ascending by the string at `id`, then the entry version at `version` numerically. -/
+  | idVersion
   deriving DecidableEq, Repr
 
 /-- A member's type. Object fields are listed in ascending key order (D5 judges keys in byte
@@ -253,10 +327,44 @@ def valueAt : List String → Value → Option Value
   | k :: ks, .obj ms => (member? ms k).bind (valueAt ks)
   | _ :: _, _ => none
 
+/-- (id, version) strictly before: the id's string order, then the entry version numerically. -/
+def idVersionBefore (ia va ib vb : String) : Bool :=
+  decide (ia < ib) ||
+    (ia == ib &&
+      match EntryVersion.parse va, EntryVersion.parse vb with
+      | some x, some y => x.cmp y == .lt
+      | _, _ => false)
+
+/-- The string at a key path, if any. -/
+def strAt (path : List String) (v : Value) : Option String :=
+  match valueAt path v with
+  | some (.str s) => some s
+  | _ => none
+
+/-- Two elements' `id` + `version` strings, when all four are strings. -/
+def idVersionKeys (a b : Value) : Option (String × String × String × String) := do
+  let ia ← strAt ["id"] a
+  let va ← strAt ["version"] a
+  let ib ← strAt ["id"] b
+  let vb ← strAt ["version"] b
+  some (ia, va, ib, vb)
+
 /-- D5 (e): an array's constraint, after its elements. -/
 def Order.check (p : List PathSeg) (xs : List Value) : Order → Option DocError
   | .nonempty => if xs.isEmpty then some ⟨p, .badValue, some (.arr [])⟩ else none
   | .ascending path => ascendingFrom p path 1 xs
+  | .any => none
+  | .empty => if xs.isEmpty then none else some ⟨p, .badValue, some (.arr xs)⟩
+  | .ascendingHas s =>
+    (ascendingFrom p [] 1 xs).orElse fun _ =>
+      if xs.isEmpty || (strsOf xs).any (·.contains s) then none
+      else some ⟨p, .badValue, some (.arr xs)⟩
+  | .ascendingWithout s =>
+    (ascendingFrom p [] 1 xs).orElse fun _ =>
+      if !xs.isEmpty && (strsOf xs).any (!·.contains s) then none
+      else some ⟨p, .badValue, some (.arr xs)⟩
+  | .unique path => uniqueFrom p path 0 [] xs
+  | .idVersion => idVersionFrom p 1 xs
 where
   /-- The first element (index `i` onward) whose string at `path` is ≤ its predecessor's. -/
   ascendingFrom (p : List PathSeg) (path : List String) (i : Nat) : List Value → Option DocError
@@ -266,6 +374,25 @@ where
         if x < y then ascendingFrom p path (i + 1) (b :: rest)
         else some ⟨p ++ [.index i] ++ path.map .key, .badValue, some (.str y)⟩
       | _, _ => ascendingFrom p path (i + 1) (b :: rest)
+    | _ => none
+  /-- The first element (index `i` onward) whose string at `path` an earlier one already has. -/
+  uniqueFrom (p : List PathSeg) (path : List String) (i : Nat) (seen : List String) :
+    List Value → Option DocError
+    | [] => none
+    | x :: xs =>
+      match valueAt path x with
+      | some (.str s) =>
+        if seen.contains s then some ⟨p ++ [.index i] ++ path.map .key, .badValue, some (.str s)⟩
+        else uniqueFrom p path (i + 1) (s :: seen) xs
+      | _ => uniqueFrom p path (i + 1) seen xs
+  /-- The first element (index `i` onward) not after its predecessor by (id, version). -/
+  idVersionFrom (p : List PathSeg) (i : Nat) : List Value → Option DocError
+    | a :: b :: rest =>
+      match idVersionKeys a b with
+      | some (ia, va, ib, vb) =>
+        if idVersionBefore ia va ib vb then idVersionFrom p (i + 1) (b :: rest)
+        else some ⟨p ++ [.index i], .badValue, some b⟩
+      | none => idVersionFrom p (i + 1) (b :: rest)
     | _ => none
 
 /-- A scalar type: kind inside the general type, then the rule. -/

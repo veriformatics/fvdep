@@ -1678,6 +1678,138 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Doc`
+
+- Contract: U4 C6 + C8; Decisions Data formats
+- Claim: `index.json` schema 1: on a J1-valid value the D5 walk accepts exactly the layouts of indexes whose nodes are well formed; `IndexFile.ofJson` accepts exactly the layouts of well-formed indexes (the relational clauses V8 + V9 included) and refuses with the walk's first violation, else the first relational one; `decodeIndex` = J's decode of the bytes with one final LF removed, then `IndexFile.ofJson`: it accepts exactly the bytes J decodes to a well-formed index's layout, a text refusal is J's, a document refusal is that value's first violation; a well-formed index's canonical bytes decode back to it.
+- Subject: `FvdepCore.Index.decodeIndex`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.IndexClaims.indexSchemaExact` (hash 0x3df28654), proved by `FvdepAudit.Index.Proof.index_schema_exact`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      (FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy v = none ↔
+        ∃ i, FvdepAudit.Index.Spec.IndexNodeWF i ∧ v = FvdepAudit.Index.Spec.indexLayout i)
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexDecodeOk` (hash 0xbf57bacb), proved by `FvdepAudit.Index.Proof.index_ok`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      ∀ (i : FvdepCore.Index.IndexFile),
+        FvdepCore.Index.IndexFile.ofJson v = Except.ok i ↔
+          FvdepAudit.Index.Spec.IndexWF i ∧ v = FvdepAudit.Index.Spec.indexLayout i
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexDecodeError` (hash 0xcbb2813f), proved by `FvdepAudit.Index.Proof.index_error`:
+
+  ```lean
+  ∀ (v : FvdepCore.Json.Value),
+    FvdepAudit.Json.Spec.Valid v →
+      ∀ (e : FvdepCore.Doc.DocError),
+        FvdepCore.Index.IndexFile.ofJson v = Except.error e ↔
+          FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy v = some e ∨
+            ∃ i,
+              FvdepAudit.Index.Spec.IndexNodeWF i ∧
+                FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy v = none ∧
+                  v = FvdepAudit.Index.Spec.indexLayout i ∧
+                    (FvdepAudit.Index.Spec.relationViolations i).head? = some e
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexBytesEncode` (hash 0x50a87ef9), proved by `FvdepAudit.Index.Proof.index_bytes_encode`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile),
+    FvdepAudit.Index.Spec.IndexWF i →
+      FvdepCore.Index.decodeIndex
+          ((FvdepCore.Json.print (FvdepAudit.Index.Spec.indexLayout i)).push 10) =
+        Except.ok i
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexBytesOk` (hash 0x1e6a3292), proved by `FvdepAudit.Index.Proof.index_bytes_ok`:
+
+  ```lean
+  ∀ (b : ByteArray) (i : FvdepCore.Index.IndexFile),
+    FvdepCore.Index.decodeIndex b = Except.ok i ↔
+      FvdepCore.Json.decode (FvdepAudit.Index.Spec.withoutFinalLF b) =
+          Except.ok (FvdepAudit.Index.Spec.indexLayout i) ∧
+        FvdepAudit.Index.Spec.IndexWF i
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexBytesDoc` (hash 0x7268adb), proved by `FvdepAudit.Index.Proof.index_bytes_doc`:
+
+  ```lean
+  ∀ (b : ByteArray) (e : FvdepCore.Doc.DocError),
+    FvdepCore.Index.decodeIndex b = Except.error (FvdepCore.Index.IndexError.doc e) ↔
+      ∃ v,
+        FvdepCore.Json.decode (FvdepAudit.Index.Spec.withoutFinalLF b) = Except.ok v ∧
+          (FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy v = some e ∨
+            ∃ i,
+              FvdepAudit.Index.Spec.IndexNodeWF i ∧
+                FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy v = none ∧
+                  v = FvdepAudit.Index.Spec.indexLayout i ∧
+                    (FvdepAudit.Index.Spec.relationViolations i).head? = some e)
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexBytesText` (hash 0x6133f4f3), proved by `FvdepAudit.Index.Proof.index_bytes_text`:
+
+  ```lean
+  ∀ (b : ByteArray) (j : FvdepCore.Json.DecodeError),
+    FvdepCore.Index.decodeIndex b = Except.error (FvdepCore.Index.IndexError.text j) ↔
+      FvdepCore.Json.decode (FvdepAudit.Index.Spec.withoutFinalLF b) = Except.error j
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Doc`
+
+- Contract: U4 C6 + C8; Decisions Data formats
+- Claim: `encodeIndex` refuses an index outside schema 1 with the first violation of its layout (the walk's, else the first relational one), else returns its canonical text + LF; an index's JSON is exactly its C6 layout; a well-formed index's JSON is J1-valid; `IndexFile.wellFormed` decides `IndexWellFormed`; each field's general type in the schema data = C6's.
+- Subject: `FvdepCore.Index.encodeIndex`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.IndexClaims.indexEncodeBytes` (hash 0x9cfecd68), proved by `FvdepAudit.Index.Proof.encode_index_iff`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile) (b : ByteArray),
+    FvdepCore.Index.encodeIndex i = Except.ok b ↔
+      FvdepAudit.Index.Spec.IndexWF i ∧
+        b = (FvdepCore.Json.print (FvdepAudit.Index.Spec.indexLayout i)).push 10
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexEncodeError` (hash 0x1cdc3ea4), proved by `FvdepAudit.Index.Proof.encode_index_error`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile) (e : FvdepCore.Doc.DocError),
+    FvdepCore.Index.encodeIndex i = Except.error e ↔
+      FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy
+            (FvdepAudit.Index.Spec.indexLayout i) =
+          some e ∨
+        FvdepAudit.Doc.Spec.firstViolation FvdepCore.Index.indexTy
+              (FvdepAudit.Index.Spec.indexLayout i) =
+            none ∧
+          (FvdepAudit.Index.Spec.relationViolations i).head? = some e
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexEncodeExact` (hash 0xb2de76b5), proved by `FvdepAudit.Index.Proof.index_encode`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile), i.toJson = FvdepAudit.Index.Spec.indexLayout i
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexValid` (hash 0xf0ee1976), proved by `FvdepAudit.Index.Proof.index_valid`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile),
+    FvdepAudit.Index.Spec.IndexWF i → FvdepAudit.Json.Spec.Valid i.toJson
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexCheck` (hash 0x6a3e5d35), proved by `FvdepAudit.Index.Proof.index_check`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile), i.wellFormed = true ↔ FvdepAudit.Index.Spec.IndexWF i
+  ```
+- Statement `FvdepLedger.Rows.IndexClaims.indexKindsExact` (hash 0x7f174775), proved by `FvdepAudit.Index.Proof.index_kinds`:
+
+  ```lean
+  FvdepAudit.Doc.Spec.kindTable "" [] FvdepCore.Index.indexTy = FvdepAudit.Index.Spec.indexKinds
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

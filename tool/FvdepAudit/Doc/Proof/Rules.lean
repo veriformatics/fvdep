@@ -51,6 +51,69 @@ theorem isProfileId_iff (s : String) : isProfileId s = true ↔ ProfileText s :=
 theorem isArg_iff (first : Bool) (s : String) : isArg first s = true ↔ ArgText first s := by
   cases first <;> simp [isArg, ArgText, and_assoc]
 
+theorem isText_iff (cap : Nat) (s : String) : isText cap s = true ↔ TextFits cap s := by
+  simp [isText, TextFits, isControl, Control, and_assoc]
+
+theorem ascendingStrs_iff : ∀ ns : List String, ascendingStrs ns = true ↔ Ascends ns
+  | [] => by simp [ascendingStrs, Ascends]
+  | [_] => by simp [ascendingStrs, Ascends]
+  | a :: b :: rest => by simp [ascendingStrs, Ascends, ascendingStrs_iff (b :: rest)]
+
+theorem statusAxiomsOk_iff (st : String) (ns : List String) :
+    statusAxiomsOk st ns = true ↔ StatusAxioms st ns := by
+  unfold statusAxiomsOk StatusAxioms
+  split <;> simp_all [List.isEmpty_iff]
+
+theorem strsOf_map : ∀ ns : List String, strsOf (ns.map .str) = some ns
+  | [] => rfl
+  | n :: ns => by simp [strsOf, strsOf_map ns]
+
+theorem strsOf_some : ∀ {xs : List Value} {ns : List String}, strsOf xs = some ns → xs = ns.map .str
+  | [], ns, h => by
+    simp only [strsOf, Option.some.injEq] at h
+    subst h
+    rfl
+  | .str s :: xs, ns, h => by
+    simp only [strsOf, Option.map_eq_some_iff] at h
+    obtain ⟨ns', h', rfl⟩ := h
+    simp [strsOf_some h']
+  | .null :: _, _, h | .bool _ :: _, _, h | .int _ :: _, _, h | .arr _ :: _, _, h | .obj _ :: _, _,
+    h => by simp [strsOf] at h
+
+theorem compatOk_iff (ms : List (String × Value)) :
+    compatOk ms = true ↔
+      ∃ (st : String) (ns : List String) (x : EntryVersion),
+        ms = [("axioms", .arr (ns.map .str)), ("status", .str st), ("version", .str (toString x))] ∧
+          (∀ n ∈ ns, TextFits 1024 n) ∧
+          Ascends ns ∧ StatusAxioms st ns ∧ SpellingFits (toString x) := by
+  constructor
+  · intro h
+    unfold compatOk at h
+    split at h
+    · rename_i axs st ver
+      cases hs : strsOf axs with
+      | none => simp [hs] at h
+      | some ns =>
+        simp only [hs, Bool.and_eq_true, List.all_eq_true, decide_eq_true_eq] at h
+        obtain ⟨⟨⟨⟨h1, h2⟩, h3⟩, h4⟩, h5⟩ := h
+        obtain ⟨x, hx⟩ := Option.isSome_iff_exists.mp h4
+        refine
+          ⟨st, ns, x, ?_, fun n hn => (isText_iff 1024 n).mp (h1 n hn),
+            (ascendingStrs_iff ns).mp h2, (statusAxiomsOk_iff st ns).mp h3, ?_⟩
+        · rw [strsOf_some hs, EntryVersion.toString_parse hx]
+        · unfold SpellingFits
+          rw [EntryVersion.toString_parse hx]
+          exact h5
+    · simp at h
+  · rintro ⟨st, ns, x, rfl, h1, h2, h3, h4⟩
+    simp only [compatOk, strsOf_map, EntryVersion.parse_toString, Option.isSome_some,
+      Bool.and_eq_true, List.all_eq_true, decide_eq_true_eq]
+    exact
+      ⟨⟨⟨⟨fun n hn => (isText_iff 1024 n).mpr (h1 n hn), (ascendingStrs_iff ns).mpr h2⟩,
+            (statusAxiomsOk_iff st ns).mpr h3⟩,
+          trivial⟩,
+        h4⟩
+
 theorem check_iff (r : Rule) (v : Value) : r.check v = true ↔ ruleHolds r v := by
   cases r <;> cases v <;> simp [Rule.check, ruleHolds]
   · constructor
@@ -80,5 +143,16 @@ theorem check_iff (r : Rule) (v : Value) : r.check v = true ↔ ruleHolds r v :=
   · exact isConstant_iff _
   · exact isProfileId_iff _
   · exact isArg_iff _ _
+  · exact isText_iff _ _
+  · exact isText_iff _ _
+  · constructor
+    · rintro ⟨h, hb⟩
+      obtain ⟨x, hx⟩ := Option.isSome_iff_exists.mp h
+      exact
+        ⟨x, (EntryVersion.toString_parse hx).symm, by
+          rw [EntryVersion.toString_parse hx]; exact hb⟩
+    · rintro ⟨x, rfl, hb⟩
+      exact ⟨by simp [EntryVersion.parse_toString], hb⟩
+  · exact compatOk_iff _
 
 end FvdepAudit.Doc.Proof

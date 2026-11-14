@@ -110,16 +110,108 @@ theorem ascending_eq (p : List PathSeg) (path : List String) :
         · simpa [h] using ih
         · simp [h]
 
+theorem orElse_eq {α : Type} (a b : Option α) : a.orElse (fun _ => b) = a.or b := by cases a <;> rfl
+
+theorem head?_append' {α : Type} (l₁ l₂ : List α) : (l₁ ++ l₂).head? = l₁.head?.or l₂.head? := by
+  cases l₁ <;> rfl
+
+theorem strsOf_eq_spec : ∀ xs : List Value, strsOf xs = strsSpec xs
+  | [] => rfl
+  | .str s :: xs => by simp [strsOf, strsSpec, strsOf_eq_spec xs]
+  | .null :: _ | .bool _ :: _ | .int _ :: _ | .arr _ :: _ | .obj _ :: _ => rfl
+
+theorem unique_eq (p : List PathSeg) (path : List String) :
+    ∀ (i : Nat) (seen : List String) (xs : List Value),
+      Order.check.uniqueFrom p path i seen xs = (nameRepeatsSpec p path i seen xs).head?
+  | _, _, [] => rfl
+  | i, seen, x :: xs => by
+    have ih := unique_eq p path (i + 1) seen xs
+    simp only [Order.check.uniqueFrom, nameRepeatsSpec, valueAt_eq]
+    cases atPath path x with
+    | none => exact ih
+    | some v =>
+      cases v with
+      | str s =>
+        by_cases h : s ∈ seen
+        · simp [h]
+        · simp [h, unique_eq p path (i + 1) (s :: seen) xs]
+      | null => exact ih
+      | bool _ => exact ih
+      | int _ => exact ih
+      | arr _ => exact ih
+      | obj _ => exact ih
+
+theorem cmp_lt_iff (x y : EntryVersion) : x.cmp y = .lt ↔ VersionBefore x y := by
+  cases x with
+  | mk a b c =>
+    cases y with
+    | mk a' b' c' =>
+      have h₁ := cmp3_spec a a'
+      have h₂ := cmp3_spec b b'
+      have h₃ := cmp3_spec c c'
+      simp only [EntryVersion.cmp, VersionBefore]
+      cases hx : cmp3 a a' <;> cases hy : cmp3 b b' <;> cases hz : cmp3 c c' <;> simp_all
+
+theorem idVersionBefore_iff (ia va ib vb : String) :
+    idVersionBefore ia va ib vb = true ↔ IdVersionBefore ia va ib vb := by
+  unfold idVersionBefore IdVersionBefore
+  cases EntryVersion.parse va <;> cases EntryVersion.parse vb <;> simp [cmp_lt_iff]
+
+theorem strAt_eq (path : List String) (v : Value) : strAt path v = strAtSpec path v := by
+  simp only [strAt, strAtSpec, valueAt_eq]
+  cases atPath path v with
+  | none => rfl
+  | some x => cases x <;> rfl
+
+theorem idVersion_eq (p : List PathSeg) :
+    ∀ (i : Nat) (xs : List Value), Order.check.idVersionFrom p i xs = (misordersSpec p i xs).head?
+  | _, [] => rfl
+  | _, [_] => rfl
+  | i, a :: b :: rest => by
+    have ih := idVersion_eq p (i + 1) (b :: rest)
+    have hk : idVersionKeys a b = keysSpec a b := by simp only [idVersionKeys, keysSpec, strAt_eq]
+    simp only [Order.check.idVersionFrom, misordersSpec, hk]
+    cases keysSpec a b with
+    | none => simpa using ih
+    | some k =>
+      obtain ⟨ia, va, ib, vb⟩ := k
+      by_cases hb : IdVersionBefore ia va ib vb
+      · simp [(idVersionBefore_iff ia va ib vb).mpr hb, hb, ih]
+      · have hb' : idVersionBefore ia va ib vb = false := by
+          cases h : idVersionBefore ia va ib vb
+          · rfl
+          · exact absurd ((idVersionBefore_iff _ _ _ _).mp h) hb
+        simp [hb', hb]
+
 theorem order_eq (p : List PathSeg) (xs : List Value) (o : Order) :
     o.check p xs = (orderSpec p xs o).head? := by
   cases o with
   | nonempty => cases xs <;> rfl
   | ascending path => exact ascending_eq p path 1 xs
-
-theorem orElse_eq {α : Type} (a b : Option α) : a.orElse (fun _ => b) = a.or b := by cases a <;> rfl
-
-theorem head?_append' {α : Type} (l₁ l₂ : List α) : (l₁ ++ l₂).head? = l₁.head?.or l₂.head? := by
-  cases l₁ <;> rfl
+  | any => rfl
+  | empty => cases xs <;> rfl
+  | ascendingHas
+    s =>
+    simp only [Order.check, orderSpec, orElse_eq, head?_append', ascending_eq, strsOf_eq_spec]
+    congr 1
+    cases xs with
+    | nil => rfl
+    | cons x xs =>
+      cases h : strsSpec (x :: xs) with
+      | none => simp
+      | some ns => by_cases hs : s ∈ ns <;> simp [hs]
+  | ascendingWithout
+    s =>
+    simp only [Order.check, orderSpec, orElse_eq, head?_append', ascending_eq, strsOf_eq_spec]
+    congr 1
+    cases xs with
+    | nil => rfl
+    | cons x xs =>
+      cases h : strsSpec (x :: xs) with
+      | none => simp
+      | some ns => by_cases hs : s ∈ ns <;> simp [hs]
+  | unique path => exact unique_eq p path 0 [] xs
+  | idVersion => exact idVersion_eq p 1 xs
 
 mutual
 theorem walk_eq (tag : String) (t : Ty) (p : List PathSeg) :

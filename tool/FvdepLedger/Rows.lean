@@ -2,6 +2,7 @@ import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
+import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
@@ -1020,6 +1021,90 @@ def sigExact : Prop :=
 
 end FvdepLedger.Rows.ProtocolClaims
 
+namespace FvdepLedger.Rows.IndexClaims
+
+open FvdepCore.Json FvdepCore.Ids FvdepCore.Doc FvdepCore.Index FvdepAudit.Doc.Spec
+  FvdepAudit.Index.Spec
+
+/-- U4 C6: an index's JSON is exactly its layout, written apart. -/
+def indexEncodeExact : Prop := ∀ (i : IndexFile), i.toJson = indexLayout i
+
+/-- U4 C6 + C8: on a J1-valid value the D5 walk finds no violation exactly when the value is the
+layout of an index whose every node is well formed. -/
+def indexSchemaExact : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v),
+    firstViolation indexTy v = none ↔ ∃ i, IndexNodeWF i ∧ v = indexLayout i
+
+/-- U4 C6: on a J1-valid value, `IndexFile.ofJson` accepts exactly the layouts of well-formed
+indexes (nodes + relational clauses), returning that index. -/
+def indexDecodeOk : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v) (i : IndexFile),
+    IndexFile.ofJson v = .ok i ↔ IndexWF i ∧ v = indexLayout i
+
+/-- U4 C6: `IndexFile.ofJson` refuses with the walk's first violation, else the first relational
+violation (notices, then removed records, in order). -/
+def indexDecodeError : Prop :=
+  ∀ (v : Value) (_hv : FvdepAudit.Json.Spec.Valid v) (e : DocError),
+    IndexFile.ofJson v = .error e ↔
+      firstViolation indexTy v = some e ∨
+        ∃ i,
+          IndexNodeWF i ∧
+            firstViolation indexTy v = none ∧
+            v = indexLayout i ∧ (relationViolations i).head? = some e
+
+/-- U4 C6: a well-formed index's JSON is a J1-valid value. -/
+def indexValid : Prop := ∀ (i : IndexFile) (_h : IndexWF i), FvdepAudit.Json.Spec.Valid i.toJson
+
+/-- U4 C6: `IndexFile.wellFormed` decides `IndexWellFormed`. -/
+def indexCheck : Prop := ∀ (i : IndexFile), i.wellFormed = true ↔ IndexWF i
+
+/-- U4 C6 + C8: each index field's general type in the schema data = C6's, written apart. -/
+def indexKindsExact : Prop := kindTable "" [] indexTy = indexKinds
+
+/-- U4 C6: `encodeIndex` refuses an index outside schema 1, else returns its canonical text + LF. -/
+def indexEncodeBytes : Prop :=
+  ∀ (i : IndexFile) (b : ByteArray),
+    encodeIndex i = .ok b ↔ IndexWF i ∧ b = (print (indexLayout i)).push 0x0A
+
+/-- U4 C6 + C9: `encodeIndex` refuses with the first violation of the index's layout: the walk's,
+else the first relational one. -/
+def indexEncodeError : Prop :=
+  ∀ (i : IndexFile) (e : DocError),
+    encodeIndex i = .error e ↔
+      firstViolation indexTy (indexLayout i) = some e ∨
+        firstViolation indexTy (indexLayout i) = none ∧ (relationViolations i).head? = some e
+
+/-- U4 C8 `IndexBytes`: a well-formed index's bytes decode back to it. -/
+def indexBytesEncode : Prop :=
+  ∀ (i : IndexFile) (_h : IndexWF i), decodeIndex ((print (indexLayout i)).push 0x0A) = .ok i
+
+/-- U4 C8 `IndexBytes`: `decodeIndex` accepts exactly the bytes whose text (one final LF removed) J
+decodes to the layout of a well-formed index, returning that index. -/
+def indexBytesOk : Prop :=
+  ∀ (b : ByteArray) (i : IndexFile),
+    decodeIndex b = .ok i ↔ decode (withoutFinalLF b) = .ok (indexLayout i) ∧ IndexWF i
+
+/-- U4 C8 `IndexBytes`: a document refusal of `decodeIndex` = the first violation of the value J
+decodes from the bytes (one final LF removed): the walk's, else the first relational one. -/
+def indexBytesDoc : Prop :=
+  ∀ (b : ByteArray) (e : DocError),
+    decodeIndex b = .error (.doc e) ↔
+      ∃ v,
+        decode (withoutFinalLF b) = .ok v ∧
+          (firstViolation indexTy v = some e ∨
+            ∃ i,
+              IndexNodeWF i ∧
+                firstViolation indexTy v = none ∧
+                v = indexLayout i ∧ (relationViolations i).head? = some e)
+
+/-- U4 C8 `IndexBytes`: a text refusal of `decodeIndex` = J's refusal of the bytes (one final LF
+removed). -/
+def indexBytesText : Prop :=
+  ∀ (b : ByteArray) (j : DecodeError),
+    decodeIndex b = .error (.text j) ↔ decode (withoutFinalLF b) = .error j
+
+end FvdepLedger.Rows.IndexClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -1748,6 +1833,54 @@ def protocolSigRow : Row :=
     residue := []
     unproven := [] }
 
+def indexDecodeRow : Row :=
+  { component := `FvdepCore.Index.Doc
+    contract := "U4 C6 + C8; Decisions Data formats"
+    claim :=
+      "`index.json` schema 1: on a J1-valid value the D5 walk accepts exactly the layouts of " ++
+        "indexes whose nodes are well formed; `IndexFile.ofJson` accepts exactly the layouts of " ++
+        "well-formed indexes (the relational clauses V8 + V9 included) and refuses with the " ++
+        "walk's first violation, else the first relational one; `decodeIndex` = J's decode of " ++
+        "the bytes with one final LF removed, then `IndexFile.ofJson`: it accepts exactly the " ++
+        "bytes J decodes to a well-formed index's layout, a text refusal is J's, a document " ++
+        "refusal is that value's first violation; a well-formed index's canonical bytes decode " ++
+        "back to it."
+    claims :=
+      [(``IndexClaims.indexSchemaExact, ``FvdepAudit.Index.Proof.index_schema_exact),
+        (``IndexClaims.indexDecodeOk, ``FvdepAudit.Index.Proof.index_ok),
+        (``IndexClaims.indexDecodeError, ``FvdepAudit.Index.Proof.index_error),
+        (``IndexClaims.indexBytesEncode, ``FvdepAudit.Index.Proof.index_bytes_encode),
+        (``IndexClaims.indexBytesOk, ``FvdepAudit.Index.Proof.index_bytes_ok),
+        (``IndexClaims.indexBytesDoc, ``FvdepAudit.Index.Proof.index_bytes_doc),
+        (``IndexClaims.indexBytesText, ``FvdepAudit.Index.Proof.index_bytes_text)]
+    subject := ``FvdepCore.Index.decodeIndex
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def indexEncodeRow : Row :=
+  { component := `FvdepCore.Index.Doc
+    contract := "U4 C6 + C8; Decisions Data formats"
+    claim :=
+      "`encodeIndex` refuses an index outside schema 1 with the first violation of its layout " ++
+        "(the walk's, else the first relational one), else returns its canonical text + LF; " ++
+        "an index's JSON is exactly its C6 layout; a well-formed index's JSON is J1-valid; " ++
+        "`IndexFile.wellFormed` decides `IndexWellFormed`; each field's general type in the " ++
+        "schema data = C6's."
+    claims :=
+      [(``IndexClaims.indexEncodeBytes, ``FvdepAudit.Index.Proof.encode_index_iff),
+        (``IndexClaims.indexEncodeError, ``FvdepAudit.Index.Proof.encode_index_error),
+        (``IndexClaims.indexEncodeExact, ``FvdepAudit.Index.Proof.index_encode),
+        (``IndexClaims.indexValid, ``FvdepAudit.Index.Proof.index_valid),
+        (``IndexClaims.indexCheck, ``FvdepAudit.Index.Proof.index_check),
+        (``IndexClaims.indexKindsExact, ``FvdepAudit.Index.Proof.index_kinds)]
+    subject := ``FvdepCore.Index.encodeIndex
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -1758,7 +1891,8 @@ def ledger : Ledger :=
         jsonDecodeRow, jsonPrintRow, docReceiptRow, docLockRow, docEnvelopeRow, docClipRow,
         hashFrameRow, sha256DigestRow, sha256StreamRow, manifestTextRow, manifestValidateRow,
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
-        sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow]
+        sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
+        indexDecodeRow, indexEncodeRow]
     residue := residue }
 
 end FvdepLedger.Rows
