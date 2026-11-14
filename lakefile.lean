@@ -25,3 +25,7 @@ package fvdep where
 @[default_target] lean_lib Fvdep
 
 lean_lib FvdepPreview
+
+/-- Obligation, compat + exact-relation proofs + their proof registries (phase 2): imports `Fvdep`,
+never imported by it or by `FvdepPreview` (gate stages `imports` + `preview`). -/
+lean_lib FvdepProofs

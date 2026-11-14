@@ -1,7 +1,9 @@
 #!/usr/bin/env bash
 # Import policy (gate stages `imports`, `preview`). Prints `file:line: import X` per violation.
-#   imports: library modules (Fvdep, FvdepPreview, FvdepProofs trees) import Init, Std + library
-#            modules alone, so a consumer's build of a pinned snapshot stays toolchain-only; tool
+#   imports: phase-1 library modules (Fvdep, FvdepPreview trees) import Init, Std + library
+#            modules alone, so a consumer's build of a pinned snapshot stays toolchain-only; the
+#            phase-2 proof tree (FvdepProofs) adds Lean + Lake (toolchain, never an outside
+#            package) and never reaches phase 1 (preview + `preview` below); tool
 #            shipped modules (tool/Main.lean, tool/FvdepCore + tool/FvdepIO trees) add Lean, Lake +
 #            the tool's own libraries. Test modules are free. The audit tree (tool/FvdepAudit:
 #            specs + proofs about shipped code, gate-only) is imported by tool/FvdepLedger/Rows.lean
@@ -60,9 +62,10 @@ refuse() {
 case "${1:-}" in
 imports)
     rc=0
-    mapfile -t lib < <(files Fvdep.lean 'Fvdep/*.lean' FvdepPreview.lean 'FvdepPreview/*.lean' \
-        FvdepProofs.lean 'FvdepProofs/*.lean')
-    check '^(Init|Std|Fvdep|FvdepPreview|FvdepProofs)([.]|$)' "${lib[@]}" || rc=1
+    mapfile -t lib < <(files Fvdep.lean 'Fvdep/*.lean' FvdepPreview.lean 'FvdepPreview/*.lean')
+    check '^(Init|Std|Fvdep|FvdepPreview)([.]|$)' "${lib[@]}" || rc=1
+    mapfile -t proofs < <(files FvdepProofs.lean 'FvdepProofs/*.lean')
+    check '^(Init|Std|Lean|Lake|Fvdep|FvdepPreview|FvdepProofs)([.]|$)' "${proofs[@]}" || rc=1
     mapfile -t tool < <(files tool/Main.lean tool/FvdepCore.lean 'tool/FvdepCore/*.lean' \
         tool/FvdepIO.lean 'tool/FvdepIO/*.lean')
     check '^(Init|Std|Lean|Lake|Fvdep|FvdepCore|FvdepIO)([.]|$)' "${tool[@]}" || rc=1

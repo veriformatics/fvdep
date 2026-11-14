@@ -119,7 +119,7 @@ tree-clean  lean checks
 FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite fuzz-replay sys-suite acceptance'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
-ROOT_TARGETS=(Fvdep FvdepPreview)
+ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
 TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit FvdepLedger
     «fvdep-ledger» FvdepLedgerFixtures)
 

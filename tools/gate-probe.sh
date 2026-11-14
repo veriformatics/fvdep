@@ -321,6 +321,12 @@ probe preview plant_preview "Fvdep.lean:1: import FvdepPreview" bash tools/check
 # A module whose name only starts like an allowed root (the `\.`-in-awk-v regression).
 plant_prefix() { sed -i '1i import FvdepPlanted' FvdepPreview.lean; }
 probe imports-prefix plant_prefix "FvdepPreview.lean:1: import FvdepPlanted" bash tools/check-imports.sh imports
+plant_preview_proofs() { sed -i '1i import FvdepProofs' FvdepPreview.lean; }
+probe imports-preview-proofs plant_preview_proofs "FvdepPreview.lean:1: import FvdepProofs" \
+    bash tools/check-imports.sh imports
+plant_proofs_outside() { sed -i '1i import Mathlib' FvdepProofs.lean; }
+probe imports-proofs plant_proofs_outside "FvdepProofs.lean:1: import Mathlib" \
+    bash tools/check-imports.sh imports
 
 # lean-style: a tab in a Lean source; a misformatted declaration lean-fmt would rewrite.
 plant_tab() { printf '\t-- tab\n' >>Fvdep/Version.lean; }
