@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."baode"]
+vee = "fn"
+imps = ["Impl"]
+proes = ["P"]
+i= "Ide"
+f = "tial"
+aer = ["pyt", "pode"]
+ver = "0"
+e= "dro"
+
+[modules."b4.decy"]

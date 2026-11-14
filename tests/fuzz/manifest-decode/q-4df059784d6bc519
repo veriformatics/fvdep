@@ -1,0 +1,18 @@
+schema = 1
+
+[library]
+co = "4567"
+
+[policy]
+f = "rsqd"
+
+[mcdules."baode"]
+vee = "fn"
+imps = ["Impl"]
+proes = ["P"]
+i= "Ide"
+f = "Pro"
+
+[modulZs."basde"]
+ver = "0"
+e = [1E1111]

@@ -1,0 +1,17 @@
+schema = 1
+
+[library]
+commit = "0>23"
+
+[policy]
+f = "reqd"
+
+[modules."ba.encode"]
+vee = "fn"
+imps ="Ide"
+f = "Pro"
+
+[modules."baode"]
+ven = "0"
+ence = "tial"
+adr = []

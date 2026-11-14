@@ -1,0 +1,16 @@
+schema = "0167"
+
+[policy]
+pr= "rred"
+
+[modules."e"]
+ape = "fn"
+i= ["Impl"]
+p = ["Proof"]
+impl = "Imp"
+pr= "Peq"
+
+[modules."b"]
+von = "1.0.0"
+evie = "difl"
+aer = ["pn3", "im"]

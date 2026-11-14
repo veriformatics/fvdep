@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."base64."]
+vee = "fn"
+imps = ["Impl"]
+p = []
+i= "Ide"
+f = "Pro"
+
+[modules."basee"]
+von = "0"
+evte = "difl"
+aer = []

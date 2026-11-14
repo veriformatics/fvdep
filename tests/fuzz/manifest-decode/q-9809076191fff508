@@ -1,0 +1,15 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[modules."base64.encode"]
+ver = "0"
+shape = "fn"
+impl_modules = ["Impl"]
+proof_modules = ["Proof"]
+impl = "Ime"
+proof = "_eq"
+sion = "1.0.0"
+evidence = "differential"
+adapter = ["py3", "imp.py"]

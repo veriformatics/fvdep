@@ -1,0 +1,21 @@
+schema = 1
+
+[library]
+cve = "difl"
+aommit = "0127"
+
+[policy]
+proof = "reed"
+
+[modules."b"]
+von = "1.0.0"
+shape = "fn"
+imes = ["Impl"]
+pr= ["f"]
+impl = "ode"
+proof = "Prq"
+
+[modules."baode"]
+ven = "1.0.0"
+ence = "tial"
+adr = ["py3", "imp.py"]

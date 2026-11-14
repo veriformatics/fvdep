@@ -1,0 +1,10 @@
+schema = 1
+
+[library]
+commit = "de"
+f = "Pro"
+
+[modules."basde"]
+ver = "0"
+e= "dial"
+ada = ["pyt", "py"]

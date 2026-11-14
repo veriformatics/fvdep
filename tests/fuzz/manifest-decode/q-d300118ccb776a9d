@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."base64.encode"]
+vee = "fn"
+imps = ["Impl"]
+proes = ["5"]
+i= "Ide"
+f = "Pro"
+
+[modules."base64.decode"]
+version = "0"
+evidence = "differential"
+adapter = [111E11]

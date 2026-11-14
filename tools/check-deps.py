@@ -2,10 +2,10 @@
 """Every pinned dependency has a row in docs/dependencies.md (gate stage `deps`).
 
 Pins: the Lean toolchain of every `lean-toolchain`, each tools/tools.lock tool, each workflow action
-(`uses: owner/repo[/path]@…`), each git package of every tracked `lake-manifest.json` + each
-vendored upstream (`vendor/*/lock.json`), both by GitHub `owner/repo`. A row = the name in backticks
-somewhere in the table. Prints each missing
-name. Usage: python3 -I tools/check-deps.py
+(`uses: owner/repo[/path]@…`), each git package of every tracked `lake-manifest.json`, each vendored
+upstream (`vendor/*/lock.json`) + the fuzz engine (tools/afl.lock), the last three by GitHub
+`owner/repo`. A row = the name in backticks somewhere in the table. Prints each missing name (+ an
+afl.lock without its pin line). Usage: python3 -I tools/check-deps.py
 """
 
 import json
@@ -46,6 +46,9 @@ def pins() -> set[str]:
     for f in tracked("vendor/*/lock.json"):
         upstream = json.loads(f.read_text(encoding="utf-8")).get("upstream", "")
         names.add(re.sub(r"\.git$", "", upstream.removeprefix("https://github.com/")))
+    afl = re.findall(r"^\S+ \S+ source [0-9a-f]{64} https://github\.com/([^/\s]+/[^/\s]+)/",
+                     (ROOT / "tools/afl.lock").read_text(encoding="utf-8"), re.M)
+    names.update(afl or ["tools/afl.lock pin line"])
     return names
 
 

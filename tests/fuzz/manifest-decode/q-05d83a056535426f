@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."base64.encode"]
+ven = "1.0.0"
+e = "fn"
+imps = ["Impl"]
+proes = ["P"]
+i= "I"
+
+[modules."base6 .decode"]
+ver = "0"
+e= "dial"
+ada = ["pyt", "py"]

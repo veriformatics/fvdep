@@ -1,0 +1,20 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+proof = "required"
+
+[modules."base64.encode"]
+version = "11111111111111111111111111111111111111.0.0"
+shape = "fn"
+impl_modules = ["Im''''ythonpl"]
+proof_modules = ["Pro'''m''''ythonp''''''''''''''''''''''''f"]
+impl = "Impl.encode"
+proof = "Proof.encode_eq"
+
+[modules."base64.decode"]
+version = "111111111111111111111111111111111111111111111111111111111111111111111111111111111111.0.0"
+evidence = "differential"
+adapter = ["p"]

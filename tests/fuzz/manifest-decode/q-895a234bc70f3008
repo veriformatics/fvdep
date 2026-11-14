@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules.""]
+vee = "fn"
+imps = ["Impl"]
+s = ["P"]
+i= "Ide"
+f = "Pro"
+
+[modules."e"]
+ion .0.1= "0"
+evce = "dial"
+ter = ["pyt", "py"]

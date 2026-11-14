@@ -1,0 +1,19 @@
+schema = 1
+
+[library]
+commit = "0123456789abcdef0123456789abcdef01234567"
+
+[policy]
+f = "reqd"
+
+[modules."4.encode"]
+ver = "0"
+s = "fn"
+ules = ["Impl"]
+dules = ["Proof"]
+impl = "Ime"
+p = "_eq"
+
+[modules."e"]
+ion = "1"
+ev= ["pyt", "py"]
