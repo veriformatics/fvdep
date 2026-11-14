@@ -1,6 +1,8 @@
-# Code scanning: CodeQL `security-extended` over these workflows. Lean has no CodeQL extractor (the
-# gate's proofs + tests cover it); C, Rust, Python + JavaScript join when their code lands (U9).
-# ci/** pushes run too: tools/ci-gate.sh holds a unit red while its ref has an open alert.
+# Code scanning: CodeQL `security-extended` over these workflows + fvdep's own C (`c/`; build mode
+# `none` = no build, and each matrix entry's `paths` bounds what it extracts, so vendored HACL*, the
+# test harnesses + the prototype stay out). Lean has no CodeQL extractor (the gate's proofs + tests
+# cover it); Rust, Python + JavaScript join when their code lands (U9). ci/** pushes run too:
+# tools/ci-gate.sh holds a unit red while its ref has an open alert.
 name: codeql
 
 on:
@@ -32,6 +34,10 @@ jobs:
         include:
           - language: actions
             build-mode: none
+            paths: .github
+          - language: c-cpp
+            build-mode: none
+            paths: c
     steps:
       - name: Check out the repository
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
@@ -44,6 +50,9 @@ jobs:
           languages: ${{ matrix.language }}
           build-mode: ${{ matrix.build-mode }}
           queries: security-extended
+          config: |
+            paths:
+              - ${{ matrix.paths }}
 
       - name: Analyze
         uses: github/codeql-action/analyze@9b3254085494b55a0f7c4c2b3d2d52cc712ce370 # v4.39.1
