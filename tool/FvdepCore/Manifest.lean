@@ -414,9 +414,6 @@ def toTree (m : ManifestFile) : Tree :=
       else
         [("modules", .tbl (m.modules.map fun e => (toString e.decl.module, .tbl (entryMembers e))))]
 
-/-- An uppercase hex digit of `n < 16`. -/
-def hexUpper (n : Nat) : Char := if n < 10 then Char.ofNat (48 + n) else Char.ofNat (55 + n)
-
 /-- T4: `c` inside a basic string. -/
 def escapeChar (c : Char) : List Char :=
   match c.toNat with

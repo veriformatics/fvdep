@@ -304,7 +304,17 @@ def cases : List (String × (Unit → Bool)) :=
     ("doc: a 10^4-receipt lock round-trips; normalize sorts its reversal back", fun _ =>
       let l := lockOf (ids 10000)
       let r : Lock := ⟨l.library, l.entries.reverse⟩
-      roundTrips l && r.normalize == l)]
+      roundTrips l && r.normalize == l),
+    ("doc: line rule: TAB, LF, CR short; every other Cc (C0, DEL, C1) → \\u00XX uppercase", fun _ =>
+      escapeControls "a\tb\nc\rd\x00e\x1bf\x7fg\u0085h\u009bi" ==
+        "a\\tb\\nc\\rd\\u0000e\\u001Bf\\u007Fg\\u0085h\\u009Bi"),
+    ("doc: line rule: no Cc survives; every other character as is", fun _ =>
+      let all :=
+        (List.range 0x2100).map Char.ofNat ++
+          [Char.ofNat 0x2028, Char.ofNat 0xFEFF, Char.ofNat 0x10FFFF]
+      let plain := all.filter (!isControl ·)
+      !(escapeControls (String.ofList all)).toList.any isControl &&
+        escapeControls (String.ofList plain) == String.ofList plain)]
 
 end Doc
 
@@ -527,7 +537,10 @@ def cases : List (String × (Unit → Bool)) :=
       keyPath [.key "modules", .key "base64.encode", .key "impl_modules", .index 1] ==
           "modules.\"base64.encode\".impl_modules[1]" &&
         keyPath [.key "a-b_1"] == "a-b_1" &&
-        keyPath [.key ""] == "\"\"")]
+        keyPath [.key ""] == "\"\""),
+    ("manifest: a Lake message's C1 + C0 controls render escaped (interface §1 line rule)", fun _ =>
+      (ReadError.parse (.syntax 1 0 "bad \u0085\u009b\x1b token")).detail ==
+        "syntax at 1:1: bad \\u0085\\u009B\\u001B token")]
 
 /-- Through Lake's parser (IO). -/
 def ioCases : List (String × IO Bool) :=

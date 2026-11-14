@@ -80,6 +80,24 @@ def Argv (argv : List String) : Prop :=
 /-- D2: a module id or entry version's printed spelling fits the document bound. -/
 def SpellingFits (s : String) : Prop := s.utf8ByteSize ≤ 65536
 
+/-- Unicode `Cc`: U+0000–U+001F, U+007F–U+009F. -/
+def Control (c : Char) : Prop := c.toNat < 32 ∨ 127 ≤ c.toNat ∧ c.toNat ≤ 159
+
+/-- U4 C6: 1 to `cap` UTF-8 bytes, no control character. -/
+def TextFits (cap : Nat) (s : String) : Prop :=
+  1 ≤ s.utf8ByteSize ∧ s.utf8ByteSize ≤ cap ∧ ∀ c ∈ s.toList, ¬Control c
+
+/-- Strictly ascending: each string before the next. -/
+def Ascends : List String → Prop
+  | a :: b :: rest => a < b ∧ Ascends (b :: rest)
+  | _ => True
+
+/-- U4 C6 status consistency: `proven` with no axiom; `open` with none or with `sorryAx`; `trusts`
+with some, `sorryAx` not among them. -/
+def StatusAxioms (st : String) (ns : List String) : Prop :=
+  st = "proven" ∧ ns = [] ∨
+    st = "open" ∧ (ns = [] ∨ "sorryAx" ∈ ns) ∨ st = "trusts" ∧ ns ≠ [] ∧ "sorryAx" ∉ ns
+
 /-- The meaning of each scalar rule (D2 syntax, enumerations, the evidence kind's nullness). -/
 def ruleHolds : Rule → Value → Prop
   | .null, v => v = .null
@@ -92,6 +110,18 @@ def ruleHolds : Rule → Value → Prop
   | .profile, v => ∃ s, v = .str s ∧ ProfileText s
   | .oneOf xs, v => ∃ s, v = .str s ∧ s ∈ xs
   | .arg first, v => ∃ s, v = .str s ∧ ArgText first s
+  | .label, v => ∃ s, v = .str s ∧ TextFits 1024 s
+  | .reason, v => ∃ s, v = .str s ∧ TextFits 65536 s
+  | .versionOrNull, v =>
+    v = .null ∨ ∃ x : EntryVersion, v = .str (toString x) ∧ SpellingFits (toString x)
+  | .compat, v =>
+    v = .null ∨
+      ∃ (st : String) (ns : List String) (x : EntryVersion),
+        v =
+            .obj
+              [("axioms", .arr (ns.map .str)), ("status", .str st),
+                ("version", .str (toString x))] ∧
+          (∀ n ∈ ns, TextFits 1024 n) ∧ Ascends ns ∧ StatusAxioms st ns ∧ SpellingFits (toString x)
 
 /-! ## D5 refusal walk: every violation, in order -/
 
@@ -155,10 +185,88 @@ def descentsSpec (p : List PathSeg) (path : List String) : Nat → List Value �
       descentsSpec p path (i + 1) (b :: rest)
   | _, _ => []
 
+/-- The strings of a list whose every element is a string. -/
+def strsSpec : List Value → Option (List String)
+  | [] => some []
+  | .str s :: xs => (strsSpec xs).map (s :: ·)
+  | _ :: _ => none
+
+/-- Every element (index `i` onward) whose string at `path` an earlier element has. -/
+def nameRepeatsSpec (p : List PathSeg) (path : List String) :
+    Nat → List String → List Value → List DocError
+  | _, _, [] => []
+  | i, seen, x :: xs =>
+    match atPath path x with
+    | some (.str s) =>
+      (if s ∈ seen then [⟨p ++ [.index i] ++ path.map .key, .badValue, some (.str s)⟩] else []) ++
+        nameRepeatsSpec p path (i + 1) (s :: seen) xs
+    | _ => nameRepeatsSpec p path (i + 1) seen xs
+
+/-- Strictly before by version fields, major first. -/
+def VersionBefore (x y : EntryVersion) : Prop :=
+  x.major < y.major ∨
+    x.major = y.major ∧ (x.minor < y.minor ∨ x.minor = y.minor ∧ x.patch < y.patch)
+
+instance (x y : EntryVersion) : Decidable (VersionBefore x y) := by
+  unfold VersionBefore
+  infer_instance
+
+/-- U4 C6 operation order: the id's string order, then the version numerically. -/
+def IdVersionBefore (ia va ib vb : String) : Prop :=
+  ia < ib ∨
+    ia = ib ∧
+      match EntryVersion.parse va, EntryVersion.parse vb with
+      | some x, some y => VersionBefore x y
+      | _, _ => False
+
+instance (ia va ib vb : String) : Decidable (IdVersionBefore ia va ib vb) := by
+  unfold IdVersionBefore
+  split <;> infer_instance
+
+/-- The string at a key path, if any. -/
+def strAtSpec (path : List String) (v : Value) : Option String :=
+  match atPath path v with
+  | some (.str s) => some s
+  | _ => none
+
+/-- Two elements' `id` + `version` strings, when all four are strings. -/
+def keysSpec (a b : Value) : Option (String × String × String × String) := do
+  let ia ← strAtSpec ["id"] a
+  let va ← strAtSpec ["version"] a
+  let ib ← strAtSpec ["id"] b
+  let vb ← strAtSpec ["version"] b
+  some (ia, va, ib, vb)
+
+/-- Every element (index `i` onward) not after its predecessor by (id, version). -/
+def misordersSpec (p : List PathSeg) : Nat → List Value → List DocError
+  | i, a :: b :: rest =>
+    (match keysSpec a b with
+      | some (ia, va, ib, vb) =>
+        if IdVersionBefore ia va ib vb then [] else [⟨p ++ [.index i], .badValue, some b⟩]
+      | none => []) ++
+      misordersSpec p (i + 1) (b :: rest)
+  | _, _ => []
+
 /-- D5 (e): an array's constraint, after its elements. -/
 def orderSpec (p : List PathSeg) (xs : List Value) : Order → List DocError
   | .nonempty => if xs = [] then [⟨p, .badValue, some (.arr [])⟩] else []
   | .ascending path => descentsSpec p path 1 xs
+  | .any => []
+  | .empty => if xs = [] then [] else [⟨p, .badValue, some (.arr xs)⟩]
+  | .ascendingHas s =>
+    descentsSpec p [] 1 xs ++
+      match xs, strsSpec xs with
+      | [], _ => []
+      | _, some ns => if s ∈ ns then [] else [⟨p, .badValue, some (.arr xs)⟩]
+      | _, none => [⟨p, .badValue, some (.arr xs)⟩]
+  | .ascendingWithout s =>
+    descentsSpec p [] 1 xs ++
+      match xs, strsSpec xs with
+      | [], _ => [⟨p, .badValue, some (.arr xs)⟩]
+      | _, some ns => if s ∈ ns then [⟨p, .badValue, some (.arr xs)⟩] else []
+      | _, none => [⟨p, .badValue, some (.arr xs)⟩]
+  | .unique path => nameRepeatsSpec p path 0 [] xs
+  | .idVersion => misordersSpec p 1 xs
 
 mutual
 /-- D5: every violation of `v` against `t` in walk order: the value's kind against the type; an
