@@ -20,7 +20,8 @@ repo="$(sed -E 's#^https://github.com/([^/]+/[^/]+)/.*#\1#' <<<"$old_url")"
 asset="${old_url##*/}"
 asset="${asset//$old_version/$version}"
 release="$(curl -fsSL "https://api.github.com/repos/$repo/releases/tags/v$version" ||
-    curl -fsSL "https://api.github.com/repos/$repo/releases/tags/$version")"
+    curl -fsSL "https://api.github.com/repos/$repo/releases/tags/$version" ||
+    curl -fsSL "https://api.github.com/repos/$repo/releases/tags/$name-$version")"
 line="$(jq -r --arg n "$name" --arg v "$version" --arg asset "$asset" '.assets[]
     | select(.name == $asset)
     | "\($n) \($v) linux-x86_64 \(.digest | sub("^sha256:"; "")) \(.browser_download_url)"' <<<"$release")"

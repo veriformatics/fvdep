@@ -996,8 +996,12 @@ def residue : List Residue :=
           "(`c/fvdep_sha256*.c`, `FvdepIO.Hash`)"
       reason :=
         "C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance " ++
-          "claim); the shim + orchestration are small, reviewed + tested (FIPS 180-4 " ++
-          "examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching)"
+          "claim); the shim + orchestration are small, reviewed + tested: `lake test` (FIPS " ++
+          "180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state " ++
+          "branching) + S5's blind suite (stage `codec-suite`, 1,212 cases: NIST CAVP short, " ++
+          "long + Monte vectors, `sha256sum` differentials, update splits, chunk arithmetic + " ++
+          "the total limit at lowered ceilings, `ofReader`, `sha256File`, concurrent Tasks; the " ++
+          "C core under gcc ASan + UBSan, zero leaks)"
       ruling := "HACL* (verified upstream) + FFI wrapper (tested)"
       boundary :=
         [``FvdepIO.Hash.sha256, ``FvdepIO.Hash.Sha256.initState, ``FvdepIO.Hash.Sha256.absorb,
@@ -1010,7 +1014,10 @@ def residue : List Residue :=
         "toolchain code (Decisions: trusted); `ofLake` names any key of another shape; " ++
           "`fvdep.toml` ≤ 64 KiB bounds its recursion depth (T1); tested by `lake test` " ++
           "(a printed manifest reads back, syntax + repeated keys refuse with Lake's line, a " ++
-          "BOM refuses first)"
+          "BOM refuses first) + T6's blind suite (stage `manifest-suite`: 1,850 credited " ++
+          "cases through Lake's parser, `ofLake` + `validate`; the 4 `T.worst.*` cap cases = " ++
+          "uncredited evidence of the parser at the cap: no fvdep mutant reaches them + a " ++
+          "driver stack down to 256 KiB leaves them green)"
       ruling := "Lake.Toml + Lake comparison code (toolchain)"
       boundary := [``Lake.Toml.loadToml] },
     { id := "sys-shim"
@@ -1397,7 +1404,8 @@ def sha256DigestRow : Row :=
     contract := "U3 S1–S4 + H3"
     claim :=
       "`digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = " ++
-        "HACL*'s verified C behind the FFI (tested residue `hacl-sha256`)."
+        "HACL*'s verified C behind the FFI (tested residue `hacl-sha256`; `digest` itself: S5's " ++
+        "blind suite, stage `codec-suite`, against an independent frame encoder)."
     claims := []
     subject := ``FvdepIO.Hash.digest
     path := []

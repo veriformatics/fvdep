@@ -41,10 +41,19 @@ copy() {
     for d in .lake tool/.lake; do
         [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
     done
-    # The fixture suite's green mark (keyed on its inputs): the fast gate in a copy reuses it.
-    if [[ -f "$root/.gate/ledger-suite.green" ]]; then
-        mkdir -p "$dir/.gate" && cp "$root/.gate/ledger-suite.green" "$dir/.gate/"
+    # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
+    # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
+    if [[ "${with_suites:-0}" == 1 ]]; then
+        for d in tests/codec/.lake tests/manifest/.lake tests/sha256/.build; do
+            [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
+        done
     fi
+    # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
+    for d in ledger-suite codec-suite manifest-suite; do
+        if [[ -f "$root/.gate/$d.green" ]]; then
+            mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
+        fi
+    done
     printf '%s' "$dir"
 }
 
@@ -404,7 +413,28 @@ plant_case_flip() {
     awk -F'\t' -v OFS='\t' '$1 == "T5" { $4 = 0 } 1' tests/ledger/cases.tsv >cases.tmp &&
         mv cases.tmp tests/ledger/cases.tsv
 }
-probe ledger-suite plant_case_flip "FAIL T5" env FVDEP_LEDGER_ONLY=T5 bash tests/ledger/run.sh
+probe ledger-suite plant_case_flip "FAIL T5" \
+    env FVDEP_LEDGER_ONLY=T5 bash -c 'source tools/gate.sh; ledger_suite'
+
+# codec-suite + manifest-suite: a driver harness answering one case wrong fails it, named (stage
+# function, one case; codec's S cases run whole).
+plant_codec_harness() { sed -i 's/toString maxDepth$/toString (maxDepth + 1)/' tests/codec/CodecHarness.lean; }
+with_suites=1 probe codec-suite plant_codec_harness "FAIL J.limits" \
+    env FVDEP_CODEC_CASE=J.limits bash -c 'source tools/gate.sh; codec_suite'
+plant_manifest_driver() { sed -i 's/toJson maxBytes)\]$/toJson (maxBytes + 1))]/' tests/manifest/Driver.lean; }
+with_suites=1 probe manifest-suite plant_manifest_driver "FAIL T.maxBytes" \
+    env FVDEP_MANIFEST_CASE=T.maxBytes bash -c 'source tools/gate.sh; manifest_suite'
+
+# codec-suite's frozen inventories (expected values change only by their own unit): one expected
+# value flipped → the freeze guard names the breach before any case runs.
+plant_frozen() { # FILE
+    awk -F'\t' -v OFS='\t' 'NR == 2 { $NF = (substr($NF, 1, 1) == "0" ? "1" : "0") substr($NF, 2) } 1' \
+        "$1" >frozen.tmp && mv frozen.tmp "$1"
+}
+plant_frozen_jh() { plant_frozen tests/codec/FROZEN-JH.tsv; }
+plant_frozen_jhd() { plant_frozen tests/codec/FROZEN-JHD.tsv; }
+probe codec-freeze-jh plant_frozen_jh "B2-2 breach" python3 -I tests/codec/freeze_jh.py
+probe codec-freeze-jhd plant_frozen_jhd "B3-2 breach" python3 -I tests/codec/freeze_jhd.py
 
 # cli: a binary answering as the contract says passes; one printing a wrong version fails. The fake
 # mirrors docs/interface.md §1–§2 whole, failed writes included (exit 2; the message unless the pipe

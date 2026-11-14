@@ -1,0 +1,2 @@
+# CAVP corpus = pinned upstream bytes, including CRLF and significant fixture whitespace.
+*.rsp binary

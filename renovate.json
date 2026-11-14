@@ -26,6 +26,13 @@
         "git-refs"
       ],
       "minimumReleaseAge": "0 days"
+    },
+    {
+      "description": "jq tags read `jq-<version>`; the tools/tools.lock manager strips only a leading `v`",
+      "matchPackageNames": [
+        "jqlang/jq"
+      ],
+      "extractVersion": "^jq-(?<version>.*)$"
     }
   ],
   "customManagers": [
