@@ -1,4 +1,4 @@
-exclude = ["prototype/**", "tool/**", "tools/**"]
+exclude = ["prototype/**", "tests/**", "tool/**", "tools/**"]
 
 [format]
 line-width = 100

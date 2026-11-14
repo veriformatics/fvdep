@@ -91,6 +91,8 @@ lean-test   lean
 cli         lean
 coverage    lean
 ledger-suite lean
+codec-suite lean
+manifest-suite lean
 imports     checks
 preview     checks
 spec        checks
@@ -111,7 +113,7 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview)
@@ -175,26 +177,58 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 # docs/verification.md = the rendering.
 coverage() { (cd tool && lake exe fvdep-ledger --check ../docs/verification.md); }
 
-# The suite's input closure: checker, fixtures, driver, both Lake configs + toolchain pins.
-ledger_suite_key() {
-    git ls-files -co --exclude-standard -z -- tool/FvdepLedger tool/FvdepLedger.lean \
-        tool/LedgerMain.lean tool/FvdepLedgerFixtures tool/FvdepLedgerFixtures.lean tests/ledger \
-        tool/lakefile.lean tool/lake-manifest.json tool/lean-toolchain lakefile.lean \
-        lake-manifest.json lean-toolchain | sort -z | xargs -0 sha256sum | sha256sum | cut -c1-64
+# SHA-256 over the tracked + untracked-unignored files under PATH…, both Lake configs + toolchain
+# pins: a suite's input closure (over-inclusive: a missed input would reuse a stale green).
+closure_key() {
+    git ls-files -co --exclude-standard -z -- "$@" tool/lakefile.lean tool/lake-manifest.json \
+        tool/lean-toolchain lakefile.lean lake-manifest.json lean-toolchain |
+        sort -z | xargs -0 sha256sum | sha256sum | cut -c1-64
 }
 
-# The blind fixture suite (L9): the checker's planted breaches + clean controls. It grades the
-# checker alone ⇒ with FVDEP_REUSE=1 (the fast gate) a green verdict stands while its input closure
-# stays byte-identical; the full gate always runs it.
-ledger_suite() {
-    local key mark=.gate/ledger-suite.green
-    key="$(ledger_suite_key)" || key=''
+# A blind suite with its input closure KEY: with FVDEP_REUSE=1 (the fast gate) a green verdict
+# stands while that closure stays byte-identical; the full gate always runs it. A run narrowed to
+# one case (FVDEP_LEDGER_ONLY, FVDEP_CODEC_CASE, FVDEP_MANIFEST_CASE) never vouches for the whole.
+suite() { # NAME KEY CMD…
+    local name="$1" key="$2" mark=".gate/$1.green"
+    shift 2
     if [[ "${FVDEP_REUSE:-0}" == 1 && -n "$key" && -f "$mark" && "$(cat "$mark")" == "$key" ]]; then
-        printf 'ledger-suite: input closure %s = the last green run: verdict reused\n' "${key:0:12}"
+        printf '%s: input closure %s = the last green run: verdict reused\n' "$name" "${key:0:12}"
         return 0
     fi
-    bash tests/ledger/run.sh || return 1
-    if [[ -n "$key" ]]; then mkdir -p .gate && printf '%s\n' "$key" >"$mark"; fi
+    "$@" || return 1
+    [[ -z "${FVDEP_LEDGER_ONLY:-}${FVDEP_CODEC_CASE:-}${FVDEP_MANIFEST_CASE:-}" && -n "$key" ]] || return 0
+    mkdir -p .gate && printf '%s\n' "$key" >"$mark"
+}
+
+ledger_suite_key() {
+    closure_key tool/FvdepLedger tool/FvdepLedger.lean tool/LedgerMain.lean \
+        tool/FvdepLedgerFixtures tool/FvdepLedgerFixtures.lean tests/ledger
+}
+
+# The blind fixture suite (L9): the checker's planted breaches + clean controls; it grades the
+# checker alone.
+ledger_suite() { suite ledger-suite "$(ledger_suite_key)" bash tests/ledger/run.sh; }
+
+# Shipped code the codec + manifest drivers build (the tool requires the root library by path).
+shipped_closure() {
+    closure_key "$@" tool/FvdepCore tool/FvdepCore.lean tool/FvdepIO tool/FvdepIO.lean c \
+        vendor/hacl-star 'Fvdep*'
+}
+
+# The blind codec suite (tester-3; U3 J, H, D + S5): tests/codec/run.sh = the J/H/D cases through
+# the codec driver + the S cases through the sanitized SHA-256 core; jq = the pinned one (its output
+# bytes are the printer cases' second oracle).
+codec_suite() {
+    local jq
+    jq="$(pinned jq)" || return 1
+    suite codec-suite "$({ shipped_closure tests/codec tests/sha256; awk '$1 == "jq"' tools/tools.lock; } |
+        sha256sum | cut -c1-64)" env PATH="${jq%/*}:$PATH" bash tests/codec/run.sh
+}
+
+# The blind manifest suite (tester-4; U3 T6): the reader, validator + printer through its driver.
+manifest_suite() {
+    suite manifest-suite "$(shipped_closure tests/manifest)" bash tests/manifest/run.sh \
+        ${FVDEP_MANIFEST_CASE:+--case "$FVDEP_MANIFEST_CASE"}
 }
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.
