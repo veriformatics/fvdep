@@ -20,11 +20,14 @@ ci_missing() {
         | if length == 1 then empty else $s end' "$@" <<<"$doc"
 }
 
-# The id of workflow $1's run for commit $2 on branch $3, waiting up to 5 min for it to appear.
+# The id of workflow $1's run (.github/workflows/$1.yml) for commit $2 on branch $3, waiting up to
+# 15 min for it to appear. Read from the repository's run list: GitHub's workflow-filtered list
+# (`gh run list -w`) has stayed empty for 5 min while the run existed + ran.
 run_id() {
     local id="" _
-    for _ in $(seq 60); do
-        id="$(gh run list -b "$3" -c "$2" -w "$1" -L 1 --json databaseId --jq '.[0].databaseId // empty')"
+    for _ in $(seq 180); do
+        id="$(gh api "repos/{owner}/{repo}/actions/runs?head_sha=$2&branch=$3&per_page=100" \
+            --jq "[.workflow_runs[] | select(.path == \".github/workflows/$1.yml\")] | max_by(.id) | .id // empty")"
         [[ -n "$id" ]] && break
         sleep 5
     done
