@@ -24,16 +24,43 @@ inductive DeclKind where
   | recursor
   deriving DecidableEq, Repr
 
-/-- One declaration `libraryFacts` observed: its module of origin + kind; a definition's value. -/
+/-- A declaration's safety as the environment reports it (`isUnsafe`, else `isPartial`). -/
+inductive Safety where
+  | safe
+  | «unsafe»
+  | «partial»
+  deriving DecidableEq, Repr
+
+/-- One declaration `libraryFacts` observed: its module of origin, kind + type; a definition's or
+theorem's value; the marks C3 V3 reads (safety, `@[implemented_by]`, `@[extern]`, noncomputable). -/
 structure Decl where
   name : Name
   module : Name
   kind : DeclKind
   value : Option Expr
+  type : Expr
+  safety : Safety
+  implementedBy : Bool
+  isExtern : Bool
+  isNoncomputable : Bool
 
-/-- The raw observations the pure index functions read (C8 boundary). -/
+/-- A library module the build loaded: its direct imports + the file at its canonical path (C4:
+`some` bytes = a regular file, no link, no special file, no alias). -/
+structure ModFacts where
+  name : Name
+  imports : List Name
+  file : Option ByteArray
+
+/-- The raw observations the pure index functions read (C8 boundary): every declaration + every
+module of the libraries `Fvdep` + `FvdepProofs`, every `Fvdep/Registry/<Dep>/<Op>/V*.lean` on disk,
+the type of each entry's ABI application (key (shape, spec); `none` = ill-typed: V5) + the kernel's
+verdict on each compat pair's spec types (key (spec, compat spec): V6). -/
 structure Facts where
   decls : List Decl
+  modules : List ModFacts
+  entryFiles : List String
+  abiType : List ((Name × Name) × Option Expr)
+  specDefeq : List ((Name × Name) × Bool)
 
 /-- The root registry module: its constants are read through (C2: renamed-constant chains). -/
 def rootModule : Name := `Fvdep.Registry

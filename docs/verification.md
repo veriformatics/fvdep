@@ -1911,6 +1911,54 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Rules`
+
+- Contract: U4 C3 + C4 + C9 + C8
+- Claim: Entry rules: `validate` accepts exactly the registries for which every row of C9's order holds — each listed entry's own file observed; per entry (in `modules` order) V1–V7 + C4's file check, V3's flags over `reach`'s checked constants; the unlisted entry files; V8 notices; V9 removed records; V10 profiles — the rows written apart; a refusal is what the first failing row may report; `reach` holds exactly the library constants reached from an entry's roots through definition values.
+- Subject: `FvdepCore.Index.Rules.validate`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RulesClaims.validateAccepts` (hash 0x9b1a5333), proved by `FvdepAudit.Index.Rules.Proof.validate_accepts`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (l : FvdepCore.Index.Registry.Lists),
+    FvdepCore.Index.Rules.validate F l = none ↔ FvdepAudit.Index.Rules.Spec.RegistryValid F l
+  ```
+- Statement `FvdepLedger.Rows.RulesClaims.validateFirst` (hash 0x84edf439), proved by `FvdepAudit.Index.Rules.Proof.validate_first`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (l : FvdepCore.Index.Registry.Lists)
+    (f : FvdepCore.Index.Rules.Found),
+    FvdepCore.Index.Rules.validate F l = some f →
+      FvdepAudit.Index.Rules.Spec.FirstFail (FvdepAudit.Index.Rules.Spec.specChecks F l) f
+  ```
+- Statement `FvdepLedger.Rows.RulesClaims.reachExact` (hash 0x22db6cf), proved by `FvdepAudit.Index.Rules.Proof.reach_exact`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (roots : List Lean.Name) (c : Lean.Name),
+    c ∈ FvdepCore.Index.Rules.reach F roots ↔
+      FvdepAudit.Index.Rules.Spec.ConstReach F roots c ∧ FvdepCore.Index.Rules.libDecl? F c ≠ none
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Rules`
+
+- Contract: U4 C4 + C8
+- Claim: `closure F M` holds exactly the modules reachable from `M` through the import edges of `M` + the `Fvdep` modules it reaches, each once.
+- Subject: `FvdepCore.Index.Rules.closure`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.RulesClaims.closureExact` (hash 0x45e14f28), proved by `FvdepAudit.Index.Rules.Proof.closure_exact`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (M m : Lean.Name),
+    (m ∈ FvdepCore.Index.Rules.closure F M ↔ FvdepAudit.Index.Rules.Spec.ImportReach F M m) ∧
+      (FvdepCore.Index.Rules.closure F M).Nodup
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

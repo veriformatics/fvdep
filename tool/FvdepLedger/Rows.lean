@@ -3,6 +3,7 @@ import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Proof.Claims
+import FvdepAudit.Index.Rules.Proof.Claims
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
@@ -1147,6 +1148,33 @@ def registryCertificateExact : Prop :=
 
 end FvdepLedger.Rows.RegistryClaims
 
+namespace FvdepLedger.Rows.RulesClaims
+
+open Lean FvdepCore.Index.Registry FvdepCore.Index.Rules FvdepAudit.Index.Rules.Spec
+
+/-- U4 C3 + C8 `ValidateExact` (acceptance): `validate` accepts exactly the registries for which
+every row of C9's order holds — C3's rules, C4's file check + the load observations, written apart
+(`specChecks`). -/
+def validateAccepts : Prop := ∀ (F : Facts) (l : Lists), validate F l = none ↔ RegistryValid F l
+
+/-- U4 C9 + C8 `ValidateExact` (order): a refusal is what the first failing row of C9's order may
+report (a reason with several offenders: its least by printed name). -/
+def validateFirst : Prop :=
+  ∀ (F : Facts) (l : Lists) (f : Found) (_h : validate F l = some f), FirstFail (specChecks F l) f
+
+/-- U4 C4 + C8 `ClosureExact`: `closure F M` holds exactly the modules reachable from `M` through
+the import edges of `M` + the `Fvdep` modules it reaches (`M` included), each once. -/
+def closureExact : Prop :=
+  ∀ (F : Facts) (M m : Name), (m ∈ closure F M ↔ ImportReach F M m) ∧ (closure F M).Nodup
+
+/-- U4 C3 V3: `reach` holds exactly the checked constants — the library constants reached from the
+roots through library definition values. -/
+def reachExact : Prop :=
+  ∀ (F : Facts) (roots : List Name) (c : Name),
+    c ∈ reach F roots ↔ ConstReach F roots c ∧ libDecl? F c ≠ none
+
+end FvdepLedger.Rows.RulesClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -1989,6 +2017,39 @@ def registryCertificateRow : Row :=
     residue := []
     unproven := [] }
 
+def validateRow : Row :=
+  { component := `FvdepCore.Index.Rules
+    contract := "U4 C3 + C4 + C9 + C8"
+    claim :=
+      "Entry rules: `validate` accepts exactly the registries for which every row of C9's " ++
+        "order holds — each listed entry's own file observed; per entry (in `modules` order) " ++
+        "V1–V7 + C4's file check, V3's flags over `reach`'s checked constants; the unlisted " ++
+        "entry files; V8 notices; V9 removed records; V10 profiles — the rows written apart; " ++
+        "a refusal is what the first failing row may report; `reach` holds exactly the library " ++
+        "constants reached from an entry's roots through definition values."
+    claims :=
+      [(``RulesClaims.validateAccepts, ``FvdepAudit.Index.Rules.Proof.validate_accepts),
+        (``RulesClaims.validateFirst, ``FvdepAudit.Index.Rules.Proof.validate_first),
+        (``RulesClaims.reachExact, ``FvdepAudit.Index.Rules.Proof.reach_exact)]
+    subject := ``FvdepCore.Index.Rules.validate
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def closureRow : Row :=
+  { component := `FvdepCore.Index.Rules
+    contract := "U4 C4 + C8"
+    claim :=
+      "`closure F M` holds exactly the modules reachable from `M` through the import edges of " ++
+        "`M` + the `Fvdep` modules it reaches, each once."
+    claims := [(``RulesClaims.closureExact, ``FvdepAudit.Index.Rules.Proof.closure_exact)]
+    subject := ``FvdepCore.Index.Rules.closure
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2001,7 +2062,7 @@ def ledger : Ledger :=
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
-        registryCertificateRow]
+        registryCertificateRow, validateRow, closureRow]
     residue := residue }
 
 end FvdepLedger.Rows

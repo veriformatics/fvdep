@@ -401,13 +401,13 @@ def appendE (T xs ys : Expr) : Expr :=
 
 def entryName : Name := `Fvdep.Registry.Base64.Encode.V1_0_0.entry
 
-def decl (n m : Name) (v : Expr) : Decl := ⟨n, m, .defn, some v⟩
+def decl (n m : Name) (v : Expr) : Decl :=
+  ⟨n, m, .defn, some v, .sort .zero, .safe, false, false, false⟩
 
 /-- A registry: `modules` = a root-module chunk constant `++ []`; the chunk = one entry
 reference. -/
 def facts (modules notices : Expr) (extra : List Decl := []) : Facts :=
-  {
-    decls :=
+  { decls :=
       [decl entryName `Fvdep.Registry.Base64.Encode.V1_0_0 (moduleMk "base64.encode" "1.0.0"),
           decl `Fvdep.Registry.part `Fvdep.Registry
             (consE moduleT (.const entryName []) (nilE moduleT)),
@@ -415,7 +415,11 @@ def facts (modules notices : Expr) (extra : List Decl := []) : Facts :=
           decl `Fvdep.Registry.profiles `Fvdep.Registry (nilE (.const `P [])),
           decl `Fvdep.Registry.notices `Fvdep.Registry.Notices notices,
           decl `Fvdep.Registry.removed `Fvdep.Registry.Removed (nilE (.const `R []))] ++
-        extra }
+        extra
+    modules := []
+    entryFiles := []
+    abiType := []
+    specDefeq := [] }
 
 def okModules : Expr := appendE moduleT (.const `Fvdep.Registry.part []) (nilE moduleT)
 
@@ -428,13 +432,13 @@ def refused (F : Facts) : Option Name :=
 
 def cases : List (String × (Unit → Bool)) :=
   [("registry: a 10^6-element cons spine decodes in a loop", fun _ =>
-      match decode ⟨[]⟩ (.list .str) (spineOf 1000000) [] [`t] with
+      match decode ⟨[], [], [], [], []⟩ (.list .str) (spineOf 1000000) [] [`t] with
       | .ok v => v.elems.length == 1000000
       | .error _ => false),
     ("registry: Lean's `have` chunks of a long list literal (tail = a let-bound chunk)", fun _ =>
       let chunk := consE strT (strE "d") (consE strT (strE "e") (nilE strT))
       let body := consE strT (strE "a") (consE strT (strE "b") (.bvar 0))
-      match decode ⟨[]⟩ (.list .str) (.letE `y strT chunk body true) [] [`t] with
+      match decode ⟨[], [], [], [], []⟩ (.list .str) (.letE `y strT chunk body true) [] [`t] with
       | .ok v => v.elems.map Val.strD == ["a", "b", "d", "e"]
       | .error _ => false),
     ("registry: root-module chunk `++` + an entry reference → the entry + its module", fun _ =>
@@ -483,7 +487,9 @@ def cases : List (String × (Unit → Bool)) :=
           repl
       let n₁ := n "r1" (.some (.str "1.0.1"))
       let n₂ := n "r2" .none
-      match decode ⟨[]⟩ (.list noticeForm) (listLiteral noticeForm [n₁, n₂]) [] [`t] with
+      match
+        decode ⟨[], [], [], [], []⟩ (.list noticeForm) (listLiteral noticeForm [n₁, n₂]) []
+          [`t] with
       | .ok v => v == .cons n₁ (.cons n₂ .nil)
       | .error _ => false),
     ("registry: the certificate's lists (`modules` records without entry annotations, " ++
@@ -517,6 +523,140 @@ def cases : List (String × (Unit → Bool)) :=
       | .error _ => false)]
 
 end Registry
+
+/-! Compiled-code smoke for the entry rules (contract U4 C3, C4, C9): the proofs tie `validate` to
+the rows written apart; these pin the rows against C9's text — a valid one-entry registry passes,
+each plant refuses with its first failing row (flag-major order, then the least carrier; Lean's own
+vs a hand-written `_unsafe_rec`; the load refusal before the entry rules). -/
+
+namespace Rules
+
+open Lean FvdepCore.Index.Registry FvdepCore.Index.Rules
+
+def listT (t : Name) : Expr := .app (.const ``List [.zero]) (.const t [])
+
+def specM : Name := `Fvdep.Base64.Encode.V1_0_0
+
+def entryM : Name := `Fvdep.Registry.Base64.Encode.V1_0_0
+
+def typesM : Name := `Fvdep.Registry.Types.V1
+
+/-- A safe definition `specM.<s>`. -/
+def defn (s : String) (v : Expr := .lit (.natVal 0)) (t : Expr := .sort 1) : Decl :=
+  { name := .str specM s
+    module := specM
+    kind := .defn
+    value := some v
+    type := t
+    safety := .safe
+    implementedBy := false
+    isExtern := false
+    isNoncomputable := false }
+
+/-- The spec `encode` (its value names each `reached` declaration) + the obligation `bits`, the
+three modules of the entry's closure + its file. -/
+def facts (reached : List Decl) (other : List Decl := []) : Facts :=
+  { decls :=
+      [defn "encode" (reached.foldl (fun acc d => .app acc (.const d.name [])) (.lit (.natVal 0)))
+            (.forallE `x (listT ``UInt8) (listT ``Char) .default),
+          defn "bits" (.const ``True []) (.sort .zero)] ++
+        reached ++
+        other
+    modules :=
+      [⟨entryM, [specM, typesM], some .empty⟩, ⟨specM, [`Init.Data.List.Basic], some .empty⟩,
+        ⟨typesM, [], some .empty⟩]
+    entryFiles := ["Fvdep/Registry/Base64/Encode/V1_0_0.lean"]
+    abiType := []
+    specDefeq := [] }
+
+def entry : Entry :=
+  { module := entryM
+    id := "base64.encode"
+    version := "1.0.0"
+    spec := .str specM "encode"
+    obligations := [.str specM "bits"]
+    abi := none
+    compat := none }
+
+def lists (es : List Entry) : Lists := ⟨es, 0, [], []⟩
+
+def subj : String := "base64.encode@1.0.0"
+
+def withSpecModule (F : Facts) (x : ModFacts) : Facts :=
+  { F with modules := F.modules.map fun y => if y.name == specM then x else y }
+
+def cases : List (String × (Unit → Bool)) :=
+  [("rules: a valid one-entry registry passes", fun _ =>
+      validate (facts []) (lists [entry]) == none),
+    ("rules: an entry listed twice → the second one: `listed twice` (C9 text)", fun _ =>
+      (validate (facts []) (lists [entry, entry])).map render ==
+        some "Library error: base64.encode@1.0.0: listed twice."),
+    ("rules: flags — the first listed flag a checked constant carries, then its least carrier",
+      fun _ =>
+      let a := { defn "a" with isNoncomputable := true }
+      let b := { defn "b" with safety := .unsafe }
+      let c := { defn "c" with safety := .unsafe }
+      validate (facts [c, a, b]) (lists [entry]) == some (subj, .flagged (.str specM "b") .unsafe)),
+    ("rules: an opaque constant + Lean's own `_unsafe_rec` (partial safety) → `partial`", fun _ =>
+      let p :=
+        { defn "p" with
+          kind := .opaque, value := none }
+      let rec' :=
+        { defn "p" with
+          name := .str (.str specM "p") "_unsafe_rec", safety := .partial }
+      (validate (facts [p] [rec']) (lists [entry])).map render ==
+        some "Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.p is partial."),
+    ("rules: a hand-written `_unsafe_rec` (Lean compiles callers from it) → `implemented_by`",
+      fun _ =>
+      let q := defn "q"
+      let rec' := { defn "q" with name := .str (.str specM "q") "_unsafe_rec" }
+      validate (facts [q] [rec']) (lists [entry]) ==
+        some (subj, .flagged (.str specM "q") .implementedBy)),
+    ("rules: a listed entry's file missing from the entry files → load refusal (C9 text)", fun _ =>
+      (validate { facts [] with entryFiles := [] } (lists [entry])).map render ==
+        some "Could not load the built library: no entry file observed for base64.encode@1.0.0."),
+    ("rules: a closure module without a regular file → C4 (C9 text)", fun _ =>
+      (validate (withSpecModule (facts []) ⟨specM, [], none⟩) (lists [entry])).map render ==
+        some
+          ("Library error: base64.encode@1.0.0: the closure module Fvdep.Base64.Encode.V1_0_0 " ++
+            "is not a regular file at Fvdep/Base64/Encode/V1_0_0.lean.")),
+    ("rules: imports outside Init, Std + the library → the least imported module", fun _ =>
+      let F :=
+        withSpecModule (facts []) ⟨specM, [`Lean.Expr, `FvdepProofs.X, `Std.Data], some .empty⟩
+      validate F (lists [entry]) == some (subj, .closureImports `FvdepProofs.X)),
+    ("rules: unlisted entry files → the first in path byte order, its id@version from the path",
+      fun _ =>
+      let p := "Fvdep/Registry/Base64/DecodeUrl/V1_0_0.lean"
+      let F := facts []
+      validate
+          { F with entryFiles := F.entryFiles ++ ["Fvdep/Registry/Semver/Parse/V1_0_0.lean", p] }
+          (lists [entry]) ==
+        some ("base64.decode_url@1.0.0", .unlisted p)),
+    ("rules: V7 holds — an unversioned library module + `V01_0_0` (not canonical) → the least",
+      fun _ =>
+      let F := facts []
+      let M' : ModFacts :=
+        ⟨entryM, [specM, typesM, `Fvdep.Registry, `Fvdep.Base64.Rfc4648.V01_0_0], some .empty⟩
+      validate { F with modules := F.modules.map fun y => if y.name == entryM then M' else y }
+          (lists [entry]) ==
+        some (subj, .closureHolds `Fvdep.Base64.Rfc4648.V01_0_0)),
+    ("rules: V6 — compat naming a later listed version → `not an earlier listed version`", fun _ =>
+      let later :=
+        { entry with
+          version := "1.1.0", module := `Fvdep.Registry.Base64.Encode.V1_1_0 }
+      let F := facts []
+      validate { F with entryFiles := F.entryFiles ++ ["Fvdep/Registry/Base64/Encode/V1_1_0.lean"] }
+          (lists [{ entry with compat := some "1.1.0" }, later]) ==
+        some (subj, .compatNotEarlier "1.1.0")),
+    ("rules: a notice naming nothing → V8", fun _ =>
+      validate (facts [])
+          { lists [entry] with notices := [⟨"base64.encode", "9.9.9", "r", none⟩] } ==
+        some ("base64.encode@9.9.9", .noticeNamesNothing)),
+    ("rules: a nonempty `profiles` → V10, the last row", fun _ =>
+      validate (facts []) { lists [entry] with profiles := 1 } ==
+        some ("Fvdep.Registry.profiles", .profiles))]
+
+end Rules
 
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
@@ -938,7 +1078,9 @@ def main : IO UInt32 := do
                 fun _ => generated.all fun args => run args == expected args,
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
-            (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++ Hash.cases ++
+            (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++
+                  Rules.cases ++
+                  Hash.cases ++
                   Manifest.cases).map
               fun c => check c.1 c.2).mapM
         id
