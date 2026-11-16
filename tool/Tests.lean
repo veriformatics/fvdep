@@ -845,6 +845,164 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Statuses
 
+/-! Compiled-code smoke for the index value (contract U4 C4, C6, C9): the proof covers the
+definitions (`AssembleExact`); these cases pin the value's layout, C6's order, the warnings' order,
+the toolchain trim + the schema walk's acceptance through the compiled code. -/
+
+namespace Assemble
+
+open Lean FvdepCore.Json FvdepCore.Index.Registry FvdepCore.Index.Rules FvdepCore.Index.Statuses
+open FvdepCore.Index.Assemble
+
+/-- A digest stand-in (the claim holds for every `h`): the frame's size. -/
+def hSize (b : ByteArray) : String := toString b.size
+
+def tc : String := "leanprover/lean4:v4.35.0"
+
+def run (F : Facts) (ax : List (Name × List Name)) (l : Lists) (raw : String := tc ++ "\n") :
+    Option (Value × List Warning) :=
+  match assemble F ax l raw hSize with
+  | .ok x => some x
+  | .error _ => none
+
+/-- An entry of `id`@`version` (no proof registry: open + a warning). -/
+def other (id version : String) : Entry :=
+  { Rules.entry with
+    id := id
+    version := version
+    module :=
+      .str `Fvdep.Registry.X
+        (String.ofList (version.toList.map fun c => if c = '.' then '_' else c)) }
+
+/-- The operations' (id, version) in a value. -/
+def opKeys (v : Value) : List (String × String) :=
+  match FvdepCore.Doc.valueAt ["operations"] v with
+  | some (.arr xs) =>
+    xs.filterMap fun x =>
+      (FvdepCore.Doc.strAt ["id"] x).bind fun i => (FvdepCore.Doc.strAt ["version"] x).map (i, ·)
+  | _ => []
+
+def toolchainOf (raw : String) : Option String :=
+  (run Statuses.lib [(Statuses.t, [])] (Rules.lists [Rules.entry]) raw).bind fun x =>
+    FvdepCore.Doc.strAt ["toolchain"] x.1
+
+def cases : List (String × (Unit → Bool)) :=
+  [("assemble: one entry → the C6 value (registry strings, statuses, digest, toolchain)", fun _ =>
+      let F := Statuses.lib
+      let digest :=
+        toString (FvdepCore.Hash.frame "fvdep/entry/1" (closureFiles F Rules.entryM)).size
+      run F [(Statuses.t, [])] (Rules.lists [Rules.entry]) ==
+        some
+          (.obj
+              [("notices", .arr []),
+                ("operations",
+                  .arr
+                    [.obj
+                        [("compat", .null), ("digest", .str digest), ("id", .str "base64.encode"),
+                          ("obligations",
+                            .arr
+                              [.obj
+                                  [("axioms", .arr []), ("name", .str "bits"),
+                                    ("status", .str "proven")]]),
+                          ("version", .str "1.0.0")]]),
+                ("removed", .arr []), ("schema", .int 1), ("toolchain", .str tc)],
+            [])),
+    ("assemble: operations in C6's order — id bytes, then the version numerically", fun _ =>
+      let es :=
+        [other "semver.parse" "1.0.0", other "base64.encode" "1.10.0",
+          other "base64.encode" "2.0.0", other "base64.encode" "1.9.0"]
+      ((run (Rules.facts []) [] (Rules.lists es)).map fun x => opKeys x.1) ==
+        some
+          [("base64.encode", "1.9.0"), ("base64.encode", "1.10.0"), ("base64.encode", "2.0.0"),
+            ("semver.parse", "1.0.0")]),
+    ("assemble: warnings in `modules` order, not the operations' order", fun _ =>
+      let es := [other "semver.parse" "1.0.0", other "base64.encode" "1.0.0"]
+      ((run (Rules.facts []) [] (Rules.lists es)).map fun x => x.2.map Warning.render) ==
+        some
+          [s!"Warning: semver.parse@1.0.0: obligation {Statuses.bits} counts as open: " ++
+              "no proof registry.",
+            s!"Warning: base64.encode@1.0.0: obligation {Statuses.bits} counts as open: " ++
+              "no proof registry."]),
+    ("assemble: the toolchain = the `lean-toolchain` text without surrounding whitespace", fun _ =>
+      toolchainOf (" \t" ++ tc ++ " \r\n") == some tc && toolchainOf " \n\t" == some "" &&
+        toolchainOf ("a b") == some "a b"),
+    ("assemble: notices + removed records in registry order, from the registry strings", fun _ =>
+      let l :=
+        { Rules.lists
+            [Rules.entry] with
+          notices := [⟨"base64.encode", "1.0.0", "r2", some "2.0.0"⟩, ⟨"x.y", "0.1.0", "r1", none⟩]
+          removed := [⟨"x.y", "0.1.0", .profile, "d", "lean", "c"⟩] }
+      match run Statuses.lib [(Statuses.t, [])] l with
+      | some (v, _) =>
+        FvdepCore.Doc.valueAt ["notices"] v ==
+            some
+              (.arr
+                [.obj
+                    [("id", .str "base64.encode"), ("reason", .str "r2"),
+                      ("replacement", .str "2.0.0"), ("version", .str "1.0.0")],
+                  .obj
+                    [("id", .str "x.y"), ("reason", .str "r1"), ("replacement", .null),
+                      ("version", .str "0.1.0")]]) &&
+          FvdepCore.Doc.valueAt ["removed"] v ==
+            some
+              (.arr
+                [.obj
+                    [("digest", .str "d"), ("id", .str "x.y"), ("kind", .str "profile"),
+                      ("last_commit", .str "c"), ("toolchain", .str "lean"),
+                      ("version", .str "0.1.0")]])
+      | none => false),
+    ("assemble: a compat edge + an obligation's axioms in the operations' values", fun _ =>
+      let c := Name.str Statuses.proofsM "compat"
+      let F :=
+        Statuses.compatLib (some c) (Statuses.eqNewOld Statuses.newEntry.spec Rules.entry.spec)
+      match
+        run F [(Statuses.t, [`Z.ax]), (c, [`K.ax])]
+          (Rules.lists [Rules.entry, Statuses.newEntry]) with
+      | some (v, _) =>
+        match FvdepCore.Doc.valueAt ["operations"] v with
+        | some (.arr [o₁, o₂]) =>
+          FvdepCore.Doc.valueAt ["obligations"] o₁ ==
+              some
+                (.arr
+                  [.obj
+                      [("axioms", .arr [.str "Z.ax"]), ("name", .str "bits"),
+                        ("status", .str "trusts")]]) &&
+            FvdepCore.Doc.valueAt ["compat"] o₂ ==
+              some
+                (.obj
+                  [("axioms", .arr [.str "K.ax"]), ("status", .str "trusts"),
+                    ("version", .str "1.0.0")])
+        | _ => false
+      | none => false),
+    ("assemble: a theorem without an observed axiom list → the load refusal passes through",
+      fun _ =>
+      match assemble Statuses.lib [] (Rules.lists [Rules.entry]) tc hSize with
+      | .error f =>
+        render f ==
+          s!"Could not load the built library: no axiom list of {Statuses.t} observed for " ++
+            "base64.encode@1.0.0."
+      | .ok _ => false),
+    ("assemble: the value passes C6's schema walk + encodes, decoding back", fun _ =>
+      let hex (_ : ByteArray) : String := String.ofList (List.replicate 64 'a')
+      match assemble Statuses.lib [(Statuses.t, [])] (Rules.lists [Rules.entry]) tc hex with
+      | .ok (v, _) =>
+        match FvdepCore.Index.IndexFile.ofJson v with
+        | .ok i =>
+          match FvdepCore.Index.encodeIndex i with
+          | .ok b =>
+            match FvdepCore.Index.decodeIndex b with
+            | .ok i' => i' == i && i.operations.length == 1
+            | .error _ => false
+          | .error _ => false
+        | .error _ => false
+      | .error _ => false),
+    ("entryFrame = the H3 `fvdep/entry/1` frame over `closureFiles`", fun _ =>
+      let F := Rules.facts []
+      (entryFrame F Rules.entryM).data ==
+        (FvdepCore.Hash.frame "fvdep/entry/1" (closureFiles F Rules.entryM)).data)]
+
+end Assemble
+
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
 The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
@@ -1268,6 +1426,7 @@ def main : IO UInt32 := do
             (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++
                   Rules.cases ++
                   Statuses.cases ++
+                  Assemble.cases ++
                   Hash.cases ++
                   Manifest.cases).map
               fun c => check c.1 c.2).mapM

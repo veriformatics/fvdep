@@ -2008,6 +2008,26 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Assemble`
+
+- Contract: U4 C4 + C6 + C9 + C8
+- Claim: Index value: after `validate` accepted the lists, `assemble` returns exactly the index value written apart — the entries' statuses, the operations = those entries strictly ascending in C6's (id, version) order, each with its digest `h` of the H3 `fvdep/entry/1` frame of its closure files, notices + removed records in registry order, the `lean-toolchain` text without surrounding whitespace — + C9's warnings in `modules` order; with no such statuses it refuses.
+- Subject: `FvdepCore.Index.Assemble.assemble`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.AssembleClaims.assembleExact` (hash 0x7920e63), proved by `FvdepAudit.Index.Assemble.Proof.assemble_exact`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (ax : List (Lean.Name × List Lean.Name))
+    (l : FvdepCore.Index.Registry.Lists) (raw : String) (h : ByteArray → String),
+    FvdepCore.Index.Rules.validate F l = none →
+      ∀ (v : FvdepCore.Json.Value) (ws : List FvdepCore.Index.Statuses.Warning),
+        FvdepCore.Index.Assemble.assemble F ax l raw h = Except.ok (v, ws) ↔
+          FvdepAudit.Index.Assemble.Spec.AssembleSpec F ax l raw h v ws
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

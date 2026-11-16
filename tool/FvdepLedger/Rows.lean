@@ -2,8 +2,8 @@ import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
+import FvdepAudit.Index.Assemble.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
-import FvdepAudit.Index.Statuses.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
@@ -1204,6 +1204,23 @@ def closureFilesDistinct : Prop :=
 
 end FvdepLedger.Rows.StatusesClaims
 
+namespace FvdepLedger.Rows.AssembleClaims
+
+open Lean FvdepCore.Json FvdepCore.Index.Registry FvdepCore.Index.Rules FvdepCore.Index.Statuses
+open FvdepCore.Index.Assemble FvdepAudit.Index.Assemble.Spec
+
+/-- U4 C4 + C6 + C9 + C8 `AssembleExact`: after `validate` accepted the lists, `assemble` returns
+exactly the index value + warnings written apart (`AssembleSpec`: the entries' statuses, the
+operations = those entries strictly ascending in C6's (id, version) order with their digests `h` of
+the H3 `fvdep/entry/1` frame, notices + removed records in registry order, the trimmed toolchain,
+C9's warnings in `modules` order); with no such statuses it refuses. -/
+def assembleExact : Prop :=
+  ∀ (F : Facts) (ax : List (Name × List Name)) (l : Lists) (raw : String) (h : ByteArray → String)
+    (_h : validate F l = none) (v : Value) (ws : List Warning),
+    assemble F ax l raw h = .ok (v, ws) ↔ AssembleSpec F ax l raw h v ws
+
+end FvdepLedger.Rows.AssembleClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -2113,6 +2130,23 @@ def closureFilesRow : Row :=
     residue := []
     unproven := [] }
 
+def assembleRow : Row :=
+  { component := `FvdepCore.Index.Assemble
+    contract := "U4 C4 + C6 + C9 + C8"
+    claim :=
+      "Index value: after `validate` accepted the lists, `assemble` returns exactly the index " ++
+        "value written apart — the entries' statuses, the operations = those entries strictly " ++
+        "ascending in C6's (id, version) order, each with its digest `h` of the H3 " ++
+        "`fvdep/entry/1` frame of its closure files, notices + removed records in registry " ++
+        "order, the `lean-toolchain` text without surrounding whitespace — + C9's warnings in " ++
+        "`modules` order; with no such statuses it refuses."
+    claims := [(``AssembleClaims.assembleExact, ``FvdepAudit.Index.Assemble.Proof.assemble_exact)]
+    subject := ``FvdepCore.Index.Assemble.assemble
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2125,7 +2159,7 @@ def ledger : Ledger :=
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
-        registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow]
+        registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow]
     residue := residue }
 
 end FvdepLedger.Rows
