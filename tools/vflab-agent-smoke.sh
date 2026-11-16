@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Drafting-agent preflight on vflab (Decisions `Growth`; Tasks `Growth preflight`), after
 # tools/vflab-provision.sh. Each check runs as fvdep-agent in fvapi_gate.slice:
-#   isolation — an developer process cannot read the agent unit's credential or its environment
+#   isolation — a process under the SSH login cannot read the agent unit's credential or its environment
 #     (a canary credential; positive control: root reads both);
 #   binary — the pinned claude starts under bwrap (`--version` names the pinned version);
 #   login — with /etc/fvdep/claude-oauth-token present, `claude -p` under bwrap answers a fixed
@@ -25,7 +25,7 @@ claude_version="$(sed -n 's/^claude_version=\([0-9.]*\)$/\1/p' \
     exit 2
 }
 
-# Runs as developer on vflab; $1 = claude version.
+# Runs as the SSH login user on vflab; $1 = claude version.
 remote="$(
     cat <<'REMOTE'
 set -uo pipefail
@@ -68,7 +68,7 @@ user_cred=$?
 sudo systemctl stop "$unit.service" 2>/dev/null
 held=0
 [ "$root_env$root_cred" = 11 ] && [ "$user_env" -ne 0 ] && [ "$user_cred" -ne 0 ] && held=1
-check isolation "root reads environment $root_env, credential $root_cred; developer read rc environment $user_env, credential $user_cred" "$held"
+check isolation "root reads environment $root_env, credential $root_cred; SSH login read rc environment $user_env, credential $user_cred" "$held"
 
 # The sandbox: $1 = claude version, the rest = claude's arguments.
 # shellcheck disable=SC2016 # expands inside the unit

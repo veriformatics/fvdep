@@ -51,14 +51,25 @@ slice=fvapi_gate.slice
 # The id reaches remote command lines: anything outside [A-Za-z0-9._-] → _. The `fvdep-` prefix
 # marks fvdep's workspaces beside fvapi's.
 id="fvdep-$(basename -- "$root" | tr -c 'A-Za-z0-9._\n-' _)-$(printf '%s' "$root" | sha256sum | cut -c1-8)"
-home=/home/developer
-ws="$home/gate/ws/$id"
 ssh_opts=(-o BatchMode=yes -o ServerAliveInterval=15 -o ServerAliveCountMax=4)
 
 fail_setup() {
-    printf 'vflab-run: %s (workspace %s:%s)\n' "$1" "$host" "$ws" >&2
+    printf 'vflab-run: %s (workspace %s:%s)\n' "$1" "$host" "${ws:-unresolved}" >&2
     exit 125
 }
+
+quote() { printf '%q ' "$@"; }
+
+# Resolve the SSH account before uploading files or starting a privileged unit.
+# SSH's status must survive command substitution; mapfile alone would hide it.
+identity=$(ssh "${ssh_opts[@]}" "$host" 'set -eu; id -u; id -g; printf "%s\n" "$HOME"') ||
+    fail_setup 'cannot resolve the SSH account'
+mapfile -t remote_identity <<<"$identity"
+[[ ${#remote_identity[@]} -eq 3 ]] || fail_setup 'invalid SSH account response'
+remote_uid=${remote_identity[0]} remote_gid=${remote_identity[1]} remote_home=${remote_identity[2]}
+[[ $remote_uid =~ ^[0-9]+$ && $remote_gid =~ ^[0-9]+$ && $remote_home == /* ]] ||
+    fail_setup 'invalid SSH account response'
+ws="$remote_home/gate/ws/$id"
 
 head="$(git -C "$root" rev-parse --verify -q HEAD)" || fail_setup 'no HEAD commit'
 tmp="$(mktemp -d)"
@@ -72,7 +83,7 @@ ssh "${ssh_opts[@]}" "$host" "[ -e /etc/systemd/system/$slice ] && systemctl is-
     cap=\$(systemctl show -P MemoryMax $slice) &&
         { [ \"\$cap\" = infinity ] || [ \"\$cap\" -gt $memory_bytes ]; } || {
         echo \"MemoryMax $memory is not below the cap of $slice (\$cap)\" >&2; exit 1; }
-    mkdir -p '$home/gate/ws' && cat >'$bundle'" <"$tmp/head.bundle" ||
+    mkdir -p $(quote "$remote_home/gate/ws") && cat >$(quote "$bundle")" <"$tmp/head.bundle" ||
     fail_setup "$slice missing, inactive or capped at or below MemoryMax $memory, or bundle upload failed"
 
 # Runs inside the unit, under the workspace lock: sync from the tar stream on stdin, then the
@@ -101,13 +112,12 @@ rm -rf "$ws/.incoming"
 cd "$ws" || fail "workspace missing"
 "$@" </dev/null'
 
-quote() { printf '%q ' "$@"; }
-remote="sudo systemd-run --uid=developer --gid=developer --slice=$slice \
+remote="sudo systemd-run --uid=$remote_uid --gid=$remote_gid --slice=$slice \
     --wait --pipe --collect --expand-environment=no --property=Type=oneshot \
     --property=TimeoutStartSec=$timeout --property=TimeoutStopSec=30 \
     --property=MemoryMax=$memory --property=MemorySwapMax=0 --property=IgnoreSIGPIPE=no \
-    --setenv=HOME=$home \
-    --setenv=PATH=$home/.elan/bin:$ws/.tools/bin:$home/.local/node/bin:/usr/local/bin:/usr/bin:/bin \
+    $(quote "--setenv=HOME=$remote_home" \
+        "--setenv=PATH=$remote_home/.elan/bin:$ws/.tools/bin:$remote_home/.local/node/bin:/usr/local/bin:/usr/bin:/bin") \
     -- $(quote /usr/bin/flock "$ws.lock" /bin/bash -c "$inner" vflab-run "$ws" "$root" "$bundle" \
         "$head" "$@")"
 
@@ -116,7 +126,8 @@ remote="sudo systemd-run --uid=developer --gid=developer --slice=$slice \
 # the workspace path literally; on stderr they drop systemd-run's opening "Running as unit" line
 # and fold its closing accounting block (result, runtime, CPU, memory peak) into one line.
 # shellcheck disable=SC2016
-filter='function map(s,   out, i) {
+filter='BEGIN { ws = ENVIRON["FVDEP_REMOTE_WS"]; root = ENVIRON["FVDEP_LOCAL_ROOT"] }
+function map(s,   out, i) {
     out = ""
     while ((i = index(s, ws)) > 0) { out = out substr(s, 1, i - 1) root; s = substr(s, i + length(ws)) }
     return out s
@@ -133,9 +144,9 @@ END {
     fflush()
 }'
 mkfifo "$tmp/out" "$tmp/err"
-awk -v ws="$ws" -v root="$root" -v err=0 "$filter" <"$tmp/out" &
+FVDEP_REMOTE_WS="$ws" FVDEP_LOCAL_ROOT="$root" awk -v err=0 "$filter" <"$tmp/out" &
 out_pid=$!
-awk -v ws="$ws" -v root="$root" -v err=1 "$filter" <"$tmp/err" >&2 &
+FVDEP_REMOTE_WS="$ws" FVDEP_LOCAL_ROOT="$root" awk -v err=1 "$filter" <"$tmp/err" >&2 &
 err_pid=$!
 # The graded file set: tracked (minus deleted) + untracked-unignored. `comm -z`, not `grep -z -f`:
 # grep reads its pattern file newline-separated even under -z, so a deleted path would stay listed.
@@ -151,7 +162,7 @@ out_rc=$?
 wait "$err_pid"
 err_rc=$?
 # The unit removes its bundle; one that never started leaves it here.
-ssh "${ssh_opts[@]}" "$host" "rm -f '$bundle'" || true
+ssh "${ssh_opts[@]}" "$host" "rm -f -- $(quote "$bundle")" || true
 rc="${statuses[1]}"
 if [[ $rc -ne 0 ]]; then
     exit "$rc"

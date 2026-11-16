@@ -3,11 +3,11 @@
 # Idempotent: each piece missing or off its stated state is set + printed; the rest stays as is.
 # Host maintenance ⇒ announce it to the fvapi session first (CLAUDE.local.md).
 # - ZFS dataset data/fvdep at /srv/data/fvdep (child of the encrypted pool `data`, under its key),
-#   quota 64G = fvdep's bound on the pool it shares with fvapi; growth/ = developer 0750; sys-test/ =
-#   developer 0700, the ZFS root of tests/sys (case F.filesystem.zfs; runs without sudo).
+#   quota 64G = fvdep's bound on the pool it shares with fvapi; growth/ = SSH login user 0750; sys-test/ =
+#   SSH login user 0700, the ZFS root of tests/sys (case F.filesystem.zfs; runs without sudo).
 # - System user fvdep-agent (no home, nologin) = the drafting agent's UID: same-UID processes can
 #   read a unit's credentials + /proc/<pid>/environ ⇒ the subscription token never reaches an
-#   developer process.
+#   SSH login process.
 # - /etc/fvdep = root 0700, the token drop: /etc/fvdep/claude-oauth-token (root 0600), read only by
 #   systemd LoadCredential into the agent's unit.
 # - Claude Code native binary /opt/fvdep/claude/<version>/claude (root 0755), pinned by version +
@@ -29,6 +29,7 @@ remote="$(
     cat <<'REMOTE'
 set -euo pipefail
 version=$1 sha=$2
+# sudo records the unchanged SSH caller; the agent keeps its separate system UID.
 say() { printf 'vflab-provision: %s\n' "$*"; }
 if ! zfs list -H -o name data/fvdep >/dev/null 2>&1; then
     zfs create -o quota=64G data/fvdep
@@ -41,8 +42,8 @@ fi
 [ "$(zfs get -H -o value mountpoint data/fvdep)" = /srv/data/fvdep ] &&
     [ "$(zfs get -H -o value mounted data/fvdep)" = yes ] ||
     { say 'data/fvdep is not mounted at /srv/data/fvdep'; exit 1; }
-install -d -o developer -g developer -m 0750 /srv/data/fvdep/growth
-install -d -o developer -g developer -m 0700 /srv/data/fvdep/sys-test
+install -d -o "${SUDO_UID:?}" -g "${SUDO_GID:?}" -m 0750 /srv/data/fvdep/growth
+install -d -o "${SUDO_UID:?}" -g "${SUDO_GID:?}" -m 0700 /srv/data/fvdep/sys-test
 if ! id -u fvdep-agent >/dev/null 2>&1; then
     useradd --system --user-group --no-create-home --home-dir /nonexistent \
         --shell /usr/sbin/nologin fvdep-agent
