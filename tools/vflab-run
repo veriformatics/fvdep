@@ -150,9 +150,11 @@ FVDEP_REMOTE_WS="$ws" FVDEP_LOCAL_ROOT="$root" awk -v err=1 "$filter" <"$tmp/err
 err_pid=$!
 # The graded file set: tracked (minus deleted) + untracked-unignored. `comm -z`, not `grep -z -f`:
 # grep reads its pattern file newline-separated even under -z, so a deleted path would stay listed.
-git -C "$root" ls-files -d -z | sort -z >"$tmp/deleted" &&
-    git -C "$root" ls-files -co --exclude-standard --deduplicate -z | sort -z |
-    comm -z -23 - "$tmp/deleted" >"$tmp/files"
+# Byte order for sort + comm alike: under a UTF-8 locale uutils coreutils 0.10 (Ubuntu 26.04's
+# default) sorts in an order its comm rejects (stderr warning; its merge assumes its own order).
+git -C "$root" ls-files -d -z | LC_ALL=C sort -z >"$tmp/deleted" &&
+    git -C "$root" ls-files -co --exclude-standard --deduplicate -z | LC_ALL=C sort -z |
+    LC_ALL=C comm -z -23 - "$tmp/deleted" >"$tmp/files"
 list_rc=$?
 tar -C "$root" --null -T "$tmp/files" -cf - |
     ssh "${ssh_opts[@]}" "$host" "$remote" >"$tmp/out" 2>"$tmp/err"
