@@ -57,9 +57,10 @@ structure Source where
 def roots : List String :=
   ["Fvdep.lean", "FvdepPreview.lean", "FvdepProofs.lean", "Fvdep", "FvdepPreview", "FvdepProofs"]
 
-/-- The `.lean` files at or under `rel`, at most `fuel` directories deep: links followed for their
-content (the build compiles what Lake would read) + marked irregular, each directory once by its
-real path (no link cycle), special files never opened (no FIFO blocks the run). -/
+/-- The `.lean` files at or under `rel`, `fuel` = path components left (C1: 64 from a root): links
+followed for their content (the build compiles what Lake would read) + marked irregular, each
+directory once by its real path (no link cycle), special files never opened (no FIFO blocks the
+run). -/
 def collect : Nat → String → Bool → StateT (Array String × Array Source) IO Unit
   | 0, _, _ => pure ()
   | fuel + 1, rel, regular => do
@@ -94,8 +95,8 @@ def collect : Nat → String → Bool → StateT (Array String × Array Source) 
     | _ =>
       pure ()
 
-/-- Every library source of the working copy, read once (C4: the framed bytes = the compiled
-ones). -/
+/-- Every library source of the working copy at most 64 path components deep (C1), read once (C4:
+the framed bytes = the compiled ones). -/
 def snapshot : IO (Array Source) := do
   let mut st : Array String × Array Source := (#[], #[])
   for r in roots do

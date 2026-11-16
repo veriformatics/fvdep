@@ -17,11 +17,11 @@ invocation.unrecognized-command	U1	interface §1; U1 K2	unrecognized-command emi
 invocation.unrecognized-option	U1	interface §1; U1 K2	unrecognized-option emits usage on stderr alone and exits 2	example	merged
 invocation.version	U1	interface §1; U1 K2	Version uses stdout alone and exactly one LF	example	merged
 invocation.version-extra	U1	interface §1; U1 K2	version-extra emits usage on stderr alone and exits 2	example	merged
-library.identity-proof-exclusion	U4	Decisions Library layout + identity; library Registry (identity)	Changing proof bytes alone leaves the entry identity unchanged	property	unmerged
-library.identity-source-sensitive	U4	Decisions Library layout + identity; library Registry (identity)	Changing any sampled source-closure byte changes the entry digest	property	unmerged
-library.identity-unrelated-entry	U4	library Registry (identity); Decisions Spec modularity	Adding a separately versioned entry leaves the original identity unchanged	property	unmerged
-library.index-drift	U4	interface §3 index	index --check reports byte drift without rewriting the committed index	example	unmerged
-library.index-pure	U4	Decisions Library layout + identity; library Registry; interface §3	Index generation is byte-idempotent and --check is read-only	property	unmerged
+library.identity-proof-exclusion	U4	Decisions Library layout + identity; library Registry (identity)	Changing proof bytes alone leaves the entry identity unchanged	property	merged
+library.identity-source-sensitive	U4	Decisions Library layout + identity; library Registry (identity)	Changing any sampled source-closure byte changes the entry digest	property	merged
+library.identity-unrelated-entry	U4	library Registry (identity); Decisions Spec modularity	Adding a separately versioned entry leaves the original identity unchanged	property	merged
+library.index-drift	U4	interface §3 index	index --check reports byte drift without rewriting the committed index	example	merged
+library.index-pure	U4	Decisions Library layout + identity; library Registry; interface §3	Index generation is byte-idempotent and --check is read-only	property	merged
 oracle.base64.decode.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
 oracle.base64.decode_url.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode_url accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
 oracle.base64.encode.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode agrees with an independent bit-level encoder over seeded byte strings	property	unmerged
@@ -74,7 +74,7 @@ invocation.command-help.build-lib	U8	interface §1	build-lib --help needs no pro
 invocation.command-help.check	U8	interface §1	check --help needs no project or library	example	unmerged
 invocation.command-help.diff	U8	interface §1	diff --help needs no project or library	example	unmerged
 invocation.command-help.fetch	U8	interface §1	fetch --help needs no project or library	example	unmerged
-invocation.command-help.index	U8	interface §1	index --help needs no project or library	example	unmerged
+invocation.command-help.index	U8	interface §1	index --help needs no project or library	example	merged
 invocation.command-help.init	U8	interface §1	init --help needs no project or library	example	unmerged
 invocation.command-help.list	U8	interface §1	list --help needs no project or library	example	unmerged
 invocation.command-help.lock	U8	interface §1	lock --help needs no project or library	example	unmerged

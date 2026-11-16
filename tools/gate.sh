@@ -98,6 +98,7 @@ index-suite lean
 fuzz-replay lean
 sys-suite   lean
 acceptance  lean
+index       lean
 index-history lean
 imports     checks
 preview     checks
@@ -119,7 +120,7 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite acceptance index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite acceptance index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -280,6 +281,14 @@ acceptance() {
     suite acceptance "$(shipped_closure tests/acceptance tool/Main.lean)" \
         "${FVDEP_ACCEPTANCE_CASE:-}" env FVDEP_BIN="$root/tool/.lake/build/bin/fvdep" \
         python3 -I tests/acceptance/run.py --merged ${FVDEP_ACCEPTANCE_CASE:+-k "$FVDEP_ACCEPTANCE_CASE"}
+}
+
+# C7: the committed index.json = the bytes `fvdep index` makes of the library sources (a fresh
+# snapshot build, its observations + the kernel replay; `--check` never writes); verdict reused like
+# the suites'. Drift after a library change → regenerate: bash tools/update-index.sh (desktop).
+index() {
+    suite index "$(shipped_closure index.json tool/Main.lean)" "" \
+        "$root/tool/.lake/build/bin/fvdep" index --check
 }
 
 # C7 + C9 `history`: the working tree's index.json against HEAD's + each of HEAD's parents' committed

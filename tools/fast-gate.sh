@@ -15,7 +15,7 @@ start="$(stamp)"
 ledger_begin fast
 
 sequential=(lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite
-    library-suite index-suite fuzz-replay sys-suite acceptance index-history)
+    library-suite index-suite fuzz-replay sys-suite acceptance index index-history)
 # A suite's green verdict stands while its inputs are unchanged (gate.sh `suite`).
 export FVDEP_REUSE=1
 parallel=()

@@ -51,7 +51,7 @@ copy() {
     fi
     # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
     for d in ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite \
-        acceptance; do
+        acceptance index; do
         if [[ -f "$root/.gate/$d.green" ]]; then
             mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
         fi
@@ -579,6 +579,34 @@ probe ci-verdict plant_marker "not green: checks" ci_verdict
 
 # fast gate: a failing background stage (deps: a pin without a row) fails the fast gate, named.
 probe fast-gate plant_tool "FAILED: deps" bash tools/fast-gate.sh
+
+# index (C7): the committed index.json one byte off the library → drift; a theorem forged in
+# FvdepProofs (kernel check skipped at elaboration) → the kernel replay rejects its module; a
+# registry list in a form fvdep cannot read → that refusal. Every run builds the library afresh
+# (≈ 3 GB peak on the launch library) ⇒ one at a time across these probes (CI runners: 16 GB).
+index_stage() { flock "$scratch/index.lock" bash -c 'source tools/gate.sh; index'; }
+plant_index_drift() { printf ' ' >>index.json; }
+probe index-drift plant_index_drift "index.json differs from the library" index_stage
+plant_index_forged() {
+    cat >FvdepProofs/Probe.lean <<'EOF'
+import Lean
+set_option debug.skipKernelTC true
+open Lean Elab Command in
+run_cmd liftCoreM <| addDecl (.thmDecl {
+  name := `FvdepProofs.Probe.forged
+  levelParams := []
+  type := mkConst ``False
+  value := mkConst ``True.intro
+})
+EOF
+    printf 'import FvdepProofs.Probe\n' >>FvdepProofs.lean
+}
+probe index-replay plant_index_forged "Kernel replay rejected FvdepProofs.Probe: " index_stage
+plant_index_form() {
+    sed -i 's/^\(def profiles : .*\) := \[\]$/\1 := List.reverse []/' Fvdep/Registry.lean
+}
+probe index-registry plant_index_form \
+    "The registry uses a form fvdep cannot read: Fvdep.Registry.profiles." index_stage
 
 # index-history (C7 + C9 `history`): each history breach fails the stage, named; every control run
 # is the copy's root commit (no committed index.json, or an unchanged one) and passes.
