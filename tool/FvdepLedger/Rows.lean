@@ -1158,7 +1158,8 @@ every row of C9's order holds — C3's rules, C4's file check + the load observa
 def validateAccepts : Prop := ∀ (F : Facts) (l : Lists), validate F l = none ↔ RegistryValid F l
 
 /-- U4 C9 + C8 `ValidateExact` (order): a refusal is what the first failing row of C9's order may
-report (a reason with several offenders: its least by printed name). -/
+report (a reason with several offenders: V3, V7 + C4 its least by printed name, V4 its first in
+entry order). -/
 def validateFirst : Prop :=
   ∀ (F : Facts) (l : Lists) (f : Found) (_h : validate F l = some f), FirstFail (specChecks F l) f
 

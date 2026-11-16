@@ -62,18 +62,20 @@ theorem propIn_iff (F : Facts) (e : Entry) (o : Name) :
   simp only [Bool.and_eq_true, Option.isSome_iff_ne_none, PropObligation, propIn]
   apply and_congr_right
   intro _
-  split
-  · rename_i d hd
-    simp only [Bool.and_eq_true, beq_iff_eq, alphaEq_iff]
-    constructor
-    · rintro ⟨⟨hk, hm⟩, ht⟩
-      exact ⟨d, hd, hk, hm, by simpa [erase] using ht⟩
-    · rintro ⟨d', hd', hk, hm, ht⟩
-      rw [hd] at hd'
-      cases hd'
-      exact ⟨⟨hk, hm⟩, by simpa [erase] using ht⟩
-  · rename_i hd
-    simp [hd]
+  apply and_congr
+  · cases o <;> simp
+  · split
+    · rename_i d hd
+      simp only [Bool.and_eq_true, beq_iff_eq, alphaEq_iff]
+      constructor
+      · rintro ⟨⟨hk, hm⟩, ht⟩
+        exact ⟨d, hd, hk, hm, by simpa [erase] using ht⟩
+      · rintro ⟨d', hd', hk, hm, ht⟩
+        rw [hd] at hd'
+        cases hd'
+        exact ⟨⟨hk, hm⟩, by simpa [erase] using ht⟩
+    · rename_i hd
+      simp [hd]
 
 theorem abiShape_iff (F : Facts) (a : Name) : abiShape F a = true ↔ AbiShape F a := by
   unfold abiShape AbiShape

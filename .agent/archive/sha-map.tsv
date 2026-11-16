@@ -1,0 +1,62 @@
+old	new	subject
+b38c444	4964d17	repo: standup → template files, .gitignore, spec skeleton
+9fdd332	4cf621c	prototype: fvdep end-to-end → Lean spec library + oracle, example impl
+6dbdd4f	c90877a	prototype: review fixes → audited compat claim, stale-oracle rebuild, 
+3e1d114	97e9da9	repo: janitor-1 ignore gaps → python/rust/os/env ignore rules
+c576e76	6cc786f	prototype: navigator-1 lead (lean check passed any spec) → module-refe
+9ebb36b	8302efe	prototype: navigator-1 rows I1/Q4 → scan says 'has a spec' not 'covere
+1f7d89d	9d55018	spec: user rulings at PROTOTYPE showing → Decisions + ITERATE tasks; P
+1e64b13	3154798	spec: fvapi-5d host ruling (42c5b62) → vflab shared at equal priority 
+31f2ab5	0217f30	prototype: r1 rulings (proof-only, modular specs, profiles) → per-op m
+34b3885	b37b43b	spec: tick r1 rows → 31f2ab5
+de834ec	70ebe93	prototype: axiom-only check accepts forged + tampered-spec proofs → la
+0ec6dc4	b0f5bcc	spec: r1 user rulings (Lean via C route, security bar, profile publish
+de60fa0	4f0caa8	prototype: r2 rulings (Lean via C library, profile publishing) → Fvdep
+0d02827	740f8d7	spec: r2 C-library + publish-status → Artifacts, Decisions; tick de60f
+b72d2cb	b1b2c45	prototype: r2 automation ruling (agent drafts, kernel admits; first gr
+23acf03	f45d4ab	spec: tick r2 automation + self-verification plan → b72d2cb
+ea9d56e	49f2f30	prototype: r2 review (navigator-3, janitor-5) → tour installs Node bin
+418ff71	ad7137f	prototype: r3 user ruling (business rules → IMPLEMENT; trim past-illus
+b49e059	ba3bbce	spec: tick r3 trim → 418ff71
+63b96d5	816e807	spec: ITERATE close (user go r3: "let's close ITERATE") → Phase IMPLEM
+bd20f3f	9e7303e	repo: template behind → refreshed (Markdown-exact spec-lint fences, tu
+8c03d74	a39d09a	spec: orientation business rules open (8 + 4 scope questions) → user r
+95d5755	2c51a77	spec: stack + core method open (prototype = Python CLI + one-phase che
+5d5e6a5	8cc5045	spec: stack + core-method rulings landed → ticked (95d5755); unit plan
+7454871	3af404a	spec: unit plan unreviewed, interface + library v1 open holes → pre-mo
+c9cab81	6c58d36	spec: C1/C2 closure check found 6 clauses partly closed → receipt fiel
+ce1b195	73878b5	u1: no package, gate or CI existed → Lake packages + vflab gate (19 st
+d740f4a	7776433	u1: metadata said Apache-2.0 under an LLVM-exception LICENSE + 3 sheba
+6ec1287	8170df2	growth: vflab had no fvdep data root, agent user or pinned agent binar
+5476c14	c052e19	u2: no decision core existed + no claim about fvdep's own code was bou
+5e46a93	db84b73	spec: U2 landed unticked + its F27 row lacked statement-level evidence
+18136f7	7cce7f3	u3-j: fvdep had no JSON codec + a duplicate key went unnamed → verifie
+f3a0af8	c77b18e	u3-d: receipts, fvdep.lock + the --json envelope had no codec + U2's D
+ef1bec7	f26cbe8	spec: U3-D landed unticked + its 3,371 blind cases uncredited + lean-s
+731adcb	4eb2ff6	u3-ids: a 65,532-digit version component took 24–33 s to read (U2 pars
+2b52668	1f4de73	u3-sh: fvdep had no SHA-256 + no digest framing, and reviewer-3 found 
+d0ff24b	2b89a3f	spec: S + H landed unticked, reviewer-3's round 2 unrecorded + the T c
+49cc917	c608818	spec: tester-3's S batch landed ungraded on stub E + the real code, 41
+78bcca8	5ad233b	u3-t: fvdep had no fvdep.toml reader or printer → proven text stage (6
+bb12f50	e52057d	spec: T landed unticked + F's seam left durability, the temp range, th
+79538f9	53124a0	spec: T's faithfulness review unrecorded + F's readFile loop unbounded
+174bd60	f5814a9	u3-f: fvdep had no durable file writes, bounded reads or writer lock →
+5fd9150	a723f94	spec: F landed unticked with its gate evidence unrecorded + ci-gate mi
+d9de671	e7a888d	ci: ci-gate missed an existing gate run (GitHub's workflow-filtered ru
+1a7bb3b	67a021c	u3-close-suites: tester-3's J/H/D/S5 + tester-4's T6 blind suites grad
+c2cf46f	3e91b6f	u3-close-model-step: reviewer-3 round 4 found the native row's export 
+96c7ec1	3432036	u3-close-fuzz: U3's byte-level decoders + memory-unsafe C had no cover
+0976c75	d61c17d	u3-close-f6: tester-4's F6 persistence suite (2,819 cases) sat outside
+8635233	bab7440	u3-close-rest: U3's J5 resources were unrecorded + its commits held se
+89ce902	abcbda8	spec: U3's close landed unticked with its gate evidence unrecorded + i
+e024d81	207946b	acceptance: U1 closed while tester-1 still wrote the suite ⇒ its 18 in
+f4e8cff	0a7fa0e	u4-a: fvdep's library held only Fvdep.Version — no registry, launch sp
+22363f3	89eb7b6	u4-b: fvdep had no adapter-protocol codec (interface §8) + the launch 
+8d9ede8	84fe325	u4-a8: contract U4 holds C until a consumer has proven an implementati
+e7af5d9	65f5d58	u4-c-api: part C's black-box surface was unfixed — a blind tester coul
+381481a	898fda4	u4-c-doc: fvdep had no `index.json` codec (contract C6) + no rule for 
+92c9e83	bc32b1e	u4-c-doc-fix: a `proven` obligation's axioms skipped C9's descent-firs
+9aad949	fbf3921	u4-c-registry: fvdep could not read the library's registry (contract C
+45e5e8f	09c1f5b	u4-c-registry-fix: the certificate's `modules` + `profiles` lists sat 
+cb8f43b	a350e82	u4-c-rules-a: fvdep had no entry rules (contract C3 V1–V10 + C4's file
+4f3469e	3c2f9c6	u4-pause: the user paused the session mid part C (V4 fix + C-rules-b u

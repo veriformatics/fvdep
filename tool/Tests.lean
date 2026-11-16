@@ -652,6 +652,13 @@ def cases : List (String × (Unit → Bool)) :=
       validate (facts [])
           { lists [entry] with notices := [⟨"base64.encode", "9.9.9", "r", none⟩] } ==
         some ("base64.encode@9.9.9", .noticeNamesNothing)),
+    ("rules: V4 — an obligation declared in S outside S's namespace → not a Prop definition in S",
+      fun _ =>
+      let p :=
+        { defn "x" with
+          name := `Foo.p, type := .sort .zero }
+      validate (facts [] [p]) (lists [{ entry with obligations := [.str specM "bits", `Foo.p] }]) ==
+        some (subj, .obligationNotProp `Foo.p specM)),
     ("rules: a nonempty `profiles` → V10, the last row", fun _ =>
       validate (facts []) { lists [entry] with profiles := 1 } ==
         some ("Fvdep.Registry.profiles", .profiles))]

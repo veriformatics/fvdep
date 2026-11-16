@@ -72,9 +72,11 @@ def leastRow (P : Name → Prop) (report : Name → Found) : Row :=
 def Checked (F : Facts) (e : Entry) (c : Name) : Prop :=
   ConstReach F (e.spec :: e.abi.toList) c ∧ libDecl? F c ≠ none
 
-/-- V4: a definition declared in the entry's spec module of type exactly `Prop`. -/
+/-- V4: `S.<name>` for the entry's spec module `S`, a definition declared in `S` of type exactly
+`Prop`. -/
 def PropObligation (F : Facts) (e : Entry) (o : Name) : Prop :=
   canonical? e ≠ none ∧
+    (∃ name, o = .str (specModule e) name) ∧
     ∃ d,
       libDecl? F o = some d ∧ d.kind = .defn ∧ d.module = specModule e ∧ erase d.type = .sort .zero
 

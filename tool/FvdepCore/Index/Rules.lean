@@ -325,11 +325,15 @@ def encodable (F : Facts) (c : Name) : Bool :=
   | some d => (FvdepCore.Protocol.sigOf d.type).isSome
   | none => false
 
-/-- V4: a definition declared in `S` of type exactly `Prop`. -/
+/-- V4: `o = S.<name>`, a definition declared in `S` of type exactly `Prop` (the index names an
+obligation by its last component: C6). -/
 def propIn (F : Facts) (o S : Name) : Bool :=
-  match libDecl? F o with
-  | some d => d.kind == .defn && d.module == S && alphaEq d.type (.sort .zero)
-  | none => false
+  (match o with
+    | .str p _ => p == S
+    | _ => false) &&
+    (match libDecl? F o with
+    | some d => d.kind == .defn && d.module == S && alphaEq d.type (.sort .zero)
+    | none => false)
 
 /-- The first element repeating an earlier one. -/
 def firstRepeat (xs : List Name) : Option Name := go xs []
@@ -549,7 +553,8 @@ def decamel (s : String) : String :=
         ([], true)).1.reverse
 
 /-- The id + version an entry file's path spells (`Fvdep/Registry/<Dep>/<Op>/V<x>_<y>_<z>.lean`),
-else the path itself. -/
+else the path itself. Domain = the entry files on disk (`Facts.entryFiles`: `V*.lean` paths alone):
+the last five characters dropped are `.lean` there, unchecked. -/
 def spelled (p : String) : String :=
   match p.splitOn "/" with
   | ["Fvdep", "Registry", dep, op, file] =>
