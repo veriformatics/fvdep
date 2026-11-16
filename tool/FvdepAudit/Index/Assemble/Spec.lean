@@ -7,8 +7,8 @@ obligation by V4's shape `S.<name>`, each operation from its registry strings + 
 digest of its closure's H3 frame, the operations an arrangement of the entries strictly ascending in
 C6's (id, version) order (`IdVersionBefore`, the order the schema walk enforces), notices + removed
 records in registry order, the toolchain = the `lean-toolchain` text without surrounding
-whitespace, C9's warnings in `modules` order. Shared with the shipped code: `StatusesSpec`
-(C-rules-b), `closureFiles` (C4), `FvdepCore.Hash.frame` (U3 H). -/
+whitespace, C9's warnings in `modules` order. Reused: `StatusesSpec` (C-rules-b's spec); shared
+with the shipped code: `closureFiles` (C4), `FvdepCore.Hash.frame` (U3 H). -/
 
 namespace FvdepAudit.Index.Assemble.Spec
 

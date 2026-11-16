@@ -1003,6 +1003,93 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Assemble
 
+/-! Compiled-code smoke for the history gate (contract U4 C7 + C9): the proof covers the definition
+(`HistoryExact`); these cases pin C9's texts, its order + C7's witness rule through the compiled
+code. -/
+
+namespace History
+
+open FvdepCore.Ids FvdepCore.Index FvdepCore.Index.History
+
+def sha (c : Char) : String := String.ofList (List.replicate 40 c)
+
+def commitOf (c : Char) : Commit := (Commit.parse (sha c)).getD Doc.cm
+
+def tcA : String := "leanprover/lean4:v4.35.0"
+
+def tcB : String := "leanprover/lean4:v9.9.9"
+
+def op (digest : Char := '1') : Operation :=
+  ⟨Doc.mid "base64.encode", Doc.ver, Doc.d64 digest, [], none⟩
+
+def rec' (last : Char) (toolchain : String := tcA) (digest : Char := '1') : Removed :=
+  ⟨Doc.mid "base64.encode", Doc.ver, Doc.d64 digest, commitOf last, toolchain⟩
+
+def notice (reason : String := "r") : Notice := ⟨Doc.mid "base64.encode", Doc.ver, reason, none⟩
+
+def idx (ops : List Operation) (toolchain : String := tcA) (removed : List Removed := [])
+    (notices : List Notice := []) : IndexFile := ⟨toolchain, ops, notices, removed⟩
+
+def base (c : Char) (i : IndexFile) : Baseline := ⟨sha c, some (.ok i)⟩
+
+def lines (w : Option IndexFile) (head : Baseline) (parents : List Baseline := []) : List String :=
+  (history (.ok w) head parents).map Line.render
+
+def subj : String := "base64.encode@1.0.0"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("history: an unchanged index → no line", fun _ =>
+      lines (some (idx [op])) (base 'b' (idx [op])) [base 'c' (idx [op])] == []),
+    ("history: a changed digest → one line per baseline, HEAD first", fun _ =>
+      lines (some (idx [op '3'])) (base 'b' (idx [op])) [base 'c' (idx [op])] ==
+        [s!"history: {sha 'b'}: {subj} changed its digest",
+          s!"history: {sha 'c'}: {subj} changed its digest"]),
+    ("history: a vanished operation; an absent working index = an empty one", fun _ =>
+      lines (some (idx [])) (base 'b' (idx [op])) == [s!"history: {sha 'b'}: {subj} vanished"] &&
+        lines none (base 'b' (idx [op])) == [s!"history: {sha 'b'}: {subj} vanished"]),
+    ("history: a removal record with another digest → changed its digest, checked first", fun _ =>
+      lines (some (idx [] tcA [rec' 'b' tcA '3'] [notice])) (base 'b' (idx [op])) ==
+        [s!"history: {sha 'b'}: {subj} changed its digest"]),
+    ("history: a removal without a toolchain change", fun _ =>
+      lines (some (idx [] tcA [rec' 'b'] [notice])) (base 'b' (idx [op])) ==
+        [s!"history: {sha 'b'}: {subj} was removed without a toolchain change"]),
+    ("history: an uncommitted removal names HEAD as its lastCommit (C7)", fun _ =>
+      lines (some (idx [] tcB [rec' 'b'] [notice])) (base 'b' (idx [op])) == [] &&
+        lines (some (idx [] tcB [rec' 'e'] [notice])) (base 'b' (idx [op])) ==
+          [s!"history: {sha 'b'}: {subj}: the removal names lastCommit {sha 'e'}, " ++
+              s!"expected {sha 'b'}"]),
+    ("history: a removal record of another toolchain than its witness's", fun _ =>
+      lines (some (idx [] tcB [rec' 'b' tcB] [notice])) (base 'b' (idx [op])) ==
+        [s!"history: {sha 'b'}: {subj}: the removal names toolchain {tcB}, expected {tcA}"]),
+    ("history: a committed removal — any parent listing the operation is a witness", fun _ =>
+      let w := idx [] tcB [rec' 'd'] [notice]
+      lines (some w) (base 'b' w) [base 'c' (idx [op]), base 'd' (idx [op])] == [] &&
+        lines (some w) (base 'b' w) [base 'c' (idx [op]), base 'd' (idx [] tcA [] [])] ==
+          [s!"history: {sha 'c'}: {subj}: the removal names lastCommit {sha 'd'}, " ++
+              s!"expected {sha 'c'}"]),
+    ("history: a parent already holding the record → no witness line (preserved)", fun _ =>
+      let w := idx [] tcB [rec' 'e'] [notice]
+      lines (some w) (base 'b' w) [base 'c' w, base 'd' (idx [op])] == []),
+    ("history: removed records + notices not extending a baseline's, after its operations", fun _ =>
+      lines (some (idx [op] tcA [] [notice "b"]))
+          (base 'b' (idx [op] tcA [rec' 'f'] [notice "a"])) ==
+        [s!"history: {sha 'b'}: the removed records do not extend this commit's",
+          s!"history: {sha 'b'}: the notices do not extend this commit's"]),
+    ("history: the parents' diverging notices → that line first", fun _ =>
+      let l := idx [op] tcA [] [notice "l"]
+      let r := idx [op] tcA [] [notice "r"]
+      lines (some l) (base 'b' l) [base 'c' l, base 'd' r] ==
+        [s!"history: {sha 'b'}: the parents' notices diverge: rebase to linearize",
+          s!"history: {sha 'd'}: the notices do not extend this commit's"]),
+    ("history: an undecodable baseline → its line alone; an undecodable working index → alone",
+      fun _ =>
+      (history (.ok (some (idx [op]))) ⟨sha 'b', some (.error "malformed")⟩ []).map Line.render ==
+          [s!"history: {sha 'b'}: index.json does not decode: malformed"] &&
+        (history (.error "malformed") (base 'b' (idx [op])) []).map Line.render ==
+          ["history: working tree: index.json does not decode: malformed"])]
+
+end History
+
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
 The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
@@ -1427,6 +1514,7 @@ def main : IO UInt32 := do
                   Rules.cases ++
                   Statuses.cases ++
                   Assemble.cases ++
+                  History.cases ++
                   Hash.cases ++
                   Manifest.cases).map
               fun c => check c.1 c.2).mapM

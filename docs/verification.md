@@ -2028,6 +2028,24 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.History`
+
+- Contract: U4 C7 + C9 + C8
+- Claim: History: `history` returns exactly the violations written apart, in C9's order — the parents' divergence, then HEAD's lines, then each parent's: per baseline its operations in index order (≤ 1 line each: changed digest, vanished, removed without a toolchain change, the first removal's witness — lastCommit + toolchain), then its removed records' + notices' extension; an undecodable index = its one line.
+- Subject: `FvdepCore.Index.History.history`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.HistoryClaims.historyExact` (hash 0xcf2e7ead), proved by `FvdepAudit.Index.History.Proof.history_exact`:
+
+  ```lean
+  ∀ (work : Except String (Option FvdepCore.Index.IndexFile))
+    (head : FvdepCore.Index.History.Baseline) (parents : List FvdepCore.Index.History.Baseline),
+    FvdepCore.Index.History.history work head parents =
+      FvdepAudit.Index.History.Spec.HistorySpec work head parents
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

@@ -3,6 +3,7 @@ import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Assemble.Proof.Claims
+import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
@@ -1221,6 +1222,20 @@ def assembleExact : Prop :=
 
 end FvdepLedger.Rows.AssembleClaims
 
+namespace FvdepLedger.Rows.HistoryClaims
+
+open FvdepCore.Index FvdepCore.Index.History FvdepAudit.Index.History.Spec
+
+/-- U4 C7 + C9 + C8 `HistoryExact`: `history` returns exactly the violations written apart, in C9's
+order — the parents' divergence, then HEAD's lines, then each parent's (per baseline: its operations
+in index order, ≤ 1 line each by C9's check order with C7's first-removal witness rule, then its
+removed records' + notices' extension; an undecodable index = its one line). -/
+def historyExact : Prop :=
+  ∀ (work : Except String (Option IndexFile)) (head : Baseline) (parents : List Baseline),
+    history work head parents = HistorySpec work head parents
+
+end FvdepLedger.Rows.HistoryClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -2147,6 +2162,22 @@ def assembleRow : Row :=
     residue := []
     unproven := [] }
 
+def historyRow : Row :=
+  { component := `FvdepCore.Index.History
+    contract := "U4 C7 + C9 + C8"
+    claim :=
+      "History: `history` returns exactly the violations written apart, in C9's order — the " ++
+        "parents' divergence, then HEAD's lines, then each parent's: per baseline its " ++
+        "operations in index order (≤ 1 line each: changed digest, vanished, removed without a " ++
+        "toolchain change, the first removal's witness — lastCommit + toolchain), then its " ++
+        "removed records' + notices' extension; an undecodable index = its one line."
+    claims := [(``HistoryClaims.historyExact, ``FvdepAudit.Index.History.Proof.history_exact)]
+    subject := ``FvdepCore.Index.History.history
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2159,7 +2190,8 @@ def ledger : Ledger :=
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
-        registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow]
+        registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
+        historyRow]
     residue := residue }
 
 end FvdepLedger.Rows

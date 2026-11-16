@@ -562,6 +562,61 @@ probe ci-verdict plant_marker "not green: checks" ci_verdict
 # fast gate: a failing background stage (deps: a pin without a row) fails the fast gate, named.
 probe fast-gate plant_tool "FAILED: deps" bash tools/fast-gate.sh
 
+# index-history (C7 + C9 `history`): each history breach fails the stage, named; every control run
+# is the copy's root commit (no committed index.json, or an unchanged one) and passes.
+history_stage() { bash -c 'source tools/gate.sh; index_history'; }
+hist_d() { local s=''; for _ in {1..64}; do s+="$1"; done; printf '%s' "$s"; }
+hist_op() { printf '{"compat":null,"digest":"%s","id":"base64.encode","obligations":[],"version":"1.0.0"}' "$1"; }
+hist_notice() { printf '{"id":"base64.encode","reason":"%s","replacement":null,"version":"1.0.0"}' "$1"; }
+hist_record() { # LAST_COMMIT TOOLCHAIN
+    printf '{"digest":"%s","id":"base64.encode","kind":"operation","last_commit":"%s","toolchain":"%s","version":"1.0.0"}' \
+        "$(hist_d 1)" "$1" "$2"
+}
+hist_index() { # OPERATIONS REMOVED NOTICES TOOLCHAIN
+    printf '{"notices":[%s],"operations":[%s],"removed":[%s],"schema":1,"toolchain":"%s"}\n' "$3" "$1" "$2" \
+        "$4" >index.json
+}
+hist_commit() { git add index.json && git -c user.name=probe -c user.email=probe@invalid commit -q -m "$1"; }
+hist_tc=leanprover/lean4:v4.35.0
+plant_history_digest() {
+    hist_index "$(hist_op "$(hist_d 1)")" "" "" "$hist_tc" && hist_commit base &&
+        hist_index "$(hist_op "$(hist_d 3)")" "" "" "$hist_tc"
+}
+plant_history_vanished() {
+    hist_index "$(hist_op "$(hist_d 1)")" "" "" "$hist_tc" && hist_commit base && hist_index "" "" "" "$hist_tc"
+}
+plant_history_toolchain() {
+    hist_index "$(hist_op "$(hist_d 1)")" "" "" "$hist_tc" && hist_commit base &&
+        hist_index "" "$(hist_record "$(git rev-parse HEAD)" "$hist_tc")" "$(hist_notice r)" "$hist_tc"
+}
+plant_history_last() {
+    hist_index "$(hist_op "$(hist_d 1)")" "" "" "$hist_tc" && hist_commit base &&
+        hist_index "" "$(hist_record "$(printf '0%.0s' {1..40})" "$hist_tc")" "$(hist_notice r)" \
+            leanprover/lean4:v9.9.9
+}
+plant_history_notice() {
+    hist_index "$(hist_op "$(hist_d 1)")" "" "$(hist_notice first)" "$hist_tc" && hist_commit base &&
+        hist_index "$(hist_op "$(hist_d 1)")" "" "$(hist_notice edited)" "$hist_tc"
+}
+plant_history_diverge() {
+    local base left right tree head
+    hist_index "$(hist_op "$(hist_d 1)")" "" "" "$hist_tc" && hist_commit base && base="$(git rev-parse HEAD)" &&
+        hist_index "$(hist_op "$(hist_d 1)")" "" "$(hist_notice left)" "$hist_tc" && hist_commit left &&
+        left="$(git rev-parse HEAD)" && git checkout -q "$base" &&
+        hist_index "$(hist_op "$(hist_d 1)")" "" "$(hist_notice right)" "$hist_tc" && hist_commit right &&
+        right="$(git rev-parse HEAD)" && git checkout -q "$left" && tree="$(git write-tree)" &&
+        head="$(git -c user.name=probe -c user.email=probe@invalid commit-tree "$tree" -p "$left" -p "$right" -m merge)" &&
+        git reset -q --hard "$head"
+}
+plant_history_shallow() { git rev-parse HEAD >.git/shallow; }
+probe index-history-digest plant_history_digest "changed its digest" history_stage
+probe index-history-vanished plant_history_vanished "base64.encode@1.0.0 vanished" history_stage
+probe index-history-toolchain plant_history_toolchain "was removed without a toolchain change" history_stage
+probe index-history-last plant_history_last "the removal names lastCommit" history_stage
+probe index-history-notice plant_history_notice "the notices do not extend this commit's" history_stage
+probe index-history-diverge plant_history_diverge "the parents' notices diverge" history_stage
+probe index-history-shallow plant_history_shallow "shallow repository" history_stage
+
 wait
 cat "$results"/*
 missed="$(cat "$results"/* | grep -c '^PROBE .*: FAILED')"
