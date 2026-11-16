@@ -26,3 +26,5 @@ paths:
 - `fun_induction f a b with | caseN …`: each alternative binds, in order, the varying arguments its pattern leaves free (the accumulator before the matched list's head + tail), then the pattern variables, each branch hypothesis (`if h :`, `match h :`), each `have` in the branch, then the IHs — name every one (a missing name hands the IH slot a `have`).
 - No Batteries/Mathlib: `List.Forall₂` is absent ⇒ a pointwise relation = `xs.length = ys.length ∧ ∀ x ∈ xs.zip ys, R x.1 x.2`; a constructor named by a keyword (`«open»`) = `.«open»` in terms + patterns.
 - `rw [f]` with a wildcard arm's equation leaves side goals (`… → False`) → `rw [f.eq_def]` + `split`/`dsimp only`, or `simp [f]`; mutual WF soundness = `f.mutual_induct` with `(motive1 := …) (motive2 := …)` + one `?_` per generated case.
+- The kernel from compiled code = `Lean.Kernel.check` / `Kernel.isDefEq` (synchronous, an `Except`): 4.35's `addDecl` checks asynchronously — a kernel rejection is logged, never thrown, so a `try` around it reports success.
+- A nested `try (try … catch …) finally` misparses (`Invalid try`) ⇒ `tryFinally (inner) (finalizer)`.

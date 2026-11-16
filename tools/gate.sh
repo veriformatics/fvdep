@@ -94,6 +94,7 @@ ledger-suite lean
 codec-suite lean
 manifest-suite lean
 library-suite lean
+index-suite lean
 fuzz-replay lean
 sys-suite   lean
 acceptance  lean
@@ -118,7 +119,7 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite fuzz-replay sys-suite acceptance index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite acceptance index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -245,6 +246,15 @@ library_suite() {
     local key
     key="$(shipped_closure tests/library tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
     suite library-suite "$key" "${FVDEP_LIBRARY_CASE:-}" bash tests/library/run.sh
+}
+
+# The blind index suite (tester-5 batch 2; U4 C): `fvdep index [--check]` through the built binary
+# (fixture libraries, each built fresh; an LD_PRELOAD fault library) + `fvdep-dev index` (decode,
+# history).
+index_suite() {
+    local key
+    key="$(shipped_closure tests/index tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean tool/Main.lean)"
+    suite index-suite "$key" "${FVDEP_INDEX_CASE:-}" bash tests/index/run.sh
 }
 
 # Fuzz corpora (contract U3 "Fuzz"; tools/fuzz.sh): every seed + pinned crash input through each

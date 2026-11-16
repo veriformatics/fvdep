@@ -1,14 +1,40 @@
+import FvdepCore.Index.Registry
+
 /-! Effect plans (contract `docs/contracts/U2-core.md` X1): what fvdep does, as data. A command
 builds a `Plan`; `FvdepIO.execute` runs it; theorems quantify over every response an effect may get
 (`Runs`), so they hold whatever the file system or the terminal does. Effects + responses are plain
 (not indexed by a response type): inverting a run then never meets an equation between two types. -/
 
+namespace FvdepCore.Index
+
+open Lean FvdepCore.Index.Registry
+
+/-- Why `libraryFacts` (contract U4 C1) produced no observations: the build's first error line, or
+the load's reason. -/
+inductive FactsFailure where
+  | build (line : String)
+  | load (reason : String)
+
+/-- `libraryFacts`' observations (U4 C8 boundary): the facts (C2–C5; ABI application types +
+spec-type comparisons included), each `FvdepProofs` theorem's `collectAxioms`, the structure fields
+of the registry record types, and the kernel's verdict on each certificate literal (C2: by list
+constant). -/
+structure Observed where
+  facts : Facts
+  axioms : List (Name × List Name)
+  fields : List (Name × Option (List String))
+  certified : List (Name × Bool)
+
+end FvdepCore.Index
+
 namespace FvdepCore
 
-/-- The project files fvdep writes (Decisions `Data formats`). -/
+/-- The project files fvdep writes (Decisions `Data formats`; `index` = a library working copy's
+`index.json`, contract U4 C1). -/
 inductive ProjectFile where
   | lock
   | manifest
+  | index
   deriving DecidableEq, Repr
 
 /-- One effect. Output writes have no failure response: a failed write of fvdep's own output
@@ -19,19 +45,34 @@ inductive Eff where
   | err (s : String)
   | read (f : ProjectFile)
   | replace (f : ProjectFile) (bytes : ByteArray)
+  /-- U4 C1: is the working directory a library working copy (`lean-toolchain` +
+  `Fvdep/Registry.lean`), + `lean-toolchain`'s bytes. -/
+  | probe
+  /-- U4 C1 `libraryFacts`: build the working copy afresh, load it, observe it. -/
+  | libraryFacts
+  /-- U4 C1 `replay`: the toolchain's `leanchecker` over the built library's modules. -/
+  | replay
 
 /-- What an effect answered. -/
 inductive Response where
   | done
   | read (r : Except String (Option ByteArray))
   | replace (r : Except String Unit)
+  /-- `none` = no library working copy here; `some` = `lean-toolchain`'s bytes. -/
+  | probe (r : Except String (Option ByteArray))
+  | facts (r : Except FvdepCore.Index.FactsFailure FvdepCore.Index.Observed)
+  /-- `none` = every module replayed; `some (module, kernel line)` = a rejection. -/
+  | replay (r : Except String (Option (String × String)))
 
 /-- The responses an effect may get: `done` for an output write, a read result for a read, a
-replace result for a replace. -/
+replace result for a replace, an observation effect's own kind for it. -/
 def Fits : Eff → Response → Prop
   | .out _, .done | .err _, .done => True
   | .read _, .read _ => True
   | .replace _ _, .replace _ => True
+  | .probe, .probe _ => True
+  | .libraryFacts, .facts _ => True
+  | .replay, .replay _ => True
   | _, _ => False
 
 /-- A program over `Eff`: a result, or one effect + what to do with its response. -/

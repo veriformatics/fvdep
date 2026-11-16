@@ -1,0 +1,702 @@
+case	result	seconds	output
+C1.v1.id	FAIL	0.048097	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: Base64.encode@1.0.0: the id is not canonical.\n'
+C1.v1.id.unchanged	PASS	0.000018	-
+C1.v1.version	FAIL	0.047163	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@01.0.0: the version is not canonical.\n'
+C1.v1.version.unchanged	PASS	0.000019	-
+C1.v1.module	FAIL	0.046519	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the entry is declared in Fvdep.Registry.Base64.Encode.V1_0_0, not Fvdep.Registry.Other.Encode.V1_0_0.\n'
+C1.v1.module.unchanged	PASS	0.000019	-
+C1.v1.id-control-00	FAIL	0.044191	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: bad\\u0000.encode@1.0.0: the id is not canonical.\n'
+C1.v1.id-control-00.unchanged	PASS	0.000018	-
+C1.v1.id-control-0a	FAIL	0.044689	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: bad\\n.encode@1.0.0: the id is not canonical.\n'
+C1.v1.id-control-0a.unchanged	PASS	0.000015	-
+C1.v1.id-control-85	FAIL	0.043314	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: bad\\u0085.encode@1.0.0: the id is not canonical.\n'
+C1.v1.id-control-85.unchanged	PASS	0.000049	-
+C1.v1.version-control	FAIL	0.044559	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0\\n.0: the version is not canonical.\n'
+C1.v1.version-control.unchanged	PASS	0.000015	-
+C1.v1.order	FAIL	0.044930	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: Bad.encode@01.0.0: the id is not canonical.\n'
+C1.v1.order.unchanged	PASS	0.000014	-
+C1.v2.repeated-id	FAIL	0.042827	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: listed twice.\n'
+C1.v2.repeated-id.unchanged	PASS	0.000031	-
+C1.v2.unlisted	FAIL	0.044237	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.1: its entry module Fvdep/Registry/Base64/Encode/V1_0_1.lean is not listed in Fvdep.Registry.modules.\n'
+C1.v2.unlisted.unchanged	PASS	0.000018	-
+C1.v3.foreign-spec	FAIL	0.043497	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the spec Nat.add is not a definition in Fvdep.Base64.Encode.V1_0_0.\n'
+C1.v3.foreign-spec.unchanged	PASS	0.000020	-
+C1.v3.theorem-spec	FAIL	0.043720	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the spec Fvdep.Base64.Encode.V1_0_0.encode is not a definition in Fvdep.Base64.Encode.V1_0_0.\n'
+C1.v3.theorem-spec.unchanged	PASS	0.000014	-
+C1.v3.type	FAIL	0.043149	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the spec type of Fvdep.Base64.Encode.V1_0_0.encode is not encodable.\n'
+C1.v3.type.unchanged	PASS	0.000018	-
+C1.v3.partial	FAIL	0.043885	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.helper is partial.\n'
+C1.v3.partial.unchanged	PASS	0.000014	-
+C1.v3.unsafe	FAIL	0.043241	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.encode is unsafe.\n'
+C1.v3.unsafe.unchanged	PASS	0.000014	-
+C1.v3.implemented_by	FAIL	0.043684	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.helper is implemented_by.\n'
+C1.v3.implemented_by.unchanged	PASS	0.000019	-
+C1.v3.extern	FAIL	0.043322	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.helper is extern.\n'
+C1.v3.extern.unchanged	PASS	0.000015	-
+C1.v3.opaque	FAIL	0.043349	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.helper is opaque.\n'
+C1.v3.opaque.unchanged	PASS	0.000015	-
+C1.v3.noncomputable	FAIL	0.043003	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Base64.Encode.V1_0_0.encode is noncomputable.\n'
+C1.v3.noncomputable.unchanged	PASS	0.000019	-
+C1.v3.abi-root	FAIL	0.043307	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: Fvdep.Abi.V1_0_0.flagged is implemented_by.\n'
+C1.v3.abi-root.unchanged	PASS	0.000015	-
+C1.v4.not-prop	FAIL	0.042967	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the obligation Fvdep.Base64.Encode.V1_0_0.encode is not a Prop definition in Fvdep.Base64.Encode.V1_0_0.\n'
+C1.v4.not-prop.unchanged	PASS	0.000015	-
+C1.v4.theorem	FAIL	0.044234	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the obligation Fvdep.Base64.Encode.V1_0_0.fact is not a Prop definition in Fvdep.Base64.Encode.V1_0_0.\n'
+C1.v4.theorem.unchanged	PASS	0.000018	-
+C1.v4.foreign	FAIL	0.043745	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the obligation True is not a Prop definition in Fvdep.Base64.Encode.V1_0_0.\n'
+C1.v4.foreign.unchanged	PASS	0.000016	-
+C1.v4.repeat	FAIL	0.043657	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the obligation Fvdep.Base64.Encode.V1_0_0.bits is listed twice.\n'
+C1.v4.repeat.unchanged	PASS	0.000015	-
+C1.v5.module	FAIL	0.043434	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the ABI shape Fvdep.Base64.Encode.V1_0_0.encode is not a definition in a Fvdep.Abi.V<x>_<y>_<z> module.\n'
+C1.v5.module.unchanged	PASS	0.000014	-
+C1.v5.type	FAIL	0.042866	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the ABI shape Fvdep.Abi.V1_0_0.wrong does not take the spec to ByteArray \xe2\x86\x92 ByteArray or ByteArray \xe2\x86\x92 Option ByteArray.\n'
+C1.v5.type.unchanged	PASS	0.000023	-
+C1.v6.unlisted	FAIL	0.043845	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: compat 0.0.0 is not an earlier listed version.\n'
+C1.v6.unlisted.unchanged	PASS	0.000024	-
+C1.v6.same	FAIL	0.044236	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: compat 1.0.0 is not an earlier listed version.\n'
+C1.v6.same.unchanged	PASS	0.000017	-
+C1.v6.bad	FAIL	0.043480	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: compat 01.0.0 is not an earlier listed version.\n'
+C1.v6.bad.unchanged	PASS	0.000015	-
+C1.v6.type	FAIL	0.042414	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@2.0.0: compat 1.0.0 has another spec type.\n'
+C1.v6.type.unchanged	PASS	0.000050	-
+C1.v7.holds	FAIL	0.044597	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: its closure holds Fvdep.Unversioned.\n'
+C1.v7.holds.unchanged	PASS	0.000018	-
+C1.v7.imports	FAIL	0.045231	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: its closure imports Lean.\n'
+C1.v7.imports.unchanged	PASS	0.000018	-
+C1.c4.link	FAIL	0.044154	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the closure module Fvdep.Base64.Encode.V1_0_0 is not a regular file at Fvdep/Base64/Encode/V1_0_0.lean.\n'
+C1.c4.link.unchanged	PASS	0.000028	-
+C1.c4.alias	FAIL	0.044606	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the closure module Fvdep.Base64.Encode.V1_0_0 is not a regular file at Fvdep/Base64/Encode/V1_0_0.lean.\n'
+C1.c4.alias.unchanged	PASS	0.000021	-
+C1.entry-order.first	FAIL	0.045774	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: Bad.encode@1.0.0: the id is not canonical.\n'
+C1.entry-order.first.unchanged	PASS	0.000019	-
+C1.entry-order.reversed	FAIL	0.044339	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.1: the obligation Fvdep.Base64.Encode.V1_0_1.encode is not a Prop definition in Fvdep.Base64.Encode.V1_0_1.\n'
+C1.entry-order.reversed.unchanged	PASS	0.000016	-
+C1.v10.profiles	FAIL	0.042265	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: Fvdep.Registry.profiles: profiles are not indexed yet.\n'
+C1.v10.profiles.unchanged	PASS	0.000049	-
+C7.absent.lean-toolchain	FAIL	0.042190	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'No fvdep library found here. Run "fvdep index" in a library working copy.\n'
+C7.absent.lean-toolchain.unchanged	PASS	0.000015	-
+C7.absent.Fvdep-Registry.lean	FAIL	0.042116	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'No fvdep library found here. Run "fvdep index" in a library working copy.\n'
+C7.absent.Fvdep-Registry.lean.unchanged	PASS	0.000019	-
+C7.presence-before-toolchain	FAIL	0.044195	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'No fvdep library found here. Run "fvdep index" in a library working copy.\n'
+C7.presence-before-toolchain.unchanged	PASS	0.000023	-
+C7.toolchain-control	FAIL	0.043730	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'This library uses Lean leanprover/lean4:v0\\u0085.0.0; this fvdep checks Lean leanprover/lean4:v4.35.0. Install the matching fvdep.\n'
+C7.toolchain-control.unchanged	PASS	0.000016	-
+C7.toolchain-before-build	FAIL	0.043318	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'This library uses Lean leanprover/lean4:v0.0.0; this fvdep checks Lean leanprover/lean4:v4.35.0. Install the matching fvdep.\n'
+C7.toolchain-before-build.unchanged	PASS	0.000017	-
+C8.build	FAIL	0.044172	assert: fixed build prefix + source-relative path got=False want=True
+C8.form.modules	FAIL	0.043375	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.modules.\n'
+C8.form.modules.unchanged	PASS	0.000018	-
+C8.form.notices	FAIL	0.042876	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.notices.\n'
+C8.form.notices.unchanged	PASS	0.000025	-
+C8.form.removed	FAIL	0.044696	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.removed.\n'
+C8.form.removed.unchanged	PASS	0.000015	-
+C8.form.root-helper	FAIL	0.043807	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.chunk.\n'
+C8.form.root-helper.unchanged	PASS	0.000019	-
+C8.form.entry	FAIL	0.043268	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.Base64.Encode.V1_0_0.entry.\n'
+C8.form.entry.unchanged	PASS	0.000016	-
+C8.d4.inline-entry	FAIL	0.043617	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.modules.\n'
+C8.d4.inline-entry.unchanged	PASS	0.000018	-
+C8.d4.outside-helper	FAIL	0.043374	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.notices.\n'
+C8.d4.outside-helper.unchanged	PASS	0.000015	-
+C8.d4.order-modules	FAIL	0.042397	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.modules.\n'
+C8.d4.order-modules.unchanged	PASS	0.000036	-
+C8.d4.order-profiles	FAIL	0.045474	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.profiles.\n'
+C8.d4.order-profiles.unchanged	PASS	0.000016	-
+C8.d4.order-notices	FAIL	0.044743	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.notices.\n'
+C8.d4.order-notices.unchanged	PASS	0.000018	-
+C8.form.type-layout	FAIL	0.044407	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'The registry uses a form fvdep cannot read: Fvdep.Registry.modules.\n'
+C8.form.type-layout.unchanged	PASS	0.000022	-
+C8.form.profile-elements	FAIL	0.044302	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: Fvdep.Registry.profiles: profiles are not indexed yet.\n'
+C8.form.profile-elements.unchanged	PASS	0.000018	-
+C8.load	FAIL	0.046432	assert: fixed load line got=False want=True
+C3.status.proven	FAIL	0.044599	blocked: index result unavailable (exit 2)
+C3.warning.proven	FAIL	0.000016	assert: warning does not change exit got=2 want=0
+C3.status.sorry	FAIL	0.044859	blocked: index result unavailable (exit 2)
+C3.warning.sorry	FAIL	0.000024	assert: warning does not change exit got=2 want=0
+C3.status.custom	FAIL	0.044613	blocked: index result unavailable (exit 2)
+C3.warning.custom	FAIL	0.000015	assert: warning does not change exit got=2 want=0
+C3.status.missing-registry	FAIL	0.042402	blocked: index result unavailable (exit 2)
+C3.warning.missing-registry	FAIL	0.000022	assert: warning does not change exit got=2 want=0
+C3.status.unreadable	FAIL	0.046870	blocked: index result unavailable (exit 2)
+C3.warning.unreadable	FAIL	0.000018	assert: warning does not change exit got=2 want=0
+C3.status.unmapped	FAIL	0.045855	blocked: index result unavailable (exit 2)
+C3.warning.unmapped	FAIL	0.000024	assert: warning does not change exit got=2 want=0
+C3.status.twice	FAIL	0.045271	blocked: index result unavailable (exit 2)
+C3.warning.twice	FAIL	0.000020	assert: warning does not change exit got=2 want=0
+C3.status.not-theorem	FAIL	0.046052	blocked: index result unavailable (exit 2)
+C3.warning.not-theorem	FAIL	0.000016	assert: warning does not change exit got=2 want=0
+C3.status.outside	FAIL	0.046379	blocked: index result unavailable (exit 2)
+C3.warning.outside	FAIL	0.000021	assert: warning does not change exit got=2 want=0
+C3.status.wrong-statement	FAIL	0.044742	blocked: index result unavailable (exit 2)
+C3.warning.wrong-statement	FAIL	0.000030	assert: warning does not change exit got=2 want=0
+C3.warning.registry-order	FAIL	0.051679	assert: warnings preserve exit got=2 want=0
+C3.replay.forged	FAIL	0.046326	assert: replay module + fixed prefix got=False want=True
+C4.compat.proven	FAIL	0.045967	blocked: index result unavailable (exit 2)
+C4.warning.proven	FAIL	0.000020	assert: compat warning exit got=2 want=0
+C4.compat.wrong	FAIL	0.047831	blocked: index result unavailable (exit 2)
+C4.warning.wrong	FAIL	0.000015	assert: compat warning exit got=2 want=0
+C4.compat.unmapped	FAIL	0.047122	blocked: index result unavailable (exit 2)
+C4.warning.unmapped	FAIL	0.000021	assert: compat warning exit got=2 want=0
+C4.compat.ignored	FAIL	0.044064	blocked: index result unavailable (exit 2)
+C4.warning.ignored	FAIL	0.000015	assert: compat warning exit got=2 want=0
+C5.notice.unknown	FAIL	0.045015	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the notice names no listed or removed entry.\n'
+C5.notice.unknown.unchanged	PASS	0.000015	-
+C5.notice.replacement	FAIL	0.043241	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice replacement 2.0.0 is not a listed or removed version of base64.encode.\n'
+C5.notice.replacement.unchanged	PASS	0.000014	-
+C5.notice.reason.empty	FAIL	0.041435	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.empty.unchanged	PASS	0.000019	-
+C5.notice.reason.control	FAIL	0.043890	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.control.unchanged	PASS	0.000027	-
+C5.notice.reason.del	FAIL	0.046574	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.del.unchanged	PASS	0.000017	-
+C5.notice.reason.nel	FAIL	0.042739	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.nel.unchanged	PASS	0.000014	-
+C5.notice.reason.large	FAIL	0.063264	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.large.unchanged	PASS	0.000028	-
+C5.notice.reason.multibyte-large	FAIL	0.070250	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the notice reason must be 1 to 65536 UTF-8 bytes without control characters.\n'
+C5.notice.reason.multibyte-large.unchanged	PASS	0.000035	-
+C5.removed.listed	FAIL	0.070205	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the removed record is still listed.\n'
+C5.removed.listed.unchanged	PASS	0.000024	-
+C5.removed.duplicate	FAIL	0.055326	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the removed record is recorded twice.\n'
+C5.removed.duplicate.unchanged	PASS	0.000018	-
+C5.removed.kind	FAIL	0.045977	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the removed record must have kind operation.\n'
+C5.removed.kind.unchanged	PASS	0.000026	-
+C5.removed.digest	FAIL	0.047462	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the removed digest must be 64 lowercase hex digits.\n'
+C5.removed.digest.unchanged	PASS	0.000027	-
+C5.removed.lastCommit	FAIL	0.057202	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the removed lastCommit must be 40 lowercase hex digits.\n'
+C5.removed.lastCommit.unchanged	PASS	0.000019	-
+C5.removed.toolchain	FAIL	0.044283	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: the removed toolchain must not be empty.\n'
+C5.removed.toolchain.unchanged	PASS	0.000030	-
+C5.removed.notice	FAIL	0.060410	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: other.encode@1.0.0: no notice names the removed record.\n'
+C5.removed.notice.unchanged	PASS	0.000029	-
+C5.logs.order	FAIL	0.043530	blocked: index result unavailable (exit 2)
+C5.notice.cap	FAIL	0.046928	blocked: index result unavailable (exit 2)
+C2.identity.reference-frames	FAIL	0.043682	blocked: reference digest index unavailable
+C2.identity.comment	FAIL	0.051440	blocked: identity index exit 2
+C2.identity.proof	FAIL	0.000014	blocked: identity index exit 2
+C2.identity.shared	FAIL	0.000005	blocked: identity index exit 2
+C2.identity.closure-boundary	FAIL	0.000004	blocked: identity index exit 2
+C2.identity.unrelated	FAIL	0.042927	blocked: first index unavailable
+C12.schema.new-version-after-index	FAIL	0.000013	blocked: first index unavailable
+C2.identity.alternate-root	FAIL	0.063458	assert: last stderr line got=b'  --version         Show the fvdep version.\n' want=b'Library error: base64.encode@1.0.0: the closure module Fvdep.Base64.Encode.V1_0_0 is not a regular file at Fvdep/Base64/Encode/V1_0_0.lean.\n'
+C2.identity.alternate-root.unchanged	PASS	0.000021	-
+C6.purity.idempotent	FAIL	0.053252	blocked: purity initial index unavailable
+C6.purity.check-readonly	FAIL	0.000015	blocked: purity initial index unavailable
+C6.purity.drift-readonly	FAIL	0.000005	blocked: purity initial index unavailable
+C6.purity.environment-artifact	FAIL	0.000008	blocked: purity initial index unavailable
+C6.purity.absolute-path	FAIL	0.000004	blocked: purity initial index unavailable
+C6.purity.check-current	FAIL	0.000004	blocked: purity initial index unavailable
+C6.purity.check-drift	FAIL	0.000017	blocked: purity initial index unavailable
+C6.purity.check-absent	FAIL	0.000004	blocked: purity initial index unavailable
+C6.no-writer-lock	FAIL	0.042430	assert: index does not take the project writer lock got=2 want=0
+C6.concurrent	FAIL	0.066317	assert: concurrent unchanged-tree index runs got=[2, 2] want=[0, 0]
+C6.io.read	FAIL	0.053685	assert: read error fixed line got=False want=True
+C6.io.write	FAIL	0.063400	assert: write error fixed line got=False want=True
+C9.help	FAIL	0.090698	assert: help exit got=2 want=0
+C9.usage.0	PASS	0.056494	-
+C9.usage.1	PASS	0.043659	-
+C9.usage.2	PASS	0.044030	-
+C9.usage.3	PASS	0.050140	-
+C9.usage.4	PASS	0.050689	-
+C9.usage.5	PASS	0.048273	-
+C9.presentation.lake-progress	FAIL	0.041586	assert: progress fixture indexes got=2 want=0
+C12.schema.launch	FAIL	0.051725	blocked: index result unavailable (exit 2)
+C12.bound.obligation-name	PASS	0.048364	-
+C12.bound.axiom-name	PASS	0.052769	-
+C12.bound.removed-toolchain-cc	FAIL	0.043220	assert: D3 rev2 fixed schema-refusal prefix got=False want=True
+C12.bound.removed-toolchain-long	FAIL	0.043325	assert: D3 rev2 fixed schema-refusal prefix got=False want=True
+C12.schema.empty	FAIL	0.042056	assert: empty library indexes got=2 want=0
+C12.schema.numeric-order	FAIL	0.047538	blocked: index result unavailable (exit 2)
+C12.registry.accepted-forms	FAIL	0.045772	assert: let, root constant, HAppend accepted got=2 want=0
+C11.roundtrip.full	FAIL	0.003194	assert: decode exit got=2 want=0
+C11.roundtrip.empty	FAIL	0.003074	assert: decode exit got=2 want=0
+C11.roundtrip.noncanonical	FAIL	0.002993	assert: decode exit got=2 want=0
+C11.root-kind.0	FAIL	0.003265	assert: decode exit got=2 want=1
+C11.root-kind.1	FAIL	0.003072	assert: decode exit got=2 want=1
+C11.root-kind.2	FAIL	0.003055	assert: decode exit got=2 want=1
+C11.root-kind.3	FAIL	0.003351	assert: decode exit got=2 want=1
+C11.root-kind.4	FAIL	0.003333	assert: decode exit got=2 want=1
+C11.schema.missing	FAIL	0.003067	assert: decode exit got=2 want=1
+C11.schema.zero	FAIL	0.003169	assert: decode exit got=2 want=1
+C11.schema.two	FAIL	0.003192	assert: decode exit got=2 want=1
+C11.schema.string	FAIL	0.003346	assert: decode exit got=2 want=1
+C11.schema.bool	FAIL	0.003107	assert: decode exit got=2 want=1
+C11.schema.null	FAIL	0.003778	assert: decode exit got=2 want=1
+C11.missing.root.schema	FAIL	0.003199	assert: decode exit got=2 want=1
+C11.missing.root.toolchain	FAIL	0.004300	assert: decode exit got=2 want=1
+C11.missing.root.operations	FAIL	0.003886	assert: decode exit got=2 want=1
+C11.missing.root.notices	FAIL	0.003519	assert: decode exit got=2 want=1
+C11.missing.root.removed	FAIL	0.003975	assert: decode exit got=2 want=1
+C11.unknown.root	FAIL	0.004230	assert: decode exit got=2 want=1
+C11.kind.root.schema.0	FAIL	0.003857	assert: decode exit got=2 want=1
+C11.kind.root.schema.1	FAIL	0.004020	assert: decode exit got=2 want=1
+C11.kind.root.schema.2	FAIL	0.003985	assert: decode exit got=2 want=1
+C11.kind.root.schema.3	FAIL	0.004056	assert: decode exit got=2 want=1
+C11.kind.root.schema.4	FAIL	0.004047	assert: decode exit got=2 want=1
+C11.kind.root.toolchain.0	FAIL	0.004517	assert: decode exit got=2 want=1
+C11.kind.root.toolchain.1	FAIL	0.004318	assert: decode exit got=2 want=1
+C11.kind.root.toolchain.2	FAIL	0.003429	assert: decode exit got=2 want=1
+C11.kind.root.toolchain.3	FAIL	0.003496	assert: decode exit got=2 want=1
+C11.kind.root.toolchain.4	FAIL	0.003520	assert: decode exit got=2 want=1
+C11.kind.root.operations.0	FAIL	0.003624	assert: decode exit got=2 want=1
+C11.kind.root.operations.1	FAIL	0.003224	assert: decode exit got=2 want=1
+C11.kind.root.operations.2	FAIL	0.003612	assert: decode exit got=2 want=1
+C11.kind.root.operations.3	FAIL	0.003614	assert: decode exit got=2 want=1
+C11.kind.root.operations.4	FAIL	0.003643	assert: decode exit got=2 want=1
+C11.kind.root.notices.0	FAIL	0.003516	assert: decode exit got=2 want=1
+C11.kind.root.notices.1	FAIL	0.003856	assert: decode exit got=2 want=1
+C11.kind.root.notices.2	FAIL	0.004057	assert: decode exit got=2 want=1
+C11.kind.root.notices.3	FAIL	0.003514	assert: decode exit got=2 want=1
+C11.kind.root.notices.4	FAIL	0.003900	assert: decode exit got=2 want=1
+C11.kind.root.removed.0	FAIL	0.003439	assert: decode exit got=2 want=1
+C11.kind.root.removed.1	FAIL	0.003619	assert: decode exit got=2 want=1
+C11.kind.root.removed.2	FAIL	0.003792	assert: decode exit got=2 want=1
+C11.kind.root.removed.3	FAIL	0.003884	assert: decode exit got=2 want=1
+C11.kind.root.removed.4	FAIL	0.003791	assert: decode exit got=2 want=1
+C11.missing.operations-0.id	FAIL	0.003945	assert: decode exit got=2 want=1
+C11.missing.operations-0.version	FAIL	0.003454	assert: decode exit got=2 want=1
+C11.missing.operations-0.digest	FAIL	0.003700	assert: decode exit got=2 want=1
+C11.missing.operations-0.compat	FAIL	0.004122	assert: decode exit got=2 want=1
+C11.missing.operations-0.obligations	FAIL	0.003803	assert: decode exit got=2 want=1
+C11.unknown.operations-0	FAIL	0.003440	assert: decode exit got=2 want=1
+C11.kind.operations-0.id.0	FAIL	0.003835	assert: decode exit got=2 want=1
+C11.kind.operations-0.id.1	FAIL	0.003452	assert: decode exit got=2 want=1
+C11.kind.operations-0.id.2	FAIL	0.003676	assert: decode exit got=2 want=1
+C11.kind.operations-0.id.3	FAIL	0.003750	assert: decode exit got=2 want=1
+C11.kind.operations-0.id.4	FAIL	0.003498	assert: decode exit got=2 want=1
+C11.kind.operations-0.version.0	FAIL	0.003892	assert: decode exit got=2 want=1
+C11.kind.operations-0.version.1	FAIL	0.003647	assert: decode exit got=2 want=1
+C11.kind.operations-0.version.2	FAIL	0.003871	assert: decode exit got=2 want=1
+C11.kind.operations-0.version.3	FAIL	0.003534	assert: decode exit got=2 want=1
+C11.kind.operations-0.version.4	FAIL	0.003843	assert: decode exit got=2 want=1
+C11.kind.operations-0.digest.0	FAIL	0.003599	assert: decode exit got=2 want=1
+C11.kind.operations-0.digest.1	FAIL	0.003758	assert: decode exit got=2 want=1
+C11.kind.operations-0.digest.2	FAIL	0.003574	assert: decode exit got=2 want=1
+C11.kind.operations-0.digest.3	FAIL	0.003916	assert: decode exit got=2 want=1
+C11.kind.operations-0.digest.4	FAIL	0.003470	assert: decode exit got=2 want=1
+C11.kind.operations-0.compat.0	FAIL	0.003930	assert: decode exit got=2 want=1
+C11.kind.operations-0.compat.1	FAIL	0.004108	assert: decode exit got=2 want=1
+C11.kind.operations-0.compat.2	FAIL	0.003781	assert: decode exit got=2 want=1
+C11.kind.operations-0.compat.3	FAIL	0.004255	assert: decode exit got=2 want=1
+C11.kind.operations-0.obligations.0	FAIL	0.003877	assert: decode exit got=2 want=1
+C11.kind.operations-0.obligations.1	FAIL	0.003604	assert: decode exit got=2 want=1
+C11.kind.operations-0.obligations.2	FAIL	0.003816	assert: decode exit got=2 want=1
+C11.kind.operations-0.obligations.3	FAIL	0.003910	assert: decode exit got=2 want=1
+C11.kind.operations-0.obligations.4	FAIL	0.003669	assert: decode exit got=2 want=1
+C11.missing.operations-0-obligations-0.name	FAIL	0.003853	assert: decode exit got=2 want=1
+C11.missing.operations-0-obligations-0.status	FAIL	0.004426	assert: decode exit got=2 want=1
+C11.missing.operations-0-obligations-0.axioms	FAIL	0.004141	assert: decode exit got=2 want=1
+C11.unknown.operations-0-obligations-0	FAIL	0.003411	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.name.0	FAIL	0.003642	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.name.1	FAIL	0.003358	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.name.2	FAIL	0.003150	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.name.3	FAIL	0.003337	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.name.4	FAIL	0.003641	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.status.0	FAIL	0.003404	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.status.1	FAIL	0.004501	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.status.2	FAIL	0.003215	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.status.3	FAIL	0.003272	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.status.4	FAIL	0.003459	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.axioms.0	FAIL	0.003085	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.axioms.1	FAIL	0.003458	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.axioms.2	FAIL	0.003114	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.axioms.3	FAIL	0.003063	assert: decode exit got=2 want=1
+C11.kind.operations-0-obligations-0.axioms.4	FAIL	0.003403	assert: decode exit got=2 want=1
+C11.missing.operations-1-compat.axioms	FAIL	0.003184	assert: decode exit got=2 want=1
+C11.missing.operations-1-compat.status	FAIL	0.003217	assert: decode exit got=2 want=1
+C11.missing.operations-1-compat.version	FAIL	0.003364	assert: decode exit got=2 want=1
+C11.unknown.operations-1-compat	FAIL	0.003282	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.axioms.0	FAIL	0.003272	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.axioms.1	FAIL	0.003512	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.axioms.2	FAIL	0.003249	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.axioms.3	FAIL	0.003310	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.axioms.4	FAIL	0.003709	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.status.0	FAIL	0.003711	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.status.1	FAIL	0.003311	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.status.2	FAIL	0.003801	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.status.3	FAIL	0.003853	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.status.4	FAIL	0.003971	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.version.0	FAIL	0.003684	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.version.1	FAIL	0.003496	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.version.2	FAIL	0.003678	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.version.3	FAIL	0.003652	assert: decode exit got=2 want=1
+C11.kind.operations-1-compat.version.4	FAIL	0.004569	assert: decode exit got=2 want=1
+C11.missing.notices-0.id	FAIL	0.003274	assert: decode exit got=2 want=1
+C11.missing.notices-0.version	FAIL	0.003415	assert: decode exit got=2 want=1
+C11.missing.notices-0.reason	FAIL	0.003095	assert: decode exit got=2 want=1
+C11.missing.notices-0.replacement	FAIL	0.003022	assert: decode exit got=2 want=1
+C11.unknown.notices-0	FAIL	0.003718	assert: decode exit got=2 want=1
+C11.kind.notices-0.id.0	FAIL	0.003988	assert: decode exit got=2 want=1
+C11.kind.notices-0.id.1	FAIL	0.003437	assert: decode exit got=2 want=1
+C11.kind.notices-0.id.2	FAIL	0.003606	assert: decode exit got=2 want=1
+C11.kind.notices-0.id.3	FAIL	0.003878	assert: decode exit got=2 want=1
+C11.kind.notices-0.id.4	FAIL	0.003530	assert: decode exit got=2 want=1
+C11.kind.notices-0.version.0	FAIL	0.003605	assert: decode exit got=2 want=1
+C11.kind.notices-0.version.1	FAIL	0.003571	assert: decode exit got=2 want=1
+C11.kind.notices-0.version.2	FAIL	0.003497	assert: decode exit got=2 want=1
+C11.kind.notices-0.version.3	FAIL	0.004137	assert: decode exit got=2 want=1
+C11.kind.notices-0.version.4	FAIL	0.003952	assert: decode exit got=2 want=1
+C11.kind.notices-0.reason.0	FAIL	0.003377	assert: decode exit got=2 want=1
+C11.kind.notices-0.reason.1	FAIL	0.003937	assert: decode exit got=2 want=1
+C11.kind.notices-0.reason.2	FAIL	0.003878	assert: decode exit got=2 want=1
+C11.kind.notices-0.reason.3	FAIL	0.003465	assert: decode exit got=2 want=1
+C11.kind.notices-0.reason.4	FAIL	0.003915	assert: decode exit got=2 want=1
+C11.kind.notices-0.replacement.0	FAIL	0.003905	assert: decode exit got=2 want=0
+C11.kind.notices-0.replacement.1	FAIL	0.003541	assert: decode exit got=2 want=1
+C11.kind.notices-0.replacement.2	FAIL	0.004114	assert: decode exit got=2 want=1
+C11.kind.notices-0.replacement.3	FAIL	0.004168	assert: decode exit got=2 want=1
+C11.kind.notices-0.replacement.4	FAIL	0.004346	assert: decode exit got=2 want=1
+C11.missing.removed-0.id	FAIL	0.004230	assert: decode exit got=2 want=1
+C11.missing.removed-0.version	FAIL	0.003918	assert: decode exit got=2 want=1
+C11.missing.removed-0.kind	FAIL	0.003511	assert: decode exit got=2 want=1
+C11.missing.removed-0.digest	FAIL	0.004081	assert: decode exit got=2 want=1
+C11.missing.removed-0.toolchain	FAIL	0.003854	assert: decode exit got=2 want=1
+C11.missing.removed-0.last_commit	FAIL	0.003459	assert: decode exit got=2 want=1
+C11.unknown.removed-0	FAIL	0.004159	assert: decode exit got=2 want=1
+C11.kind.removed-0.id.0	FAIL	0.003763	assert: decode exit got=2 want=1
+C11.kind.removed-0.id.1	FAIL	0.003760	assert: decode exit got=2 want=1
+C11.kind.removed-0.id.2	FAIL	0.003934	assert: decode exit got=2 want=1
+C11.kind.removed-0.id.3	FAIL	0.003718	assert: decode exit got=2 want=1
+C11.kind.removed-0.id.4	FAIL	0.003847	assert: decode exit got=2 want=1
+C11.kind.removed-0.version.0	FAIL	0.003848	assert: decode exit got=2 want=1
+C11.kind.removed-0.version.1	FAIL	0.004246	assert: decode exit got=2 want=1
+C11.kind.removed-0.version.2	FAIL	0.004087	assert: decode exit got=2 want=1
+C11.kind.removed-0.version.3	FAIL	0.004068	assert: decode exit got=2 want=1
+C11.kind.removed-0.version.4	FAIL	0.003527	assert: decode exit got=2 want=1
+C11.kind.removed-0.kind.0	FAIL	0.003330	assert: decode exit got=2 want=1
+C11.kind.removed-0.kind.1	FAIL	0.004036	assert: decode exit got=2 want=1
+C11.kind.removed-0.kind.2	FAIL	0.003845	assert: decode exit got=2 want=1
+C11.kind.removed-0.kind.3	FAIL	0.003595	assert: decode exit got=2 want=1
+C11.kind.removed-0.kind.4	FAIL	0.003693	assert: decode exit got=2 want=1
+C11.kind.removed-0.digest.0	FAIL	0.003812	assert: decode exit got=2 want=1
+C11.kind.removed-0.digest.1	FAIL	0.003996	assert: decode exit got=2 want=1
+C11.kind.removed-0.digest.2	FAIL	0.003507	assert: decode exit got=2 want=1
+C11.kind.removed-0.digest.3	FAIL	0.003534	assert: decode exit got=2 want=1
+C11.kind.removed-0.digest.4	FAIL	0.003480	assert: decode exit got=2 want=1
+C11.kind.removed-0.toolchain.0	FAIL	0.004055	assert: decode exit got=2 want=1
+C11.kind.removed-0.toolchain.1	FAIL	0.004157	assert: decode exit got=2 want=1
+C11.kind.removed-0.toolchain.2	FAIL	0.003458	assert: decode exit got=2 want=1
+C11.kind.removed-0.toolchain.3	FAIL	0.004105	assert: decode exit got=2 want=1
+C11.kind.removed-0.toolchain.4	FAIL	0.003844	assert: decode exit got=2 want=1
+C11.kind.removed-0.last_commit.0	FAIL	0.003361	assert: decode exit got=2 want=1
+C11.kind.removed-0.last_commit.1	FAIL	0.003903	assert: decode exit got=2 want=1
+C11.kind.removed-0.last_commit.2	FAIL	0.004000	assert: decode exit got=2 want=1
+C11.kind.removed-0.last_commit.3	FAIL	0.003787	assert: decode exit got=2 want=1
+C11.kind.removed-0.last_commit.4	FAIL	0.004267	assert: decode exit got=2 want=1
+C11.bad.id.0	FAIL	0.004003	assert: decode exit got=2 want=1
+C11.bad.id.1	FAIL	0.003802	assert: decode exit got=2 want=1
+C11.bad.id.2	FAIL	0.004149	assert: decode exit got=2 want=1
+C11.bad.id.3	FAIL	0.003906	assert: decode exit got=2 want=1
+C11.bad.id.4	FAIL	0.003658	assert: decode exit got=2 want=1
+C11.bad.id.5	FAIL	0.003813	assert: decode exit got=2 want=1
+C11.bad.version.0	FAIL	0.003818	assert: decode exit got=2 want=1
+C11.bad.version.1	FAIL	0.003893	assert: decode exit got=2 want=1
+C11.bad.version.2	FAIL	0.003997	assert: decode exit got=2 want=1
+C11.bad.version.3	FAIL	0.003635	assert: decode exit got=2 want=1
+C11.bad.version.4	FAIL	0.003787	assert: decode exit got=2 want=1
+C11.bad.version.5	FAIL	0.004234	assert: decode exit got=2 want=1
+C11.bad.version.6	FAIL	0.003526	assert: decode exit got=2 want=1
+C11.bad.digest.0	FAIL	0.003609	assert: decode exit got=2 want=1
+C11.bad.digest.1	FAIL	0.004143	assert: decode exit got=2 want=1
+C11.bad.digest.2	FAIL	0.004709	assert: decode exit got=2 want=1
+C11.bad.digest.3	FAIL	0.003960	assert: decode exit got=2 want=1
+C11.bad.digest.4	FAIL	0.003429	assert: decode exit got=2 want=1
+C11.version.cap	FAIL	0.003459	assert: decode exit got=2 want=0
+C11.id.cap-valid	FAIL	0.003382	assert: decode exit got=2 want=0
+C11.text.id-over-cap	FAIL	0.004253	assert: decode exit got=2 want=1
+C11.text.version-over-cap	FAIL	0.003832	assert: decode exit got=2 want=1
+C11.key.cap	FAIL	0.003246	assert: decode exit got=2 want=1
+C11.text.key-over-cap	FAIL	0.004261	assert: decode exit got=2 want=1
+C11.bad.obligation.name.empty	FAIL	0.003942	assert: decode exit got=2 want=1
+C11.bad.obligation.name.nul	FAIL	0.003656	assert: decode exit got=2 want=1
+C11.bad.obligation.name.del	FAIL	0.003697	assert: decode exit got=2 want=1
+C11.bad.obligation.name.over	FAIL	0.003692	assert: decode exit got=2 want=1
+C11.bad.obligation.name.utf8-over	FAIL	0.003777	assert: decode exit got=2 want=1
+C11.accept.obligation.name.cap	FAIL	0.003758	assert: decode exit got=2 want=0
+C11.accept.obligation.name.utf8-cap	FAIL	0.003908	assert: decode exit got=2 want=0
+C11.toolchain.empty	FAIL	0.003230	assert: decode exit got=2 want=1
+C11.toolchain.control	FAIL	0.004135	assert: decode exit got=2 want=1
+C11.toolchain.over	FAIL	0.004077	assert: decode exit got=2 want=1
+C11.toolchain.cap	FAIL	0.003613	assert: decode exit got=2 want=0
+C11.reason.empty	FAIL	0.003937	assert: decode exit got=2 want=1
+C11.reason.control	FAIL	0.003969	assert: decode exit got=2 want=1
+C11.reason.del	FAIL	0.004021	assert: decode exit got=2 want=1
+C11.reason.cap	FAIL	0.003943	assert: decode exit got=2 want=0
+C11.removed.commit.upper	FAIL	0.003885	assert: decode exit got=2 want=1
+C11.removed.commit.short	FAIL	0.003535	assert: decode exit got=2 want=1
+C11.removed.commit.long	FAIL	0.003872	assert: decode exit got=2 want=1
+C11.removed.kind	FAIL	0.003927	assert: decode exit got=2 want=1
+C11.status.obligation.proven.0	FAIL	0.003983	assert: decode exit got=2 want=0
+C11.status.obligation.proven.1	FAIL	0.004039	assert: decode exit got=2 want=1
+C11.status.obligation.proven.2	FAIL	0.003654	assert: decode exit got=2 want=1
+C11.status.obligation.proven.3	FAIL	0.003637	assert: decode exit got=2 want=1
+C11.status.obligation.proven.4	FAIL	0.003859	assert: decode exit got=2 want=1
+C11.status.obligation.proven.5	FAIL	0.003924	assert: decode exit got=2 want=1
+C11.status.obligation.proven.6	FAIL	0.003746	assert: decode exit got=2 want=1
+C11.status.obligation.proven.7	FAIL	0.003828	assert: decode exit got=2 want=1
+C11.status.obligation.proven.8	FAIL	0.004195	assert: decode exit got=2 want=1
+C11.status.obligation.open.0	FAIL	0.003997	assert: decode exit got=2 want=0
+C11.status.obligation.open.1	FAIL	0.003741	assert: decode exit got=2 want=0
+C11.status.obligation.open.2	FAIL	0.003594	assert: decode exit got=2 want=1
+C11.status.obligation.open.3	FAIL	0.003397	assert: decode exit got=2 want=0
+C11.status.obligation.open.4	FAIL	0.003780	assert: decode exit got=2 want=1
+C11.status.obligation.open.5	FAIL	0.003957	assert: decode exit got=2 want=1
+C11.status.obligation.open.6	FAIL	0.003703	assert: decode exit got=2 want=1
+C11.status.obligation.open.7	FAIL	0.003546	assert: decode exit got=2 want=1
+C11.status.obligation.open.8	FAIL	0.003838	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.0	FAIL	0.003555	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.1	FAIL	0.004195	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.2	FAIL	0.004126	assert: decode exit got=2 want=0
+C11.status.obligation.trusts.3	FAIL	0.003445	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.4	FAIL	0.003561	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.5	FAIL	0.003507	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.6	FAIL	0.003436	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.7	FAIL	0.004075	assert: decode exit got=2 want=1
+C11.status.obligation.trusts.8	FAIL	0.003679	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.0	FAIL	0.003465	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.1	FAIL	0.003938	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.2	FAIL	0.003484	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.3	FAIL	0.003647	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.4	FAIL	0.003839	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.5	FAIL	0.003498	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.6	FAIL	0.003707	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.7	FAIL	0.004030	assert: decode exit got=2 want=1
+C11.status.obligation.unknown.8	FAIL	0.003852	assert: decode exit got=2 want=1
+C11.status.compat.proven.0	FAIL	0.003440	assert: decode exit got=2 want=0
+C11.status.compat.proven.1	FAIL	0.004169	assert: decode exit got=2 want=1
+C11.status.compat.proven.2	FAIL	0.003886	assert: decode exit got=2 want=1
+C11.status.compat.proven.3	FAIL	0.003670	assert: decode exit got=2 want=1
+C11.status.compat.proven.4	FAIL	0.003988	assert: decode exit got=2 want=1
+C11.status.compat.proven.5	FAIL	0.004009	assert: decode exit got=2 want=1
+C11.status.compat.proven.6	FAIL	0.003613	assert: decode exit got=2 want=1
+C11.status.compat.proven.7	FAIL	0.003826	assert: decode exit got=2 want=1
+C11.status.compat.proven.8	FAIL	0.003851	assert: decode exit got=2 want=1
+C11.status.compat.open.0	FAIL	0.003465	assert: decode exit got=2 want=0
+C11.status.compat.open.1	FAIL	0.003767	assert: decode exit got=2 want=0
+C11.status.compat.open.2	FAIL	0.003578	assert: decode exit got=2 want=1
+C11.status.compat.open.3	FAIL	0.003711	assert: decode exit got=2 want=0
+C11.status.compat.open.4	FAIL	0.003936	assert: decode exit got=2 want=1
+C11.status.compat.open.5	FAIL	0.003958	assert: decode exit got=2 want=1
+C11.status.compat.open.6	FAIL	0.003477	assert: decode exit got=2 want=1
+C11.status.compat.open.7	FAIL	0.004222	assert: decode exit got=2 want=1
+C11.status.compat.open.8	FAIL	0.003812	assert: decode exit got=2 want=1
+C11.status.compat.trusts.0	FAIL	0.004082	assert: decode exit got=2 want=1
+C11.status.compat.trusts.1	FAIL	0.003987	assert: decode exit got=2 want=1
+C11.status.compat.trusts.2	FAIL	0.004134	assert: decode exit got=2 want=0
+C11.status.compat.trusts.3	FAIL	0.003711	assert: decode exit got=2 want=1
+C11.status.compat.trusts.4	FAIL	0.004093	assert: decode exit got=2 want=1
+C11.status.compat.trusts.5	FAIL	0.003905	assert: decode exit got=2 want=1
+C11.status.compat.trusts.6	FAIL	0.003526	assert: decode exit got=2 want=1
+C11.status.compat.trusts.7	FAIL	0.004123	assert: decode exit got=2 want=1
+C11.status.compat.trusts.8	FAIL	0.003902	assert: decode exit got=2 want=1
+C11.status.compat.unknown.0	FAIL	0.003708	assert: decode exit got=2 want=1
+C11.status.compat.unknown.1	FAIL	0.004227	assert: decode exit got=2 want=1
+C11.status.compat.unknown.2	FAIL	0.003841	assert: decode exit got=2 want=1
+C11.status.compat.unknown.3	FAIL	0.003881	assert: decode exit got=2 want=1
+C11.status.compat.unknown.4	FAIL	0.004209	assert: decode exit got=2 want=1
+C11.status.compat.unknown.5	FAIL	0.003714	assert: decode exit got=2 want=1
+C11.status.compat.unknown.6	FAIL	0.003830	assert: decode exit got=2 want=1
+C11.status.compat.unknown.7	FAIL	0.004087	assert: decode exit got=2 want=1
+C11.status.compat.unknown.8	FAIL	0.003589	assert: decode exit got=2 want=1
+C11.operations.reversed	FAIL	0.004680	assert: decode exit got=2 want=1
+C11.operations.duplicate	FAIL	0.003598	assert: decode exit got=2 want=1
+C11.obligations.duplicate	FAIL	0.003554	assert: decode exit got=2 want=1
+C11.relation.notice-membership	FAIL	0.003274	assert: decode exit got=2 want=1
+C11.relation.replacement	FAIL	0.003647	assert: decode exit got=2 want=1
+C11.relation.removed-listed	FAIL	0.003315	assert: decode exit got=2 want=1
+C11.relation.removed-duplicate	FAIL	0.003373	assert: decode exit got=2 want=1
+C11.relation.removed-no-notice	FAIL	0.003716	assert: decode exit got=2 want=1
+C11.order.discriminator	FAIL	0.003437	assert: decode exit got=2 want=1
+C11.order.unknown-before-missing	FAIL	0.003420	assert: decode exit got=2 want=1
+C11.order.missing-before-value	FAIL	0.004122	assert: decode exit got=2 want=1
+C11.order.member-bytes	FAIL	0.004077	assert: decode exit got=2 want=1
+C11.order.element-before-order	FAIL	0.003332	assert: decode exit got=2 want=1
+C11.order.walk-before-relation	FAIL	0.003905	assert: decode exit got=2 want=1
+C11.text.empty	FAIL	0.004016	assert: decode exit got=2 want=1
+C11.text.syntax	FAIL	0.003709	assert: decode exit got=2 want=1
+C11.text.fraction	FAIL	0.004004	assert: decode exit got=2 want=1
+C11.text.exponent	FAIL	0.004000	assert: decode exit got=2 want=1
+C11.text.negative-zero	FAIL	0.003868	assert: decode exit got=2 want=1
+C11.text.big-int	FAIL	0.003890	assert: decode exit got=2 want=1
+C11.text.bom	FAIL	0.003639	assert: decode exit got=2 want=1
+C11.text.trailing	FAIL	0.003835	assert: decode exit got=2 want=1
+C11.text.surrogate	FAIL	0.003824	assert: decode exit got=2 want=1
+C11.text.utf8	FAIL	0.003858	assert: decode exit got=2 want=1
+C11.text.depth	FAIL	0.003999	assert: decode exit got=2 want=1
+C11.text.depth-priority	FAIL	0.003927	assert: decode exit got=2 want=1
+C11.text.string-cap	FAIL	0.003839	assert: decode exit got=2 want=1
+C11.text.duplicate	FAIL	0.003970	assert: decode exit got=2 want=1
+C11.text.duplicate-escaped	FAIL	0.003888	assert: decode exit got=2 want=1
+C11.text.duplicate-nested	FAIL	0.004056	assert: decode exit got=2 want=1
+C11.presentation.key.00	FAIL	0.003914	assert: decode exit got=2 want=1
+C11.presentation.value.00	FAIL	0.003969	assert: decode exit got=2 want=1
+C11.presentation.key.01	FAIL	0.003846	assert: decode exit got=2 want=1
+C11.presentation.value.01	FAIL	0.003906	assert: decode exit got=2 want=1
+C11.presentation.key.02	FAIL	0.004135	assert: decode exit got=2 want=1
+C11.presentation.value.02	FAIL	0.003917	assert: decode exit got=2 want=1
+C11.presentation.key.03	FAIL	0.003487	assert: decode exit got=2 want=1
+C11.presentation.value.03	FAIL	0.004110	assert: decode exit got=2 want=1
+C11.presentation.key.04	FAIL	0.004111	assert: decode exit got=2 want=1
+C11.presentation.value.04	FAIL	0.003633	assert: decode exit got=2 want=1
+C11.presentation.key.05	FAIL	0.004024	assert: decode exit got=2 want=1
+C11.presentation.value.05	FAIL	0.004037	assert: decode exit got=2 want=1
+C11.presentation.key.06	FAIL	0.003753	assert: decode exit got=2 want=1
+C11.presentation.value.06	FAIL	0.003926	assert: decode exit got=2 want=1
+C11.presentation.key.07	FAIL	0.004220	assert: decode exit got=2 want=1
+C11.presentation.value.07	FAIL	0.003779	assert: decode exit got=2 want=1
+C11.presentation.key.08	FAIL	0.003957	assert: decode exit got=2 want=1
+C11.presentation.value.08	FAIL	0.004014	assert: decode exit got=2 want=1
+C11.presentation.key.09	FAIL	0.003819	assert: decode exit got=2 want=1
+C11.presentation.value.09	FAIL	0.004156	assert: decode exit got=2 want=1
+C11.presentation.key.0a	FAIL	0.003895	assert: decode exit got=2 want=1
+C11.presentation.value.0a	FAIL	0.003665	assert: decode exit got=2 want=1
+C11.presentation.key.0b	FAIL	0.004200	assert: decode exit got=2 want=1
+C11.presentation.value.0b	FAIL	0.004357	assert: decode exit got=2 want=1
+C11.presentation.key.0c	FAIL	0.003860	assert: decode exit got=2 want=1
+C11.presentation.value.0c	FAIL	0.003977	assert: decode exit got=2 want=1
+C11.presentation.key.0d	FAIL	0.004012	assert: decode exit got=2 want=1
+C11.presentation.value.0d	FAIL	0.003976	assert: decode exit got=2 want=1
+C11.presentation.key.0e	FAIL	0.003893	assert: decode exit got=2 want=1
+C11.presentation.value.0e	FAIL	0.004093	assert: decode exit got=2 want=1
+C11.presentation.key.0f	FAIL	0.003746	assert: decode exit got=2 want=1
+C11.presentation.value.0f	FAIL	0.004121	assert: decode exit got=2 want=1
+C11.presentation.key.10	FAIL	0.003817	assert: decode exit got=2 want=1
+C11.presentation.value.10	FAIL	0.003536	assert: decode exit got=2 want=1
+C11.presentation.key.11	FAIL	0.005014	assert: decode exit got=2 want=1
+C11.presentation.value.11	FAIL	0.003987	assert: decode exit got=2 want=1
+C11.presentation.key.12	FAIL	0.003691	assert: decode exit got=2 want=1
+C11.presentation.value.12	FAIL	0.003572	assert: decode exit got=2 want=1
+C11.presentation.key.13	FAIL	0.003588	assert: decode exit got=2 want=1
+C11.presentation.value.13	FAIL	0.003699	assert: decode exit got=2 want=1
+C11.presentation.key.14	FAIL	0.004137	assert: decode exit got=2 want=1
+C11.presentation.value.14	FAIL	0.003734	assert: decode exit got=2 want=1
+C11.presentation.key.15	FAIL	0.003685	assert: decode exit got=2 want=1
+C11.presentation.value.15	FAIL	0.004296	assert: decode exit got=2 want=1
+C11.presentation.key.16	FAIL	0.003732	assert: decode exit got=2 want=1
+C11.presentation.value.16	FAIL	0.003970	assert: decode exit got=2 want=1
+C11.presentation.key.17	FAIL	0.003822	assert: decode exit got=2 want=1
+C11.presentation.value.17	FAIL	0.003299	assert: decode exit got=2 want=1
+C11.presentation.key.18	FAIL	0.003466	assert: decode exit got=2 want=1
+C11.presentation.value.18	FAIL	0.004221	assert: decode exit got=2 want=1
+C11.presentation.key.19	FAIL	0.004586	assert: decode exit got=2 want=1
+C11.presentation.value.19	FAIL	0.004483	assert: decode exit got=2 want=1
+C11.presentation.key.1a	FAIL	0.004319	assert: decode exit got=2 want=1
+C11.presentation.value.1a	FAIL	0.003947	assert: decode exit got=2 want=1
+C11.presentation.key.1b	FAIL	0.003930	assert: decode exit got=2 want=1
+C11.presentation.value.1b	FAIL	0.004655	assert: decode exit got=2 want=1
+C11.presentation.key.1c	FAIL	0.005361	assert: decode exit got=2 want=1
+C11.presentation.value.1c	FAIL	0.003870	assert: decode exit got=2 want=1
+C11.presentation.key.1d	FAIL	0.003828	assert: decode exit got=2 want=1
+C11.presentation.value.1d	FAIL	0.003927	assert: decode exit got=2 want=1
+C11.presentation.key.1e	FAIL	0.003758	assert: decode exit got=2 want=1
+C11.presentation.value.1e	FAIL	0.004526	assert: decode exit got=2 want=1
+C11.presentation.key.1f	FAIL	0.004109	assert: decode exit got=2 want=1
+C11.presentation.value.1f	FAIL	0.003799	assert: decode exit got=2 want=1
+C11.presentation.key.7f	FAIL	0.004024	assert: decode exit got=2 want=1
+C11.presentation.value.7f	FAIL	0.004710	assert: decode exit got=2 want=1
+C11.presentation.key.80	FAIL	0.003517	assert: decode exit got=2 want=1
+C11.presentation.value.80	FAIL	0.003752	assert: decode exit got=2 want=1
+C11.presentation.key.81	FAIL	0.003324	assert: decode exit got=2 want=1
+C11.presentation.value.81	FAIL	0.003315	assert: decode exit got=2 want=1
+C11.presentation.key.82	FAIL	0.004023	assert: decode exit got=2 want=1
+C11.presentation.value.82	FAIL	0.003591	assert: decode exit got=2 want=1
+C11.presentation.key.83	FAIL	0.003388	assert: decode exit got=2 want=1
+C11.presentation.value.83	FAIL	0.003800	assert: decode exit got=2 want=1
+C11.presentation.key.84	FAIL	0.003944	assert: decode exit got=2 want=1
+C11.presentation.value.84	FAIL	0.003549	assert: decode exit got=2 want=1
+C11.presentation.key.85	FAIL	0.004177	assert: decode exit got=2 want=1
+C11.presentation.value.85	FAIL	0.003782	assert: decode exit got=2 want=1
+C11.presentation.key.86	FAIL	0.003455	assert: decode exit got=2 want=1
+C11.presentation.value.86	FAIL	0.003861	assert: decode exit got=2 want=1
+C11.presentation.key.87	FAIL	0.003485	assert: decode exit got=2 want=1
+C11.presentation.value.87	FAIL	0.003729	assert: decode exit got=2 want=1
+C11.presentation.key.88	FAIL	0.004342	assert: decode exit got=2 want=1
+C11.presentation.value.88	FAIL	0.003743	assert: decode exit got=2 want=1
+C11.presentation.key.89	FAIL	0.003622	assert: decode exit got=2 want=1
+C11.presentation.value.89	FAIL	0.003913	assert: decode exit got=2 want=1
+C11.presentation.key.8a	FAIL	0.003873	assert: decode exit got=2 want=1
+C11.presentation.value.8a	FAIL	0.003985	assert: decode exit got=2 want=1
+C11.presentation.key.8b	FAIL	0.003918	assert: decode exit got=2 want=1
+C11.presentation.value.8b	FAIL	0.004085	assert: decode exit got=2 want=1
+C11.presentation.key.8c	FAIL	0.004057	assert: decode exit got=2 want=1
+C11.presentation.value.8c	FAIL	0.003731	assert: decode exit got=2 want=1
+C11.presentation.key.8d	FAIL	0.005091	assert: decode exit got=2 want=1
+C11.presentation.value.8d	FAIL	0.003833	assert: decode exit got=2 want=1
+C11.presentation.key.8e	FAIL	0.003335	assert: decode exit got=2 want=1
+C11.presentation.value.8e	FAIL	0.002971	assert: decode exit got=2 want=1
+C11.presentation.key.8f	FAIL	0.003066	assert: decode exit got=2 want=1
+C11.presentation.value.8f	FAIL	0.003548	assert: decode exit got=2 want=1
+C11.presentation.key.90	FAIL	0.003521	assert: decode exit got=2 want=1
+C11.presentation.value.90	FAIL	0.003180	assert: decode exit got=2 want=1
+C11.presentation.key.91	FAIL	0.003750	assert: decode exit got=2 want=1
+C11.presentation.value.91	FAIL	0.003408	assert: decode exit got=2 want=1
+C11.presentation.key.92	FAIL	0.003465	assert: decode exit got=2 want=1
+C11.presentation.value.92	FAIL	0.003444	assert: decode exit got=2 want=1
+C11.presentation.key.93	FAIL	0.003205	assert: decode exit got=2 want=1
+C11.presentation.value.93	FAIL	0.003269	assert: decode exit got=2 want=1
+C11.presentation.key.94	FAIL	0.003657	assert: decode exit got=2 want=1
+C11.presentation.value.94	FAIL	0.003321	assert: decode exit got=2 want=1
+C11.presentation.key.95	FAIL	0.003228	assert: decode exit got=2 want=1
+C11.presentation.value.95	FAIL	0.004062	assert: decode exit got=2 want=1
+C11.presentation.key.96	FAIL	0.003776	assert: decode exit got=2 want=1
+C11.presentation.value.96	FAIL	0.003260	assert: decode exit got=2 want=1
+C11.presentation.key.97	FAIL	0.003909	assert: decode exit got=2 want=1
+C11.presentation.value.97	FAIL	0.004227	assert: decode exit got=2 want=1
+C11.presentation.key.98	FAIL	0.003937	assert: decode exit got=2 want=1
+C11.presentation.value.98	FAIL	0.003914	assert: decode exit got=2 want=1
+C11.presentation.key.99	FAIL	0.003546	assert: decode exit got=2 want=1
+C11.presentation.value.99	FAIL	0.003201	assert: decode exit got=2 want=1
+C11.presentation.key.9a	FAIL	0.003730	assert: decode exit got=2 want=1
+C11.presentation.value.9a	FAIL	0.003995	assert: decode exit got=2 want=1
+C11.presentation.key.9b	FAIL	0.004055	assert: decode exit got=2 want=1
+C11.presentation.value.9b	FAIL	0.004171	assert: decode exit got=2 want=1
+C11.presentation.key.9c	FAIL	0.003493	assert: decode exit got=2 want=1
+C11.presentation.value.9c	FAIL	0.003795	assert: decode exit got=2 want=1
+C11.presentation.key.9d	FAIL	0.003782	assert: decode exit got=2 want=1
+C11.presentation.value.9d	FAIL	0.003772	assert: decode exit got=2 want=1
+C11.presentation.key.9e	FAIL	0.003874	assert: decode exit got=2 want=1
+C11.presentation.value.9e	FAIL	0.003723	assert: decode exit got=2 want=1
+C11.presentation.key.9f	FAIL	0.003337	assert: decode exit got=2 want=1
+C11.presentation.value.9f	FAIL	0.003384	assert: decode exit got=2 want=1
+C11.presentation.value-choice.63	FAIL	0.003960	assert: decode exit got=2 want=1
+C11.presentation.value-choice.64	FAIL	0.004162	assert: decode exit got=2 want=1
+C11.presentation.value-choice.65	FAIL	0.003459	assert: decode exit got=2 want=1
+C11.presentation.literal-backslash-n	FAIL	0.004345	assert: decode exit got=2 want=1
+C11.presentation.non-cc-separators	FAIL	0.003609	assert: decode exit got=2 want=1
+C11.presentation.duplicate.lf	FAIL	0.004129	assert: decode exit got=2 want=1
+C11.presentation.duplicate.del	FAIL	0.003358	assert: decode exit got=2 want=1
+C11.presentation.duplicate.nel	FAIL	0.003413	assert: decode exit got=2 want=1
+C11.c1-control.name	FAIL	0.003532	assert: decode exit got=2 want=1
+C11.c1-control.reason	FAIL	0.003369	assert: decode exit got=2 want=1
+C11.c1-control.toolchain	FAIL	0.003152	assert: decode exit got=2 want=1
+C11.c1-control.axiom	FAIL	0.003353	assert: decode exit got=2 want=1
+C11.property.roundtrip	FAIL	0.003961	assert: generated sample 0 exit got=2 want=0
+C11.property.normalize	FAIL	0.003437	assert: generated sample 0 exit got=2 want=0
+C11.usage-unreadable	PASS	0.009345	-
+C10.root-absent	FAIL	0.024035	assert: history exit got=2 want=0
+C10.root-index	FAIL	0.024559	assert: history exit got=2 want=0
+C10.parent-absent	FAIL	0.027739	assert: history exit got=2 want=0
+C10.working-malformed	FAIL	0.019999	assert: history exit got=2 want=1
+C10.working-absent	FAIL	0.019574	assert: history exit got=2 want=1
+C10.changed	FAIL	0.019936	assert: history exit got=2 want=1
+C10.vanished	FAIL	0.020765	assert: history exit got=2 want=1
+C10.removed-good	FAIL	0.020210	assert: history exit got=2 want=0
+C10.removed-same-toolchain	FAIL	0.020677	assert: history exit got=2 want=1
+C10.removed-wrong-last	FAIL	0.021084	assert: history exit got=2 want=1
+C10.removed-digest-first	FAIL	0.020962	assert: history exit got=2 want=1
+C10.committed-removal	FAIL	0.028458	assert: history exit got=2 want=0
+C10.preserved-removal	FAIL	0.035722	assert: history exit got=2 want=0
+C10.head-then-parent	FAIL	0.026892	assert: history exit got=2 want=1
+C10.notice-edited	FAIL	0.019262	assert: history exit got=2 want=1
+C10.notice-appended	FAIL	0.018745	assert: history exit got=2 want=0
+C10.removed-edited	FAIL	0.028324	assert: history exit got=2 want=1
+C10.removed-vanished	FAIL	0.029267	assert: history exit got=2 want=1
+C10.baseline-undecodable	FAIL	0.020762	assert: history exit got=2 want=1
+C10.shallow-precedence	FAIL	0.024739	assert: history infrastructure line got=b'usage: fvdep-dev sys run OP\xe2\x80\xa6\nops: create PATH [MODE], write N, sync, close, drop, syncdir PATH, replace DIR NAME N,\n     read DIR NAME, lock DIR \xe2\x80\xa6 unlock (the ops between run under the lock), wait\nusage: fvdep-dev json measure FAMILY N TASKS [CYCLES]\nusage: fvdep-dev oracle <id>@<version>\n' want=b'history: shallow repository: fetch the full history\n'
+C10.parent-unreadable	FAIL	0.031819	assert: fixed cannot-read prefix + parent SHA got=False want=True
+C10.not-worktree	FAIL	0.003480	assert: not-git exact line got=b'usage: fvdep-dev sys run OP\xe2\x80\xa6\nops: create PATH [MODE], write N, sync, close, drop, syncdir PATH, replace DIR NAME N,\n     read DIR NAME, lock DIR \xe2\x80\xa6 unlock (the ops between run under the lock), wait\nusage: fvdep-dev json measure FAMILY N TASKS [CYCLES]\nusage: fvdep-dev oracle <id>@<version>\n' want=b'history: not a git work tree: <worktree>/tests/index/.run.k98h5qfo/not-git\n'
+C10.presentation.control-path	FAIL	0.003763	assert: not-git exact line got=b'usage: fvdep-dev sys run OP\xe2\x80\xa6\nops: create PATH [MODE], write N, sync, close, drop, syncdir PATH, replace DIR NAME N,\n     read DIR NAME, lock DIR \xe2\x80\xa6 unlock (the ops between run under the lock), wait\nusage: fvdep-dev json measure FAMILY N TASKS [CYCLES]\nusage: fvdep-dev oracle <id>@<version>\n' want=b'history: not a git work tree: <worktree>/tests/index/.run.k98h5qfo/not-git\\n\\u0085\n'
+C10.parents-notices-diverge	FAIL	0.052902	assert: history exit got=2 want=1
+C10.parents-removed-diverge	FAIL	0.060166	assert: history exit got=2 want=1
+C10.removal-witness-preserved-across-parent	FAIL	0.059452	assert: history exit got=2 want=0
+C10.explicit-dir	FAIL	0.023041	assert: default cwd history got=(2, b'', b'usage: fvdep-dev sys run OP\xe2\x80\xa6\nops: create PATH [MODE], write N, sync, close, drop, syncdir PATH, replace DIR NAME N,\n     read DIR NAME, lock DIR \xe2\x80\xa6 unlock (the ops between run under the lock), wait\nusage: fvdep-dev json measure FAMILY N TASKS [CYCLES]\nusage: fvdep-dev oracle <id>@<version>\n') want=(0, b'', b'')

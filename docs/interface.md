@@ -45,7 +45,7 @@ Binding source = `.agent/spec.md` `Decisions` (Public interface, Data formats, L
 | `trust` | none | verification profile (toolchain, kernels + modes + digests, axioms, implementation profile version) + trusted residue with reasons | 0 |
 | `admit <dir> [--base <rev>]` | library admission of a library working copy (maintainers, growth); writes nothing | per entry `ADMITTED <entry>` / `PREVIEW <entry>: <missing proofs>` / `REFUSED <entry>: <reason>` | 0 (admitted or preview) / 1 / 2 |
 | `oracle <id>@<ver> \| <profile>@<ver>` | serves the spec (or the profile's model) over adapter protocol v1 (§8) on stdin/stdout | replies only, one line per request | 0 at end of input; unknown target → 2 |
-| `index [--check]` | regenerates `index.json` from the library tree (registry + removed-entry records); `--check` compares instead | `Wrote index.json (<n> entries)` / `index.json is current` / `index.json differs from the library` | 0 / 1 (`--check` differs) / 2 |
+| `index [--check]` | in a library working copy: builds the library afresh, then regenerates `index.json` from it (registry + removed-entry records); `--check` compares instead, `index.json` untouched | `Wrote index.json (<n> entries)` / `index.json is current` / `index.json differs from the library` | 0 / 1 (`--check` differs) / 2 (the refusal = stderr's last line; messages, their order, Lake's progress + warning lines: `docs/contracts/U4-library.md` C9) |
 
 `<profile>` = `<eco>:<pkg>@<pkgver>[#<variant>]` (`docs/library.md` Profiles); `[@<ver>]` after it = the profile's own entry version. `init`, `lock` + `upgrade` run under the writer lock (§2).
 

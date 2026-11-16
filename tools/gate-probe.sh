@@ -50,7 +50,8 @@ copy() {
         done
     fi
     # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
-    for d in ledger-suite codec-suite manifest-suite library-suite fuzz-replay sys-suite acceptance; do
+    for d in ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite \
+        acceptance; do
         if [[ -f "$root/.gate/$d.green" ]]; then
             mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
         fi
@@ -457,6 +458,15 @@ s/^theorem encode_eq /axiom trialPlant : True\n\n&/' \
 with_suites=1 probe library-conformance plant_conformance_axiom "encode_eq rests on" \
     env FVDEP_LIBRARY_CASE=A.b64.vector.0.std.encode bash -c 'source tools/gate.sh; library_suite'
 
+# index-suite: a decode case expecting a refusal of a valid index fails, named (one dev-driver case:
+# no fixture library is built).
+plant_index_case() {
+    sed -i 's/^    case("roundtrip.full", base)$/    case("roundtrip.full", base, "planted")/' \
+        tests/index/driver_cases.py
+}
+with_suites=1 probe index-suite plant_index_case "FAIL C11.roundtrip.full" \
+    env FVDEP_INDEX_CASE=C11.roundtrip.full bash -c 'source tools/gate.sh; index_suite'
+
 # fuzz-replay: the json target panics on one committed input ⇒ the replay aborts naming it (the
 # harness's LEAN_ABORT_ON_PANIC turns a Lean panic into the abort the engine counts).
 plant_fuzz_panic() {
@@ -493,7 +503,9 @@ probe codec-freeze-jhd plant_frozen_jhd "B3-2 breach" python3 -I tests/codec/fre
 
 # cli: a binary answering as the contract says passes; one printing a wrong version fails. The fake
 # mirrors docs/interface.md §1–§2 whole, failed writes included (exit 2; the message unless the pipe
-# broke) — Python, since sh cannot tell a broken pipe from a full device.
+# broke) — Python, since sh cannot tell a broken pipe from a full device — + the `index` cases
+# smoke.sh runs (contract U4 C9: help, a usage refusal, the presence refusal outside a library;
+# inside one the fake builds nothing → exit 2).
 fake_binary() {
     local version
     version="$(sed -n 's/^def version : String := "\(.*\)"$/\1/p' Fvdep/Version.lean)"
@@ -502,11 +514,17 @@ fake_binary() {
 #!/usr/bin/env python3
 import os, sys
 usage = "Usage: fvdep <command> [<arguments>]\n"
+no_library = 'No fvdep library found here. Run "fvdep index" in a library working copy.\n'
 args = sys.argv[1:]
 if args == ["--version"]:
     fd, text, code = 1, "fvdep $version\n", 0
 elif args in (["help"], ["--help"], ["help", "help"], ["help", "--help"]):
-    fd, text, code = 1, usage + "\nCommands:\n  help [<command>]  Show help.\n\nOptions:\n  --version         Show the version.\n", 0
+    fd, text, code = 1, usage + "\nCommands:\n  help [<command>]  Show help.\n  index [--check]   Write or check index.json.\n\nOptions:\n  --version         Show the version.\n", 0
+elif args in (["index", "--help"], ["help", "index"]):
+    fd, text, code = 1, "Usage: fvdep index [--check]\n\nOptions:\n  --check  Compare index.json with the library.\n", 0
+elif args in (["index"], ["index", "--check"]):
+    library = os.path.exists("lean-toolchain") and os.path.exists("Fvdep/Registry.lean")
+    fd, text, code = 2, "Build failed: the fake builds no library\n" if library else no_library, 2
 else:
     fd, text, code = 2, usage, 2
 try:

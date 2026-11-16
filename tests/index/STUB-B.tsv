@@ -1,0 +1,702 @@
+case	result	seconds	output
+C1.v1.id	FAIL	0.049401	assert: refusal exit got=0 want=2
+C1.v1.id.unchanged	FAIL	0.000034	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.version	FAIL	0.048232	assert: refusal exit got=0 want=2
+C1.v1.version.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.module	FAIL	0.047149	assert: refusal exit got=0 want=2
+C1.v1.module.unchanged	FAIL	0.000046	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.id-control-00	FAIL	0.043676	assert: refusal exit got=0 want=2
+C1.v1.id-control-00.unchanged	FAIL	0.000031	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.id-control-0a	FAIL	0.042783	assert: refusal exit got=0 want=2
+C1.v1.id-control-0a.unchanged	FAIL	0.000042	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.id-control-85	FAIL	0.042937	assert: refusal exit got=0 want=2
+C1.v1.id-control-85.unchanged	FAIL	0.000068	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.version-control	FAIL	0.045686	assert: refusal exit got=0 want=2
+C1.v1.version-control.unchanged	FAIL	0.000034	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v1.order	FAIL	0.045869	assert: refusal exit got=0 want=2
+C1.v1.order.unchanged	FAIL	0.000029	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v2.repeated-id	FAIL	0.044963	assert: refusal exit got=0 want=2
+C1.v2.repeated-id.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v2.unlisted	FAIL	0.045138	assert: refusal exit got=0 want=2
+C1.v2.unlisted.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.foreign-spec	FAIL	0.043102	assert: refusal exit got=0 want=2
+C1.v3.foreign-spec.unchanged	FAIL	0.000040	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.theorem-spec	FAIL	0.043227	assert: refusal exit got=0 want=2
+C1.v3.theorem-spec.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.type	FAIL	0.043765	assert: refusal exit got=0 want=2
+C1.v3.type.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.partial	FAIL	0.044088	assert: refusal exit got=0 want=2
+C1.v3.partial.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.unsafe	FAIL	0.041708	assert: refusal exit got=0 want=2
+C1.v3.unsafe.unchanged	FAIL	0.000047	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.implemented_by	FAIL	0.044188	assert: refusal exit got=0 want=2
+C1.v3.implemented_by.unchanged	FAIL	0.000039	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.extern	FAIL	0.044396	assert: refusal exit got=0 want=2
+C1.v3.extern.unchanged	FAIL	0.000041	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.opaque	FAIL	0.044048	assert: refusal exit got=0 want=2
+C1.v3.opaque.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.noncomputable	FAIL	0.044298	assert: refusal exit got=0 want=2
+C1.v3.noncomputable.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v3.abi-root	FAIL	0.067638	assert: refusal exit got=0 want=2
+C1.v3.abi-root.unchanged	FAIL	0.000053	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v4.not-prop	FAIL	0.067645	assert: refusal exit got=0 want=2
+C1.v4.not-prop.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v4.theorem	FAIL	0.043157	assert: refusal exit got=0 want=2
+C1.v4.theorem.unchanged	FAIL	0.000051	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v4.foreign	FAIL	0.042911	assert: refusal exit got=0 want=2
+C1.v4.foreign.unchanged	FAIL	0.000036	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v4.repeat	FAIL	0.043487	assert: refusal exit got=0 want=2
+C1.v4.repeat.unchanged	FAIL	0.000031	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v5.module	FAIL	0.042192	assert: refusal exit got=0 want=2
+C1.v5.module.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v5.type	FAIL	0.042961	assert: refusal exit got=0 want=2
+C1.v5.type.unchanged	FAIL	0.000039	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v6.unlisted	FAIL	0.042611	assert: refusal exit got=0 want=2
+C1.v6.unlisted.unchanged	FAIL	0.000043	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v6.same	FAIL	0.043167	assert: refusal exit got=0 want=2
+C1.v6.same.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v6.bad	FAIL	0.044228	assert: refusal exit got=0 want=2
+C1.v6.bad.unchanged	FAIL	0.000042	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v6.type	FAIL	0.043135	assert: refusal exit got=0 want=2
+C1.v6.type.unchanged	FAIL	0.000036	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v7.holds	FAIL	0.042438	assert: refusal exit got=0 want=2
+C1.v7.holds.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v7.imports	FAIL	0.043202	assert: refusal exit got=0 want=2
+C1.v7.imports.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.c4.link	FAIL	0.043699	assert: refusal exit got=0 want=2
+C1.c4.link.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.c4.alias	FAIL	0.042341	assert: refusal exit got=0 want=2
+C1.c4.alias.unchanged	FAIL	0.000055	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.entry-order.first	FAIL	0.044326	assert: refusal exit got=0 want=2
+C1.entry-order.first.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.entry-order.reversed	FAIL	0.045055	assert: refusal exit got=0 want=2
+C1.entry-order.reversed.unchanged	FAIL	0.000039	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C1.v10.profiles	FAIL	0.042270	assert: refusal exit got=0 want=2
+C1.v10.profiles.unchanged	FAIL	0.000054	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C7.absent.lean-toolchain	FAIL	0.042059	assert: refusal exit got=0 want=2
+C7.absent.lean-toolchain.unchanged	FAIL	0.000036	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1695 chars) want=b'index sentinel: unchanged before a refusal\n'
+C7.absent.Fvdep-Registry.lean	FAIL	0.042882	assert: refusal exit got=0 want=2
+C7.absent.Fvdep-Registry.lean.unchanged	FAIL	0.000044	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C7.presence-before-toolchain	FAIL	0.042722	assert: refusal exit got=0 want=2
+C7.presence-before-toolchain.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1718 chars) want=b'index sentinel: unchanged before a refusal\n'
+C7.toolchain-control	FAIL	0.042501	assert: refusal exit got=0 want=2
+C7.toolchain-control.unchanged	FAIL	0.000040	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1726 chars) want=b'index sentinel: unchanged before a refusal\n'
+C7.toolchain-before-build	FAIL	0.042680	assert: refusal exit got=0 want=2
+C7.toolchain-before-build.unchanged	FAIL	0.000033	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1718 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.build	FAIL	0.043608	assert: build failure exit got=0 want=2
+C8.form.modules	FAIL	0.043344	assert: refusal exit got=0 want=2
+C8.form.modules.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.notices	FAIL	0.041367	assert: refusal exit got=0 want=2
+C8.form.notices.unchanged	FAIL	0.000042	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.removed	FAIL	0.042114	assert: refusal exit got=0 want=2
+C8.form.removed.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.root-helper	FAIL	0.042749	assert: refusal exit got=0 want=2
+C8.form.root-helper.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.entry	FAIL	0.042721	assert: refusal exit got=0 want=2
+C8.form.entry.unchanged	FAIL	0.000057	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.d4.inline-entry	FAIL	0.043311	assert: refusal exit got=0 want=2
+C8.d4.inline-entry.unchanged	FAIL	0.000065	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.d4.outside-helper	FAIL	0.044144	assert: refusal exit got=0 want=2
+C8.d4.outside-helper.unchanged	FAIL	0.000036	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.d4.order-modules	FAIL	0.043917	assert: refusal exit got=0 want=2
+C8.d4.order-modules.unchanged	FAIL	0.000032	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.d4.order-profiles	FAIL	0.043113	assert: refusal exit got=0 want=2
+C8.d4.order-profiles.unchanged	FAIL	0.000053	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.d4.order-notices	FAIL	0.043864	assert: refusal exit got=0 want=2
+C8.d4.order-notices.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.type-layout	FAIL	0.044184	assert: refusal exit got=0 want=2
+C8.form.type-layout.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.form.profile-elements	FAIL	0.042359	assert: refusal exit got=0 want=2
+C8.form.profile-elements.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C8.load	FAIL	0.042058	assert: load exit got=0 want=2
+C3.status.proven	PASS	0.042027	-
+C3.warning.proven	PASS	0.000025	-
+C3.status.sorry	FAIL	0.043540	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': ['sorryAx']}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.sorry	PASS	0.000025	-
+C3.status.custom	FAIL	0.043408	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'trusts', 'axioms': ['FvdepProofs.Registry.Base64.Encode.V1_0_0.alpha', 'FvdepProofs.Registry.Base64.Encode.V1_0_0.zed']}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.custom	PASS	0.000019	-
+C3.status.missing-registry	FAIL	0.044041	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'open', 'axioms': []}]
+C3.warning.missing-registry	FAIL	0.000022	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: no proof registry.', 'Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.length counts as open: no proof registry.']
+C3.status.unreadable	FAIL	0.042720	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'open', 'axioms': []}]
+C3.warning.unreadable	FAIL	0.000031	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: its proof registry cannot be read.', 'Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.length counts as open: its proof registry cannot be read.']
+C3.status.unmapped	FAIL	0.042860	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.unmapped	FAIL	0.000031	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: no theorem is mapped.']
+C3.status.twice	FAIL	0.042904	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.twice	FAIL	0.000017	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: two theorems are mapped.']
+C3.status.not-theorem	FAIL	0.042536	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.not-theorem	FAIL	0.000030	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: FvdepProofs.Registry.Base64.Encode.V1_0_0.bits is not a theorem.']
+C3.status.outside	FAIL	0.043849	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.outside	FAIL	0.000022	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: Fvdep.Base64.Encode.V1_0_0.outside is outside FvdepProofs.']
+C3.status.wrong-statement	FAIL	0.043196	assert: obligation status + full axiom names got=[{'axioms': [], 'name': 'bits', 'status': 'proven'}, {'axioms': [], 'name': 'length', 'status': 'proven'}] want=[{'name': 'bits', 'status': 'open', 'axioms': []}, {'name': 'length', 'status': 'proven', 'axioms': []}]
+C3.warning.wrong-statement	FAIL	0.000016	assert: warning lines + order got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: FvdepProofs.Registry.Base64.Encode.V1_0_0.bits proves another statement.']
+C3.warning.registry-order	FAIL	0.044125	assert: registry entry order, obligation order, then compat got=[] want=['Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.bits counts as open: no proof registry.', 'Warning: base64.encode@1.0.0: obligation Fvdep.Base64.Encode.V1_0_0.length counts as open: no proof registry.', 'Warning: base64.encode@1.0.0: compat counts as open: no proof registry.', 'Warning: base64.encode@0.9.0: obligation Fvdep.Base64.Encod… (523 chars)
+C3.replay.forged	FAIL	0.043609	assert: forged kernel term exit got=0 want=2
+C4.compat.proven	FAIL	0.044226	assert: declared compatibility status got=None want={'version': '0.9.0', 'axioms': [], 'status': 'proven'}
+C4.warning.proven	PASS	0.000025	-
+C4.compat.wrong	FAIL	0.043983	assert: declared compatibility status got=None want={'version': '0.9.0', 'axioms': [], 'status': 'open'}
+C4.warning.wrong	FAIL	0.000035	assert: compat warning exact line got=[] want=['Warning: base64.encode@1.0.0: compat counts as open: FvdepProofs.Registry.Base64.Encode.V1_0_0.compatible proves another statement.']
+C4.compat.unmapped	FAIL	0.045415	assert: declared compatibility status got=None want={'version': '0.9.0', 'axioms': [], 'status': 'open'}
+C4.warning.unmapped	FAIL	0.000035	assert: compat warning exact line got=[] want=['Warning: base64.encode@1.0.0: compat counts as open: no theorem is mapped.']
+C4.compat.ignored	PASS	0.043537	-
+C4.warning.ignored	FAIL	0.000027	assert: compat warning exact line got=[] want=['Warning: base64.encode@1.0.0: the compat theorem FvdepProofs.Registry.Base64.Encode.V1_0_0.compatible is ignored: no compat is declared.']
+C5.notice.unknown	FAIL	0.042910	assert: refusal exit got=0 want=2
+C5.notice.unknown.unchanged	FAIL	0.000051	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.replacement	FAIL	0.043585	assert: refusal exit got=0 want=2
+C5.notice.replacement.unchanged	FAIL	0.000030	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.empty	FAIL	0.042839	assert: refusal exit got=0 want=2
+C5.notice.reason.empty.unchanged	FAIL	0.000046	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.control	FAIL	0.042323	assert: refusal exit got=0 want=2
+C5.notice.reason.control.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.del	FAIL	0.052709	assert: refusal exit got=0 want=2
+C5.notice.reason.del.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.nel	FAIL	0.042648	assert: refusal exit got=0 want=2
+C5.notice.reason.nel.unchanged	FAIL	0.000041	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.large	FAIL	0.063869	assert: refusal exit got=0 want=2
+C5.notice.reason.large.unchanged	FAIL	0.000054	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.notice.reason.multibyte-large	FAIL	0.046312	assert: refusal exit got=0 want=2
+C5.notice.reason.multibyte-large.unchanged	FAIL	0.000050	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.listed	FAIL	0.044212	assert: refusal exit got=0 want=2
+C5.removed.listed.unchanged	FAIL	0.000034	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.duplicate	FAIL	0.043828	assert: refusal exit got=0 want=2
+C5.removed.duplicate.unchanged	FAIL	0.000053	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.kind	FAIL	0.043059	assert: refusal exit got=0 want=2
+C5.removed.kind.unchanged	FAIL	0.000064	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.digest	FAIL	0.044143	assert: refusal exit got=0 want=2
+C5.removed.digest.unchanged	FAIL	0.000040	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.lastCommit	FAIL	0.043192	assert: refusal exit got=0 want=2
+C5.removed.lastCommit.unchanged	FAIL	0.000052	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.toolchain	FAIL	0.043127	assert: refusal exit got=0 want=2
+C5.removed.toolchain.unchanged	FAIL	0.000035	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.removed.notice	FAIL	0.042745	assert: refusal exit got=0 want=2
+C5.removed.notice.unchanged	FAIL	0.000059	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C5.logs.order	FAIL	0.043383	assert: notice registry order got=[] want=[{'id': 'base64.encode', 'version': '1.0.0', 'reason': 'z first', 'replacement': None}, {'id': 'zed.encode', 'version': '1.0.0', 'reason': 'm second', 'replacement': None}, {'id': 'other.encode', 'version': '1.0.0', 'reason': 'a third', 'replacement': None}]
+C5.notice.cap	FAIL	0.049879	assert: 65536 UTF8 bytes kept whole got=[] want=[{'id': 'base64.encode', 'version': '1.0.0', 'reason': 'éééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé… (32848 chars)
+C2.identity.reference-frames	FAIL	0.042092	assert: independent entry framing + SHA256, closure perturbation 0 got='0000000000000000000000000000000000000000000000000000000000000000' want='b4875178cf5ddc72c9b3cf0bed078e9179bd400c1023286a6a90ab974ee40eae'
+C2.identity.comment	FAIL	0.174014	assert: closure comment byte changes digest got=False want=True
+C2.identity.proof	PASS	0.000026	-
+C2.identity.shared	FAIL	0.000025	assert: exact shared-module importer set got=set() want={'base64.decode', 'base64.decode_url', 'base64.encode_url', 'base64.encode'}
+C2.identity.closure-boundary	FAIL	0.000024	assert: Decode imports Encode; no unrelated closure changes got=set() want={'base64.decode', 'base64.encode'}
+C2.identity.unrelated	PASS	0.083305	-
+C12.schema.new-version-after-index	FAIL	0.000011	assert: new registry entry appears after an earlier index run got=False want=True
+C2.identity.alternate-root	FAIL	0.042108	assert: refusal exit got=0 want=2
+C2.identity.alternate-root.unchanged	FAIL	0.000059	assert: index byte preservation got=b'{"notices":[],"operations":[{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000000000","id":"base64.decode","obligations":[{"axioms":[],"name":"inverse","status":"proven"},{"axioms":[],"name":"canonical","status":"proven"}],"version":"1.0.0"},{"compat":null,"digest":"0000000000000000000000000000000000000000000000000000000000… (1719 chars) want=b'index sentinel: unchanged before a refusal\n'
+C6.purity.idempotent	PASS	0.323524	-
+C6.purity.check-readonly	PASS	0.000012	-
+C6.purity.drift-readonly	PASS	0.000008	-
+C6.purity.environment-artifact	PASS	0.000008	-
+C6.purity.absolute-path	PASS	0.000008	-
+C6.purity.check-current	PASS	0.000006	-
+C6.purity.check-drift	PASS	0.000006	-
+C6.purity.check-absent	PASS	0.000005	-
+C6.no-writer-lock	PASS	0.040907	-
+C6.concurrent	PASS	0.050081	-
+C6.io.read	FAIL	0.052866	assert: index read error exit got=1 want=2
+C6.io.write	FAIL	0.042731	assert: index write error exit got=0 want=2
+C9.help	PASS	0.079031	-
+C9.usage.0	PASS	0.039317	-
+C9.usage.1	PASS	0.039302	-
+C9.usage.2	PASS	0.038904	-
+C9.usage.3	PASS	0.043033	-
+C9.usage.4	PASS	0.039212	-
+C9.usage.5	PASS	0.042884	-
+C9.presentation.lake-progress	PASS	0.042336	-
+C12.schema.launch	PASS	0.051631	-
+C12.bound.obligation-name	FAIL	0.041105	assert: out-of-domain index refused before printing got=0 want=2
+C12.bound.axiom-name	FAIL	0.043205	assert: out-of-domain index refused before printing got=0 want=2
+C12.bound.removed-toolchain-cc	FAIL	0.042339	assert: out-of-domain index refused before printing got=0 want=2
+C12.bound.removed-toolchain-long	FAIL	0.042786	assert: out-of-domain index refused before printing got=0 want=2
+C12.schema.empty	FAIL	0.042467	assert: empty operation count got=b'Wrote index.json (6 entries)\n' want=b'Wrote index.json (0 entries)\n'
+C12.schema.numeric-order	FAIL	0.043447	assert: numeric ordering independent of registry order got=['1.0.0', '1.0.0', '1.0.0', '1.0.0', '1.0.0', '1.0.0'] want=['1.0.0', '1.0.2', '1.0.10']
+C12.registry.accepted-forms	FAIL	0.043944	assert: accepted forms count got=b'Wrote index.json (6 entries)\n' want=b'Wrote index.json (1 entries)\n'
+C11.roundtrip.full	FAIL	0.003530	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (937 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (939 chars)
+C11.roundtrip.empty	FAIL	0.003326	assert: decode stdout got=b'{"notices":[],"operations":[],"removed":[],"schema":1,"toolchain":"leanprover/lean4:v4.35.0"}' want=b'{"notices":[],"operations":[],"removed":[],"schema":1,"toolchain":"leanprover/lean4:v4.35.0"}\n'
+C11.roundtrip.noncanonical	FAIL	0.003287	assert: decode stdout got=b'{\n  "schema": 1,\n  "toolchain": "leanprover/lean4:v4.35.0",\n  "operations": [\n    {\n      "id": "base64.encode",\n      "version": "1.0.0",\n      "digest": "1111111111111111111111111111111111111111111111111111111111111111",\n      "compat": null,\n      "obligations": [\n        {\n          "name": "bits",\n          "status": "proven",\n          "… (1427 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (939 chars)
+C11.root-kind.0	FAIL	0.003228	assert: decode exit got=0 want=1
+C11.root-kind.1	FAIL	0.003311	assert: decode exit got=0 want=1
+C11.root-kind.2	FAIL	0.003526	assert: decode exit got=0 want=1
+C11.root-kind.3	FAIL	0.003304	assert: decode exit got=0 want=1
+C11.root-kind.4	FAIL	0.003866	assert: decode exit got=0 want=1
+C11.schema.missing	FAIL	0.003747	assert: decode exit got=0 want=1
+C11.schema.zero	FAIL	0.003333	assert: decode exit got=0 want=1
+C11.schema.two	FAIL	0.003794	assert: decode exit got=0 want=1
+C11.schema.string	FAIL	0.004095	assert: decode exit got=0 want=1
+C11.schema.bool	FAIL	0.003730	assert: decode exit got=0 want=1
+C11.schema.null	FAIL	0.004115	assert: decode exit got=0 want=1
+C11.missing.root.schema	FAIL	0.003675	assert: decode exit got=0 want=1
+C11.missing.root.toolchain	FAIL	0.003707	assert: decode exit got=0 want=1
+C11.missing.root.operations	FAIL	0.003828	assert: decode exit got=0 want=1
+C11.missing.root.notices	FAIL	0.003609	assert: decode exit got=0 want=1
+C11.missing.root.removed	FAIL	0.003838	assert: decode exit got=0 want=1
+C11.unknown.root	FAIL	0.003911	assert: decode exit got=0 want=1
+C11.kind.root.schema.0	FAIL	0.003707	assert: decode exit got=0 want=1
+C11.kind.root.schema.1	FAIL	0.003862	assert: decode exit got=0 want=1
+C11.kind.root.schema.2	FAIL	0.003600	assert: decode exit got=0 want=1
+C11.kind.root.schema.3	FAIL	0.003868	assert: decode exit got=0 want=1
+C11.kind.root.schema.4	FAIL	0.003404	assert: decode exit got=0 want=1
+C11.kind.root.toolchain.0	FAIL	0.003892	assert: decode exit got=0 want=1
+C11.kind.root.toolchain.1	FAIL	0.003539	assert: decode exit got=0 want=1
+C11.kind.root.toolchain.2	FAIL	0.003788	assert: decode exit got=0 want=1
+C11.kind.root.toolchain.3	FAIL	0.003895	assert: decode exit got=0 want=1
+C11.kind.root.toolchain.4	FAIL	0.003651	assert: decode exit got=0 want=1
+C11.kind.root.operations.0	FAIL	0.003918	assert: decode exit got=0 want=1
+C11.kind.root.operations.1	FAIL	0.003763	assert: decode exit got=0 want=1
+C11.kind.root.operations.2	FAIL	0.003887	assert: decode exit got=0 want=1
+C11.kind.root.operations.3	FAIL	0.003928	assert: decode exit got=0 want=1
+C11.kind.root.operations.4	FAIL	0.003932	assert: decode exit got=0 want=1
+C11.kind.root.notices.0	FAIL	0.003557	assert: decode exit got=0 want=1
+C11.kind.root.notices.1	FAIL	0.003713	assert: decode exit got=0 want=1
+C11.kind.root.notices.2	FAIL	0.003536	assert: decode exit got=0 want=1
+C11.kind.root.notices.3	FAIL	0.003571	assert: decode exit got=0 want=1
+C11.kind.root.notices.4	FAIL	0.003407	assert: decode exit got=0 want=1
+C11.kind.root.removed.0	FAIL	0.003915	assert: decode exit got=0 want=1
+C11.kind.root.removed.1	FAIL	0.004059	assert: decode exit got=0 want=1
+C11.kind.root.removed.2	FAIL	0.003346	assert: decode exit got=0 want=1
+C11.kind.root.removed.3	FAIL	0.003941	assert: decode exit got=0 want=1
+C11.kind.root.removed.4	FAIL	0.003741	assert: decode exit got=0 want=1
+C11.missing.operations-0.id	FAIL	0.003359	assert: decode exit got=0 want=1
+C11.missing.operations-0.version	FAIL	0.003866	assert: decode exit got=0 want=1
+C11.missing.operations-0.digest	FAIL	0.004169	assert: decode exit got=0 want=1
+C11.missing.operations-0.compat	FAIL	0.003583	assert: decode exit got=0 want=1
+C11.missing.operations-0.obligations	FAIL	0.003792	assert: decode exit got=0 want=1
+C11.unknown.operations-0	FAIL	0.003985	assert: decode exit got=0 want=1
+C11.kind.operations-0.id.0	FAIL	0.003709	assert: decode exit got=0 want=1
+C11.kind.operations-0.id.1	FAIL	0.003902	assert: decode exit got=0 want=1
+C11.kind.operations-0.id.2	FAIL	0.003868	assert: decode exit got=0 want=1
+C11.kind.operations-0.id.3	FAIL	0.003640	assert: decode exit got=0 want=1
+C11.kind.operations-0.id.4	FAIL	0.003725	assert: decode exit got=0 want=1
+C11.kind.operations-0.version.0	FAIL	0.003474	assert: decode exit got=0 want=1
+C11.kind.operations-0.version.1	FAIL	0.003719	assert: decode exit got=0 want=1
+C11.kind.operations-0.version.2	FAIL	0.004663	assert: decode exit got=0 want=1
+C11.kind.operations-0.version.3	FAIL	0.003628	assert: decode exit got=0 want=1
+C11.kind.operations-0.version.4	FAIL	0.003501	assert: decode exit got=0 want=1
+C11.kind.operations-0.digest.0	FAIL	0.003869	assert: decode exit got=0 want=1
+C11.kind.operations-0.digest.1	FAIL	0.004568	assert: decode exit got=0 want=1
+C11.kind.operations-0.digest.2	FAIL	0.003162	assert: decode exit got=0 want=1
+C11.kind.operations-0.digest.3	FAIL	0.003844	assert: decode exit got=0 want=1
+C11.kind.operations-0.digest.4	FAIL	0.003401	assert: decode exit got=0 want=1
+C11.kind.operations-0.compat.0	FAIL	0.003402	assert: decode exit got=0 want=1
+C11.kind.operations-0.compat.1	FAIL	0.003650	assert: decode exit got=0 want=1
+C11.kind.operations-0.compat.2	FAIL	0.003685	assert: decode exit got=0 want=1
+C11.kind.operations-0.compat.3	FAIL	0.003605	assert: decode exit got=0 want=1
+C11.kind.operations-0.obligations.0	FAIL	0.004211	assert: decode exit got=0 want=1
+C11.kind.operations-0.obligations.1	FAIL	0.003720	assert: decode exit got=0 want=1
+C11.kind.operations-0.obligations.2	FAIL	0.003344	assert: decode exit got=0 want=1
+C11.kind.operations-0.obligations.3	FAIL	0.003676	assert: decode exit got=0 want=1
+C11.kind.operations-0.obligations.4	FAIL	0.004080	assert: decode exit got=0 want=1
+C11.missing.operations-0-obligations-0.name	FAIL	0.003565	assert: decode exit got=0 want=1
+C11.missing.operations-0-obligations-0.status	FAIL	0.003583	assert: decode exit got=0 want=1
+C11.missing.operations-0-obligations-0.axioms	FAIL	0.003874	assert: decode exit got=0 want=1
+C11.unknown.operations-0-obligations-0	FAIL	0.003533	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.name.0	FAIL	0.003777	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.name.1	FAIL	0.003477	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.name.2	FAIL	0.003720	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.name.3	FAIL	0.003957	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.name.4	FAIL	0.003672	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.status.0	FAIL	0.003676	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.status.1	FAIL	0.004036	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.status.2	FAIL	0.003750	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.status.3	FAIL	0.003952	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.status.4	FAIL	0.004404	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.axioms.0	FAIL	0.003749	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.axioms.1	FAIL	0.004153	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.axioms.2	FAIL	0.004354	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.axioms.3	FAIL	0.003671	assert: decode exit got=0 want=1
+C11.kind.operations-0-obligations-0.axioms.4	FAIL	0.003482	assert: decode exit got=0 want=1
+C11.missing.operations-1-compat.axioms	FAIL	0.003979	assert: decode exit got=0 want=1
+C11.missing.operations-1-compat.status	FAIL	0.003965	assert: decode exit got=0 want=1
+C11.missing.operations-1-compat.version	FAIL	0.004012	assert: decode exit got=0 want=1
+C11.unknown.operations-1-compat	FAIL	0.003812	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.axioms.0	FAIL	0.004071	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.axioms.1	FAIL	0.003818	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.axioms.2	FAIL	0.003901	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.axioms.3	FAIL	0.004046	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.axioms.4	FAIL	0.003847	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.status.0	FAIL	0.004033	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.status.1	FAIL	0.004032	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.status.2	FAIL	0.003421	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.status.3	FAIL	0.003738	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.status.4	FAIL	0.003856	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.version.0	FAIL	0.003737	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.version.1	FAIL	0.004160	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.version.2	FAIL	0.003754	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.version.3	FAIL	0.003765	assert: decode exit got=0 want=1
+C11.kind.operations-1-compat.version.4	FAIL	0.003926	assert: decode exit got=0 want=1
+C11.missing.notices-0.id	FAIL	0.003742	assert: decode exit got=0 want=1
+C11.missing.notices-0.version	FAIL	0.003528	assert: decode exit got=0 want=1
+C11.missing.notices-0.reason	FAIL	0.003845	assert: decode exit got=0 want=1
+C11.missing.notices-0.replacement	FAIL	0.004069	assert: decode exit got=0 want=1
+C11.unknown.notices-0	FAIL	0.003695	assert: decode exit got=0 want=1
+C11.kind.notices-0.id.0	FAIL	0.004901	assert: decode exit got=0 want=1
+C11.kind.notices-0.id.1	FAIL	0.003601	assert: decode exit got=0 want=1
+C11.kind.notices-0.id.2	FAIL	0.003784	assert: decode exit got=0 want=1
+C11.kind.notices-0.id.3	FAIL	0.003266	assert: decode exit got=0 want=1
+C11.kind.notices-0.id.4	FAIL	0.003090	assert: decode exit got=0 want=1
+C11.kind.notices-0.version.0	FAIL	0.003378	assert: decode exit got=0 want=1
+C11.kind.notices-0.version.1	FAIL	0.003429	assert: decode exit got=0 want=1
+C11.kind.notices-0.version.2	FAIL	0.003584	assert: decode exit got=0 want=1
+C11.kind.notices-0.version.3	FAIL	0.003420	assert: decode exit got=0 want=1
+C11.kind.notices-0.version.4	FAIL	0.004720	assert: decode exit got=0 want=1
+C11.kind.notices-0.reason.0	FAIL	0.004200	assert: decode exit got=0 want=1
+C11.kind.notices-0.reason.1	FAIL	0.003084	assert: decode exit got=0 want=1
+C11.kind.notices-0.reason.2	FAIL	0.003583	assert: decode exit got=0 want=1
+C11.kind.notices-0.reason.3	FAIL	0.003662	assert: decode exit got=0 want=1
+C11.kind.notices-0.reason.4	FAIL	0.003798	assert: decode exit got=0 want=1
+C11.kind.notices-0.replacement.0	FAIL	0.004003	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"bits… (934 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"bits… (936 chars)
+C11.kind.notices-0.replacement.1	FAIL	0.003783	assert: decode exit got=0 want=1
+C11.kind.notices-0.replacement.2	FAIL	0.003329	assert: decode exit got=0 want=1
+C11.kind.notices-0.replacement.3	FAIL	0.004122	assert: decode exit got=0 want=1
+C11.kind.notices-0.replacement.4	FAIL	0.004734	assert: decode exit got=0 want=1
+C11.missing.removed-0.id	FAIL	0.003683	assert: decode exit got=0 want=1
+C11.missing.removed-0.version	FAIL	0.003835	assert: decode exit got=0 want=1
+C11.missing.removed-0.kind	FAIL	0.003451	assert: decode exit got=0 want=1
+C11.missing.removed-0.digest	FAIL	0.003517	assert: decode exit got=0 want=1
+C11.missing.removed-0.toolchain	FAIL	0.003712	assert: decode exit got=0 want=1
+C11.missing.removed-0.last_commit	FAIL	0.003433	assert: decode exit got=0 want=1
+C11.unknown.removed-0	FAIL	0.003400	assert: decode exit got=0 want=1
+C11.kind.removed-0.id.0	FAIL	0.004292	assert: decode exit got=0 want=1
+C11.kind.removed-0.id.1	FAIL	0.003770	assert: decode exit got=0 want=1
+C11.kind.removed-0.id.2	FAIL	0.003588	assert: decode exit got=0 want=1
+C11.kind.removed-0.id.3	FAIL	0.003762	assert: decode exit got=0 want=1
+C11.kind.removed-0.id.4	FAIL	0.003813	assert: decode exit got=0 want=1
+C11.kind.removed-0.version.0	FAIL	0.003227	assert: decode exit got=0 want=1
+C11.kind.removed-0.version.1	FAIL	0.004853	assert: decode exit got=0 want=1
+C11.kind.removed-0.version.2	FAIL	0.003742	assert: decode exit got=0 want=1
+C11.kind.removed-0.version.3	FAIL	0.003955	assert: decode exit got=0 want=1
+C11.kind.removed-0.version.4	FAIL	0.003380	assert: decode exit got=0 want=1
+C11.kind.removed-0.kind.0	FAIL	0.003112	assert: decode exit got=0 want=1
+C11.kind.removed-0.kind.1	FAIL	0.003516	assert: decode exit got=0 want=1
+C11.kind.removed-0.kind.2	FAIL	0.003602	assert: decode exit got=0 want=1
+C11.kind.removed-0.kind.3	FAIL	0.003900	assert: decode exit got=0 want=1
+C11.kind.removed-0.kind.4	FAIL	0.003226	assert: decode exit got=0 want=1
+C11.kind.removed-0.digest.0	FAIL	0.003749	assert: decode exit got=0 want=1
+C11.kind.removed-0.digest.1	FAIL	0.003942	assert: decode exit got=0 want=1
+C11.kind.removed-0.digest.2	FAIL	0.003615	assert: decode exit got=0 want=1
+C11.kind.removed-0.digest.3	FAIL	0.003625	assert: decode exit got=0 want=1
+C11.kind.removed-0.digest.4	FAIL	0.003598	assert: decode exit got=0 want=1
+C11.kind.removed-0.toolchain.0	FAIL	0.003650	assert: decode exit got=0 want=1
+C11.kind.removed-0.toolchain.1	FAIL	0.003425	assert: decode exit got=0 want=1
+C11.kind.removed-0.toolchain.2	FAIL	0.003405	assert: decode exit got=0 want=1
+C11.kind.removed-0.toolchain.3	FAIL	0.003411	assert: decode exit got=0 want=1
+C11.kind.removed-0.toolchain.4	FAIL	0.003478	assert: decode exit got=0 want=1
+C11.kind.removed-0.last_commit.0	FAIL	0.003678	assert: decode exit got=0 want=1
+C11.kind.removed-0.last_commit.1	FAIL	0.003561	assert: decode exit got=0 want=1
+C11.kind.removed-0.last_commit.2	FAIL	0.003684	assert: decode exit got=0 want=1
+C11.kind.removed-0.last_commit.3	FAIL	0.003398	assert: decode exit got=0 want=1
+C11.kind.removed-0.last_commit.4	FAIL	0.003674	assert: decode exit got=0 want=1
+C11.bad.id.0	FAIL	0.003525	assert: decode exit got=0 want=1
+C11.bad.id.1	FAIL	0.003747	assert: decode exit got=0 want=1
+C11.bad.id.2	FAIL	0.003281	assert: decode exit got=0 want=1
+C11.bad.id.3	FAIL	0.003154	assert: decode exit got=0 want=1
+C11.bad.id.4	FAIL	0.003635	assert: decode exit got=0 want=1
+C11.bad.id.5	FAIL	0.003437	assert: decode exit got=0 want=1
+C11.bad.version.0	FAIL	0.003456	assert: decode exit got=0 want=1
+C11.bad.version.1	FAIL	0.003566	assert: decode exit got=0 want=1
+C11.bad.version.2	FAIL	0.003368	assert: decode exit got=0 want=1
+C11.bad.version.3	FAIL	0.003482	assert: decode exit got=0 want=1
+C11.bad.version.4	FAIL	0.003565	assert: decode exit got=0 want=1
+C11.bad.version.5	FAIL	0.003750	assert: decode exit got=0 want=1
+C11.bad.version.6	FAIL	0.003540	assert: decode exit got=0 want=1
+C11.bad.digest.0	FAIL	0.003379	assert: decode exit got=0 want=1
+C11.bad.digest.1	FAIL	0.004400	assert: decode exit got=0 want=1
+C11.bad.digest.2	FAIL	0.003256	assert: decode exit got=0 want=1
+C11.bad.digest.3	FAIL	0.002978	assert: decode exit got=0 want=1
+C11.bad.digest.4	FAIL	0.003742	assert: decode exit got=0 want=1
+C11.version.cap	FAIL	0.004341	assert: decode stdout got=b'{"notices":[],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"bits","status":"proven"}],"version":"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999… (65819 chars) want=b'{"notices":[],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"bits","status":"proven"}],"version":"9999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999999… (65821 chars)
+C11.id.cap-valid	FAIL	0.005154	assert: decode stdout got=b'{"notices":[],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa… (65811 chars) want=b'{"notices":[],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa… (65813 chars)
+C11.text.id-over-cap	FAIL	0.003923	assert: decode exit got=0 want=1
+C11.text.version-over-cap	FAIL	0.005039	assert: decode exit got=0 want=1
+C11.key.cap	FAIL	0.003537	assert: decode exit got=0 want=1
+C11.text.key-over-cap	FAIL	0.003463	assert: decode exit got=0 want=1
+C11.bad.obligation.name.empty	FAIL	0.003522	assert: decode exit got=0 want=1
+C11.bad.obligation.name.nul	FAIL	0.003972	assert: decode exit got=0 want=1
+C11.bad.obligation.name.del	FAIL	0.003428	assert: decode exit got=0 want=1
+C11.bad.obligation.name.over	FAIL	0.003298	assert: decode exit got=0 want=1
+C11.bad.obligation.name.utf8-over	FAIL	0.003676	assert: decode exit got=0 want=1
+C11.accept.obligation.name.cap	FAIL	0.003324	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"x… (1957 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"x… (1959 chars)
+C11.accept.obligation.name.utf8-cap	FAIL	0.003704	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"\… (5029 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"\… (5031 chars)
+C11.toolchain.empty	FAIL	0.003613	assert: decode exit got=0 want=1
+C11.toolchain.control	FAIL	0.003840	assert: decode exit got=0 want=1
+C11.toolchain.over	FAIL	0.003814	assert: decode exit got=0 want=1
+C11.toolchain.cap	FAIL	0.003520	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (1937 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (1939 chars)
+C11.reason.empty	FAIL	0.003363	assert: decode exit got=0 want=1
+C11.reason.control	FAIL	0.003918	assert: decode exit got=0 want=1
+C11.reason.del	FAIL	0.004852	assert: decode exit got=0 want=1
+C11.reason.cap	FAIL	0.004246	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\x… (263063 chars) want=b'{"notices":[{"id":"base64.encode","reason":"\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\xc3\xa9\x… (263065 chars)
+C11.removed.commit.upper	FAIL	0.004853	assert: decode exit got=0 want=1
+C11.removed.commit.short	FAIL	0.004079	assert: decode exit got=0 want=1
+C11.removed.commit.long	FAIL	0.003508	assert: decode exit got=0 want=1
+C11.removed.kind	FAIL	0.004281	assert: decode exit got=0 want=1
+C11.status.obligation.proven.0	FAIL	0.004030	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (937 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (939 chars)
+C11.status.obligation.proven.1	FAIL	0.003748	assert: decode exit got=0 want=1
+C11.status.obligation.proven.2	FAIL	0.003855	assert: decode exit got=0 want=1
+C11.status.obligation.proven.3	FAIL	0.003593	assert: decode exit got=0 want=1
+C11.status.obligation.proven.4	FAIL	0.003907	assert: decode exit got=0 want=1
+C11.status.obligation.proven.5	FAIL	0.003870	assert: decode exit got=0 want=1
+C11.status.obligation.proven.6	FAIL	0.004164	assert: decode exit got=0 want=1
+C11.status.obligation.proven.7	FAIL	0.003275	assert: decode exit got=0 want=1
+C11.status.obligation.proven.8	FAIL	0.004073	assert: decode exit got=0 want=1
+C11.status.obligation.open.0	FAIL	0.004181	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (935 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (937 chars)
+C11.status.obligation.open.1	FAIL	0.003390	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["sorryAx"],… (944 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["sorryAx"],… (946 chars)
+C11.status.obligation.open.2	FAIL	0.003632	assert: decode exit got=0 want=1
+C11.status.obligation.open.3	FAIL	0.004020	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["Custom.a",… (955 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["Custom.a",… (957 chars)
+C11.status.obligation.open.4	FAIL	0.003656	assert: decode exit got=0 want=1
+C11.status.obligation.open.5	FAIL	0.003828	assert: decode exit got=0 want=1
+C11.status.obligation.open.6	FAIL	0.003707	assert: decode exit got=0 want=1
+C11.status.obligation.open.7	FAIL	0.003862	assert: decode exit got=0 want=1
+C11.status.obligation.open.8	FAIL	0.003939	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.0	FAIL	0.003521	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.1	FAIL	0.003714	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.2	FAIL	0.003971	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["Custom.a"]… (947 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":["Custom.a"]… (949 chars)
+C11.status.obligation.trusts.3	FAIL	0.004059	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.4	FAIL	0.003306	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.5	FAIL	0.003968	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.6	FAIL	0.004766	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.7	FAIL	0.003754	assert: decode exit got=0 want=1
+C11.status.obligation.trusts.8	FAIL	0.003491	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.0	FAIL	0.003451	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.1	FAIL	0.003179	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.2	FAIL	0.003828	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.3	FAIL	0.003366	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.4	FAIL	0.003494	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.5	FAIL	0.003596	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.6	FAIL	0.003656	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.7	FAIL	0.003396	assert: decode exit got=0 want=1
+C11.status.obligation.unknown.8	FAIL	0.003924	assert: decode exit got=0 want=1
+C11.status.compat.proven.0	FAIL	0.003462	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (937 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (939 chars)
+C11.status.compat.proven.1	FAIL	0.003796	assert: decode exit got=0 want=1
+C11.status.compat.proven.2	FAIL	0.003843	assert: decode exit got=0 want=1
+C11.status.compat.proven.3	FAIL	0.003827	assert: decode exit got=0 want=1
+C11.status.compat.proven.4	FAIL	0.003942	assert: decode exit got=0 want=1
+C11.status.compat.proven.5	FAIL	0.004330	assert: decode exit got=0 want=1
+C11.status.compat.proven.6	FAIL	0.003963	assert: decode exit got=0 want=1
+C11.status.compat.proven.7	FAIL	0.003333	assert: decode exit got=0 want=1
+C11.status.compat.proven.8	FAIL	0.004776	assert: decode exit got=0 want=1
+C11.status.compat.open.0	FAIL	0.004116	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (935 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (937 chars)
+C11.status.compat.open.1	FAIL	0.003724	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (944 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (946 chars)
+C11.status.compat.open.2	FAIL	0.003611	assert: decode exit got=0 want=1
+C11.status.compat.open.3	FAIL	0.003726	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (955 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (957 chars)
+C11.status.compat.open.4	FAIL	0.003702	assert: decode exit got=0 want=1
+C11.status.compat.open.5	FAIL	0.003752	assert: decode exit got=0 want=1
+C11.status.compat.open.6	FAIL	0.003739	assert: decode exit got=0 want=1
+C11.status.compat.open.7	FAIL	0.003544	assert: decode exit got=0 want=1
+C11.status.compat.open.8	FAIL	0.005043	assert: decode exit got=0 want=1
+C11.status.compat.trusts.0	FAIL	0.003965	assert: decode exit got=0 want=1
+C11.status.compat.trusts.1	FAIL	0.003470	assert: decode exit got=0 want=1
+C11.status.compat.trusts.2	FAIL	0.003315	assert: decode stdout got=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (947 chars) want=b'{"notices":[{"id":"base64.encode","reason":"fixture retraction","replacement":"1.1.0","version":"1.0.0"},{"id":"other.encode","reason":"fixture retraction","replacement":null,"version":"1.0.0"}],"operations":[{"compat":null,"digest":"1111111111111111111111111111111111111111111111111111111111111111","id":"base64.encode","obligations":[{"axioms":[],"name":"b… (949 chars)
+C11.status.compat.trusts.3	FAIL	0.003364	assert: decode exit got=0 want=1
+C11.status.compat.trusts.4	FAIL	0.003089	assert: decode exit got=0 want=1
+C11.status.compat.trusts.5	FAIL	0.003694	assert: decode exit got=0 want=1
+C11.status.compat.trusts.6	FAIL	0.003630	assert: decode exit got=0 want=1
+C11.status.compat.trusts.7	FAIL	0.003303	assert: decode exit got=0 want=1
+C11.status.compat.trusts.8	FAIL	0.004364	assert: decode exit got=0 want=1
+C11.status.compat.unknown.0	FAIL	0.004338	assert: decode exit got=0 want=1
+C11.status.compat.unknown.1	FAIL	0.003349	assert: decode exit got=0 want=1
+C11.status.compat.unknown.2	FAIL	0.003559	assert: decode exit got=0 want=1
+C11.status.compat.unknown.3	FAIL	0.003632	assert: decode exit got=0 want=1
+C11.status.compat.unknown.4	FAIL	0.003352	assert: decode exit got=0 want=1
+C11.status.compat.unknown.5	FAIL	0.003395	assert: decode exit got=0 want=1
+C11.status.compat.unknown.6	FAIL	0.003757	assert: decode exit got=0 want=1
+C11.status.compat.unknown.7	FAIL	0.003809	assert: decode exit got=0 want=1
+C11.status.compat.unknown.8	FAIL	0.003995	assert: decode exit got=0 want=1
+C11.operations.reversed	FAIL	0.003785	assert: decode exit got=0 want=1
+C11.operations.duplicate	FAIL	0.003235	assert: decode exit got=0 want=1
+C11.obligations.duplicate	FAIL	0.003930	assert: decode exit got=0 want=1
+C11.relation.notice-membership	FAIL	0.003963	assert: decode exit got=0 want=1
+C11.relation.replacement	FAIL	0.003509	assert: decode exit got=0 want=1
+C11.relation.removed-listed	FAIL	0.004045	assert: decode exit got=0 want=1
+C11.relation.removed-duplicate	FAIL	0.003726	assert: decode exit got=0 want=1
+C11.relation.removed-no-notice	FAIL	0.004153	assert: decode exit got=0 want=1
+C11.order.discriminator	FAIL	0.003937	assert: decode exit got=0 want=1
+C11.order.unknown-before-missing	FAIL	0.003709	assert: decode exit got=0 want=1
+C11.order.missing-before-value	FAIL	0.003470	assert: decode exit got=0 want=1
+C11.order.member-bytes	FAIL	0.004660	assert: decode exit got=0 want=1
+C11.order.element-before-order	FAIL	0.004131	assert: decode exit got=0 want=1
+C11.order.walk-before-relation	FAIL	0.003591	assert: decode exit got=0 want=1
+C11.text.empty	FAIL	0.003650	assert: decode exit got=0 want=1
+C11.text.syntax	FAIL	0.003389	assert: decode exit got=0 want=1
+C11.text.fraction	FAIL	0.003526	assert: decode exit got=0 want=1
+C11.text.exponent	FAIL	0.004093	assert: decode exit got=0 want=1
+C11.text.negative-zero	FAIL	0.003700	assert: decode exit got=0 want=1
+C11.text.big-int	FAIL	0.003279	assert: decode exit got=0 want=1
+C11.text.bom	FAIL	0.003617	assert: decode exit got=0 want=1
+C11.text.trailing	FAIL	0.003955	assert: decode exit got=0 want=1
+C11.text.surrogate	FAIL	0.003686	assert: decode exit got=0 want=1
+C11.text.utf8	FAIL	0.003622	assert: decode exit got=0 want=1
+C11.text.depth	FAIL	0.003643	assert: decode exit got=0 want=1
+C11.text.depth-priority	FAIL	0.003957	assert: decode exit got=0 want=1
+C11.text.string-cap	FAIL	0.003997	assert: decode exit got=0 want=1
+C11.text.duplicate	FAIL	0.004431	assert: decode exit got=0 want=1
+C11.text.duplicate-escaped	FAIL	0.003628	assert: decode exit got=0 want=1
+C11.text.duplicate-nested	FAIL	0.003600	assert: decode exit got=0 want=1
+C11.presentation.key.00	FAIL	0.003517	assert: decode exit got=0 want=1
+C11.presentation.value.00	FAIL	0.003565	assert: decode exit got=0 want=1
+C11.presentation.key.01	FAIL	0.004100	assert: decode exit got=0 want=1
+C11.presentation.value.01	FAIL	0.004348	assert: decode exit got=0 want=1
+C11.presentation.key.02	FAIL	0.003165	assert: decode exit got=0 want=1
+C11.presentation.value.02	FAIL	0.003547	assert: decode exit got=0 want=1
+C11.presentation.key.03	FAIL	0.003818	assert: decode exit got=0 want=1
+C11.presentation.value.03	FAIL	0.003515	assert: decode exit got=0 want=1
+C11.presentation.key.04	FAIL	0.004397	assert: decode exit got=0 want=1
+C11.presentation.value.04	FAIL	0.003715	assert: decode exit got=0 want=1
+C11.presentation.key.05	FAIL	0.003299	assert: decode exit got=0 want=1
+C11.presentation.value.05	FAIL	0.004279	assert: decode exit got=0 want=1
+C11.presentation.key.06	FAIL	0.003873	assert: decode exit got=0 want=1
+C11.presentation.value.06	FAIL	0.003810	assert: decode exit got=0 want=1
+C11.presentation.key.07	FAIL	0.003646	assert: decode exit got=0 want=1
+C11.presentation.value.07	FAIL	0.003787	assert: decode exit got=0 want=1
+C11.presentation.key.08	FAIL	0.003851	assert: decode exit got=0 want=1
+C11.presentation.value.08	FAIL	0.003657	assert: decode exit got=0 want=1
+C11.presentation.key.09	FAIL	0.003787	assert: decode exit got=0 want=1
+C11.presentation.value.09	FAIL	0.003491	assert: decode exit got=0 want=1
+C11.presentation.key.0a	FAIL	0.004926	assert: decode exit got=0 want=1
+C11.presentation.value.0a	FAIL	0.004818	assert: decode exit got=0 want=1
+C11.presentation.key.0b	FAIL	0.003946	assert: decode exit got=0 want=1
+C11.presentation.value.0b	FAIL	0.003258	assert: decode exit got=0 want=1
+C11.presentation.key.0c	FAIL	0.003845	assert: decode exit got=0 want=1
+C11.presentation.value.0c	FAIL	0.003569	assert: decode exit got=0 want=1
+C11.presentation.key.0d	FAIL	0.003404	assert: decode exit got=0 want=1
+C11.presentation.value.0d	FAIL	0.003474	assert: decode exit got=0 want=1
+C11.presentation.key.0e	FAIL	0.003593	assert: decode exit got=0 want=1
+C11.presentation.value.0e	FAIL	0.003417	assert: decode exit got=0 want=1
+C11.presentation.key.0f	FAIL	0.003354	assert: decode exit got=0 want=1
+C11.presentation.value.0f	FAIL	0.003315	assert: decode exit got=0 want=1
+C11.presentation.key.10	FAIL	0.003428	assert: decode exit got=0 want=1
+C11.presentation.value.10	FAIL	0.004592	assert: decode exit got=0 want=1
+C11.presentation.key.11	FAIL	0.003563	assert: decode exit got=0 want=1
+C11.presentation.value.11	FAIL	0.003287	assert: decode exit got=0 want=1
+C11.presentation.key.12	FAIL	0.003360	assert: decode exit got=0 want=1
+C11.presentation.value.12	FAIL	0.003436	assert: decode exit got=0 want=1
+C11.presentation.key.13	FAIL	0.003707	assert: decode exit got=0 want=1
+C11.presentation.value.13	FAIL	0.003627	assert: decode exit got=0 want=1
+C11.presentation.key.14	FAIL	0.003282	assert: decode exit got=0 want=1
+C11.presentation.value.14	FAIL	0.003617	assert: decode exit got=0 want=1
+C11.presentation.key.15	FAIL	0.003602	assert: decode exit got=0 want=1
+C11.presentation.value.15	FAIL	0.003292	assert: decode exit got=0 want=1
+C11.presentation.key.16	FAIL	0.003588	assert: decode exit got=0 want=1
+C11.presentation.value.16	FAIL	0.003462	assert: decode exit got=0 want=1
+C11.presentation.key.17	FAIL	0.003387	assert: decode exit got=0 want=1
+C11.presentation.value.17	FAIL	0.003626	assert: decode exit got=0 want=1
+C11.presentation.key.18	FAIL	0.003542	assert: decode exit got=0 want=1
+C11.presentation.value.18	FAIL	0.003639	assert: decode exit got=0 want=1
+C11.presentation.key.19	FAIL	0.003687	assert: decode exit got=0 want=1
+C11.presentation.value.19	FAIL	0.004615	assert: decode exit got=0 want=1
+C11.presentation.key.1a	FAIL	0.003629	assert: decode exit got=0 want=1
+C11.presentation.value.1a	FAIL	0.003434	assert: decode exit got=0 want=1
+C11.presentation.key.1b	FAIL	0.003358	assert: decode exit got=0 want=1
+C11.presentation.value.1b	FAIL	0.003468	assert: decode exit got=0 want=1
+C11.presentation.key.1c	FAIL	0.003579	assert: decode exit got=0 want=1
+C11.presentation.value.1c	FAIL	0.003184	assert: decode exit got=0 want=1
+C11.presentation.key.1d	FAIL	0.003352	assert: decode exit got=0 want=1
+C11.presentation.value.1d	FAIL	0.003650	assert: decode exit got=0 want=1
+C11.presentation.key.1e	FAIL	0.003489	assert: decode exit got=0 want=1
+C11.presentation.value.1e	FAIL	0.003132	assert: decode exit got=0 want=1
+C11.presentation.key.1f	FAIL	0.003422	assert: decode exit got=0 want=1
+C11.presentation.value.1f	FAIL	0.003262	assert: decode exit got=0 want=1
+C11.presentation.key.7f	FAIL	0.003147	assert: decode exit got=0 want=1
+C11.presentation.value.7f	FAIL	0.004509	assert: decode exit got=0 want=1
+C11.presentation.key.80	FAIL	0.003051	assert: decode exit got=0 want=1
+C11.presentation.value.80	FAIL	0.003128	assert: decode exit got=0 want=1
+C11.presentation.key.81	FAIL	0.003350	assert: decode exit got=0 want=1
+C11.presentation.value.81	FAIL	0.003592	assert: decode exit got=0 want=1
+C11.presentation.key.82	FAIL	0.003448	assert: decode exit got=0 want=1
+C11.presentation.value.82	FAIL	0.004688	assert: decode exit got=0 want=1
+C11.presentation.key.83	FAIL	0.003553	assert: decode exit got=0 want=1
+C11.presentation.value.83	FAIL	0.003384	assert: decode exit got=0 want=1
+C11.presentation.key.84	FAIL	0.004132	assert: decode exit got=0 want=1
+C11.presentation.value.84	FAIL	0.003708	assert: decode exit got=0 want=1
+C11.presentation.key.85	FAIL	0.003666	assert: decode exit got=0 want=1
+C11.presentation.value.85	FAIL	0.003616	assert: decode exit got=0 want=1
+C11.presentation.key.86	FAIL	0.003621	assert: decode exit got=0 want=1
+C11.presentation.value.86	FAIL	0.003733	assert: decode exit got=0 want=1
+C11.presentation.key.87	FAIL	0.003968	assert: decode exit got=0 want=1
+C11.presentation.value.87	FAIL	0.003806	assert: decode exit got=0 want=1
+C11.presentation.key.88	FAIL	0.003272	assert: decode exit got=0 want=1
+C11.presentation.value.88	FAIL	0.003834	assert: decode exit got=0 want=1
+C11.presentation.key.89	FAIL	0.003908	assert: decode exit got=0 want=1
+C11.presentation.value.89	FAIL	0.003746	assert: decode exit got=0 want=1
+C11.presentation.key.8a	FAIL	0.003875	assert: decode exit got=0 want=1
+C11.presentation.value.8a	FAIL	0.003909	assert: decode exit got=0 want=1
+C11.presentation.key.8b	FAIL	0.003743	assert: decode exit got=0 want=1
+C11.presentation.value.8b	FAIL	0.004550	assert: decode exit got=0 want=1
+C11.presentation.key.8c	FAIL	0.003424	assert: decode exit got=0 want=1
+C11.presentation.value.8c	FAIL	0.004126	assert: decode exit got=0 want=1
+C11.presentation.key.8d	FAIL	0.003427	assert: decode exit got=0 want=1
+C11.presentation.value.8d	FAIL	0.003715	assert: decode exit got=0 want=1
+C11.presentation.key.8e	FAIL	0.003420	assert: decode exit got=0 want=1
+C11.presentation.value.8e	FAIL	0.003391	assert: decode exit got=0 want=1
+C11.presentation.key.8f	FAIL	0.003417	assert: decode exit got=0 want=1
+C11.presentation.value.8f	FAIL	0.003725	assert: decode exit got=0 want=1
+C11.presentation.key.90	FAIL	0.003596	assert: decode exit got=0 want=1
+C11.presentation.value.90	FAIL	0.003117	assert: decode exit got=0 want=1
+C11.presentation.key.91	FAIL	0.003212	assert: decode exit got=0 want=1
+C11.presentation.value.91	FAIL	0.003840	assert: decode exit got=0 want=1
+C11.presentation.key.92	FAIL	0.003698	assert: decode exit got=0 want=1
+C11.presentation.value.92	FAIL	0.003277	assert: decode exit got=0 want=1
+C11.presentation.key.93	FAIL	0.004116	assert: decode exit got=0 want=1
+C11.presentation.value.93	FAIL	0.003588	assert: decode exit got=0 want=1
+C11.presentation.key.94	FAIL	0.003826	assert: decode exit got=0 want=1
+C11.presentation.value.94	FAIL	0.003964	assert: decode exit got=0 want=1
+C11.presentation.key.95	FAIL	0.004563	assert: decode exit got=0 want=1
+C11.presentation.value.95	FAIL	0.003519	assert: decode exit got=0 want=1
+C11.presentation.key.96	FAIL	0.003397	assert: decode exit got=0 want=1
+C11.presentation.value.96	FAIL	0.003555	assert: decode exit got=0 want=1
+C11.presentation.key.97	FAIL	0.003265	assert: decode exit got=0 want=1
+C11.presentation.value.97	FAIL	0.003614	assert: decode exit got=0 want=1
+C11.presentation.key.98	FAIL	0.003735	assert: decode exit got=0 want=1
+C11.presentation.value.98	FAIL	0.003668	assert: decode exit got=0 want=1
+C11.presentation.key.99	FAIL	0.003603	assert: decode exit got=0 want=1
+C11.presentation.value.99	FAIL	0.003517	assert: decode exit got=0 want=1
+C11.presentation.key.9a	FAIL	0.003462	assert: decode exit got=0 want=1
+C11.presentation.value.9a	FAIL	0.003679	assert: decode exit got=0 want=1
+C11.presentation.key.9b	FAIL	0.003876	assert: decode exit got=0 want=1
+C11.presentation.value.9b	FAIL	0.003236	assert: decode exit got=0 want=1
+C11.presentation.key.9c	FAIL	0.003982	assert: decode exit got=0 want=1
+C11.presentation.value.9c	FAIL	0.003616	assert: decode exit got=0 want=1
+C11.presentation.key.9d	FAIL	0.003716	assert: decode exit got=0 want=1
+C11.presentation.value.9d	FAIL	0.003686	assert: decode exit got=0 want=1
+C11.presentation.key.9e	FAIL	0.003964	assert: decode exit got=0 want=1
+C11.presentation.value.9e	FAIL	0.003651	assert: decode exit got=0 want=1
+C11.presentation.key.9f	FAIL	0.004015	assert: decode exit got=0 want=1
+C11.presentation.value.9f	FAIL	0.003825	assert: decode exit got=0 want=1
+C11.presentation.value-choice.63	FAIL	0.003822	assert: decode exit got=0 want=1
+C11.presentation.value-choice.64	FAIL	0.003971	assert: decode exit got=0 want=1
+C11.presentation.value-choice.65	FAIL	0.004701	assert: decode exit got=0 want=1
+C11.presentation.literal-backslash-n	FAIL	0.003940	assert: decode exit got=0 want=1
+C11.presentation.non-cc-separators	FAIL	0.003823	assert: decode exit got=0 want=1
+C11.presentation.duplicate.lf	FAIL	0.003568	assert: decode exit got=0 want=1
+C11.presentation.duplicate.del	FAIL	0.003454	assert: decode exit got=0 want=1
+C11.presentation.duplicate.nel	FAIL	0.003766	assert: decode exit got=0 want=1
+C11.c1-control.name	FAIL	0.003864	assert: decode exit got=0 want=1
+C11.c1-control.reason	FAIL	0.003093	assert: decode exit got=0 want=1
+C11.c1-control.toolchain	FAIL	0.004527	assert: decode exit got=0 want=1
+C11.c1-control.axiom	FAIL	0.004717	assert: decode exit got=0 want=1
+C11.property.roundtrip	PASS	0.178102	-
+C11.property.normalize	FAIL	0.004187	assert: generated sample 0 canonical bytes got=b'{\n "schema": 1,\n "toolchain": "leanprover/lean4:v4.35.0",\n "operations": [],\n "notices": [],\n "removed": []\n}' want=b'{"notices":[],"operations":[],"removed":[],"schema":1,"toolchain":"leanprover/lean4:v4.35.0"}\n'
+C11.usage-unreadable	FAIL	0.011905	assert: decode usage/unreadable exit got=1 want=2
+C10.root-absent	PASS	0.024777	-
+C10.root-index	PASS	0.019980	-
+C10.parent-absent	PASS	0.029228	-
+C10.working-malformed	FAIL	0.020832	assert: history exit got=0 want=1
+C10.working-absent	FAIL	0.021203	assert: history exit got=0 want=1
+C10.changed	FAIL	0.021186	assert: history exit got=0 want=1
+C10.vanished	FAIL	0.020596	assert: history exit got=0 want=1
+C10.removed-good	PASS	0.020635	-
+C10.removed-same-toolchain	FAIL	0.021568	assert: history exit got=0 want=1
+C10.removed-wrong-last	FAIL	0.020896	assert: history exit got=0 want=1
+C10.removed-digest-first	FAIL	0.020938	assert: history exit got=0 want=1
+C10.committed-removal	PASS	0.029076	-
+C10.preserved-removal	PASS	0.038014	-
+C10.head-then-parent	FAIL	0.028901	assert: history exit got=0 want=1
+C10.notice-edited	FAIL	0.039135	assert: history exit got=0 want=1
+C10.notice-appended	PASS	0.046396	-
+C10.removed-edited	FAIL	0.051202	assert: history exit got=0 want=1
+C10.removed-vanished	FAIL	0.028745	assert: history exit got=0 want=1
+C10.baseline-undecodable	FAIL	0.019210	assert: history exit got=0 want=1
+C10.shallow-precedence	FAIL	0.022262	assert: history exit got=0 want=2
+C10.parent-unreadable	FAIL	0.027146	assert: unreadable parent exit outranks violations got=0 want=2
+C10.not-worktree	FAIL	0.002960	assert: not-git exit got=0 want=2
+C10.presentation.control-path	FAIL	0.004270	assert: not-git exit got=0 want=2
+C10.parents-notices-diverge	FAIL	0.047534	assert: history exit got=0 want=1
+C10.parents-removed-diverge	FAIL	0.055285	assert: history exit got=0 want=1
+C10.removal-witness-preserved-across-parent	PASS	0.056427	-
+C10.explicit-dir	PASS	0.021493	-

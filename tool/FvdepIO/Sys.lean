@@ -124,6 +124,53 @@ def close (writer : Writer) : IO (Except SysError Unit) := run writer .close
 
 end Writer
 
+/-- A failure as message text (presentation; the reason part of a `Could not …` line). -/
+def SysError.reason (e : SysError) : String :=
+  let op :=
+    match e.op with
+    | .create => "create"
+    | .write => "write"
+    | .sync => "fsync"
+    | .close => "close"
+    | .openDir => "open directory"
+    | .syncDir => "fsync directory"
+    | .closeDir => "close directory"
+    | .openRead => "open"
+    | .read => "read"
+    | .rename => "rename"
+    | .unlink => "remove"
+    | .openLock => "open lock"
+    | .lock => "lock"
+  let cause :=
+    match e.cause with
+    | .errno n =>
+      let text :=
+        match n with
+        | 1 => "operation not permitted"
+        | 2 => "no such file or directory"
+        | 5 => "input/output error"
+        | 13 => "permission denied"
+        | 17 => "file exists"
+        | 20 => "not a directory"
+        | 21 => "is a directory"
+        | 22 => "invalid argument"
+        | 24 => "too many open files"
+        | 27 => "file too large"
+        | 28 => "no space left on device"
+        | 30 => "read-only file system"
+        | 36 => "file name too long"
+        | 40 => "too many levels of symbolic links"
+        | 122 => "disk quota exceeded"
+        | _ => "system error"
+      s!"{text} (errno {n})"
+    | .retryExhausted => "interrupted too many times"
+    | .noProgress => "no progress"
+    | .alreadyClosed => "already closed"
+    | .busy => "another process holds the lock"
+    | .tempsTaken => s!"all {tempTries} temporary names are taken"
+    | .tooLarge => "the file is too large"
+  s!"{op} {e.path}: {cause}"
+
 def syncDir (path : Path) : IO (Except SysError Unit) := do
   return (← Policy.directory (← plain) path).map fun _ => ()
 

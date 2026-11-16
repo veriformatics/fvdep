@@ -712,6 +712,7 @@ structure WriteSet where
 def WriteSet.bytes (ws : WriteSet) : ProjectFile → Option ByteArray
   | .lock => ws.lock
   | .manifest => ws.manifest
+  | .index => none
 
 /-- The replaces of a write set in the canonical order: lock, then manifest. -/
 def WriteSet.files (ws : WriteSet) : List (ProjectFile × ByteArray) :=
@@ -734,6 +735,7 @@ def commitFiles : List (ProjectFile × ByteArray) → Plan (Option (ProjectFile 
 def fileName : ProjectFile → String
   | .lock => "fvdep.lock"
   | .manifest => "fvdep.toml"
+  | .index => "index.json"
 
 /-- X3: decide first; refuse → its exit, nothing written; commit → the write set, a failure → exit 2
 naming the file. -/
@@ -765,8 +767,11 @@ theorem commitFiles_prefix (fs : List (ProjectFile × ByteArray)) (evs : List (E
     · simp
     · simp only [List.map_cons, List.cons_prefix_cons, true_and]
       cases resp with
-      | done => simp [Fits] at hf
-      | read x => simp [Fits] at hf
+      | done
+      | read _
+      | probe _
+      | facts _
+      | replay _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u => exact ih tail hr
@@ -788,8 +793,11 @@ theorem commitFiles_ok (fs : List (ProjectFile × ByteArray)) (evs : List (Eff �
     rcases h with ⟨_, h⟩ | ⟨resp, tail, rfl, hf, hr⟩
     · cases h
     · cases resp with
-      | done => simp [Fits] at hf
-      | read x => simp [Fits] at hf
+      | done
+      | read _
+      | probe _
+      | facts _
+      | replay _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u => simp [ih tail hr]
@@ -809,8 +817,11 @@ theorem commitFiles_failed (fs : List (ProjectFile × ByteArray)) (evs : List (E
     rcases h with ⟨_, h⟩ | ⟨resp, tail, rfl, hf, hr⟩
     · cases h
     · cases resp with
-      | done => simp [Fits] at hf
-      | read x => simp [Fits] at hf
+      | done
+      | read _
+      | probe _
+      | facts _
+      | replay _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u =>

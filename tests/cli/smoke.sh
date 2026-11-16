@@ -4,6 +4,7 @@
 set -uo pipefail
 
 bin="${1:?usage: tests/cli/smoke.sh <fvdep binary>}"
+[[ "$bin" == /* ]] || bin="$PWD/$bin" # case_ may run it from another directory ($here)
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)"
 version="$(sed -n 's/^def version : String := "\(.*\)"$/\1/p' "$root/Fvdep/Version.lean")"
 tmp="$(mktemp -d)"
@@ -12,10 +13,11 @@ fails=0
 usage_line='Usage: fvdep <command> [<arguments>]'
 
 # case NAME WANT_RC WANT_STREAM(stdout|stderr) WANT_FIRST_LINE ARGS…
+# The binary runs in $here (default: the current directory).
 case_() {
     local name="$1" want_rc="$2" stream="$3" first="$4" rc out err
     shift 4
-    "$bin" "$@" >"$tmp/out" 2>"$tmp/err"
+    (cd -- "${here:-.}" && exec "$bin" "$@") >"$tmp/out" 2>"$tmp/err"
     rc=$?
     out="$tmp/out" err="$tmp/err"
     [[ "$stream" == stderr ]] && { out="$tmp/err" err="$tmp/out"; }
@@ -56,6 +58,24 @@ case_ "no argument" 2 stderr "$usage_line"
 case_ "unknown command" 2 stderr "$usage_line" frobnicate
 case_ "unknown option" 2 stderr "$usage_line" --frobnicate
 case_ "extra argument" 2 stderr "$usage_line" --version extra
+
+# `fvdep index` (contract U4 C9): its help, a usage refusal before any library check, the presence
+# refusal outside a library working copy with nothing written.
+index_line='Usage: fvdep index [--check]'
+case_ "index --help" 0 stdout "$index_line" index --help
+case_ "help index" 0 stdout "$index_line" help index
+case_ "index unknown option" 2 stderr "$usage_line" index --frobnicate
+mkdir "$tmp/empty"
+no_library='No fvdep library found here. Run "fvdep index" in a library working copy.'
+here="$tmp/empty" case_ "index outside a library" 2 stderr "$no_library" index
+here="$tmp/empty" case_ "index --check outside a library" 2 stderr "$no_library" index --check
+if [[ -z "$(find "$tmp/empty" -mindepth 1 -print -quit)" ]]; then
+    printf 'PASS index outside a library writes nothing\n'
+else
+    printf 'FAIL index outside a library wrote %s\n' \
+        "$(find "$tmp/empty" -mindepth 1 -printf '%P ')"
+    fails=$((fails + 1))
+fi
 
 # A failed write of the command's own output = I/O failure (docs/interface.md §2): exit 2, the
 # reason on stderr while stderr accepts it, nothing written to stdout by the handler. /dev/full

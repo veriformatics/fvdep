@@ -1,0 +1,702 @@
+case	clause	family	domain
+C1.v1.id	C3 V1; C9	F1	named fixture
+C1.v1.id.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.version	C3 V1; C9	F1	named fixture
+C1.v1.version.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.module	C3 V1; C9	F1	named fixture
+C1.v1.module.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.id-control-00	C3 V1; D3 raw subject; C9	F1	named fixture
+C1.v1.id-control-00.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.id-control-0a	C3 V1; D3 raw subject; C9	F1	named fixture
+C1.v1.id-control-0a.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.id-control-85	C3 V1; D3 raw subject; C9	F1	named fixture
+C1.v1.id-control-85.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.version-control	C3 V1; D3 raw subject; C9	F1	named fixture
+C1.v1.version-control.unchanged	C1 no write before decision	F1	named fixture
+C1.v1.order	C3 V1 order; C9	F1	named fixture
+C1.v1.order.unchanged	C1 no write before decision	F1	named fixture
+C1.v2.repeated-id	C3 V2; C9	F1	named fixture
+C1.v2.repeated-id.unchanged	C1 no write before decision	F1	named fixture
+C1.v2.unlisted	C3 V2 path order; C9	F1	named fixture
+C1.v2.unlisted.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.foreign-spec	C3 V3; C9	F1	named fixture
+C1.v3.foreign-spec.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.theorem-spec	C3 V3 order; C9	F1	named fixture
+C1.v3.theorem-spec.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.type	C3 V3; C9	F1	named fixture
+C1.v3.type.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.partial	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.partial.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.unsafe	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.unsafe.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.implemented_by	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.implemented_by.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.extern	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.extern.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.opaque	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.opaque.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.noncomputable	C3 V3 roots + transitive flags; C9	F1	named fixture
+C1.v3.noncomputable.unchanged	C1 no write before decision	F1	named fixture
+C1.v3.abi-root	C3 V3 ABI roots; C9	F1	named fixture
+C1.v3.abi-root.unchanged	C1 no write before decision	F1	named fixture
+C1.v4.not-prop	C3 V4; C9	F1	named fixture
+C1.v4.not-prop.unchanged	C1 no write before decision	F1	named fixture
+C1.v4.theorem	C3 V4; C9	F1	named fixture
+C1.v4.theorem.unchanged	C1 no write before decision	F1	named fixture
+C1.v4.foreign	C3 V4; C9	F1	named fixture
+C1.v4.foreign.unchanged	C1 no write before decision	F1	named fixture
+C1.v4.repeat	C3 V4; C9	F1	named fixture
+C1.v4.repeat.unchanged	C1 no write before decision	F1	named fixture
+C1.v5.module	C3 V5; C9	F1	named fixture
+C1.v5.module.unchanged	C1 no write before decision	F1	named fixture
+C1.v5.type	C3 V5; C9	F1	named fixture
+C1.v5.type.unchanged	C1 no write before decision	F1	named fixture
+C1.v6.unlisted	C3 V6; C9	F1	named fixture
+C1.v6.unlisted.unchanged	C1 no write before decision	F1	named fixture
+C1.v6.same	C3 V6; C9	F1	named fixture
+C1.v6.same.unchanged	C1 no write before decision	F1	named fixture
+C1.v6.bad	C3 V6; C9	F1	named fixture
+C1.v6.bad.unchanged	C1 no write before decision	F1	named fixture
+C1.v6.type	C3 V6; C9	F1	named fixture
+C1.v6.type.unchanged	C1 no write before decision	F1	named fixture
+C1.v7.holds	C3 V7; C9	F1	named fixture
+C1.v7.holds.unchanged	C1 no write before decision	F1	named fixture
+C1.v7.imports	C3 V7; C9	F1	named fixture
+C1.v7.imports.unchanged	C1 no write before decision	F1	named fixture
+C1.c4.link	C3 C4; C9	F1	named fixture
+C1.c4.link.unchanged	C1 no write before decision	F1	named fixture
+C1.c4.alias	C3 C4; C9	F1	named fixture
+C1.c4.alias.unchanged	C1 no write before decision	F1	named fixture
+C1.entry-order.first	C3 C9 entry order; C9	F1	named fixture
+C1.entry-order.first.unchanged	C1 no write before decision	F1	named fixture
+C1.entry-order.reversed	C3 C9 entry order; C9	F1	named fixture
+C1.entry-order.reversed.unchanged	C1 no write before decision	F1	named fixture
+C1.v10.profiles	C3 V10; C9	F1	named fixture
+C1.v10.profiles.unchanged	C1 no write before decision	F1	named fixture
+C7.absent.lean-toolchain	C1/C9 presence	F7	named fixture
+C7.absent.lean-toolchain.unchanged	C1 no write before decision	F7	named fixture
+C7.absent.Fvdep-Registry.lean	C1/C9 presence	F7	named fixture
+C7.absent.Fvdep-Registry.lean.unchanged	C1 no write before decision	F7	named fixture
+C7.presence-before-toolchain	C9 precedence	F7	named fixture
+C7.presence-before-toolchain.unchanged	C1 no write before decision	F7	named fixture
+C7.toolchain-control	C1/C9; D3 line escaping	F7	named fixture
+C7.toolchain-control.unchanged	C1 no write before decision	F7	named fixture
+C7.toolchain-before-build	C1/C9 toolchain + trim	F7	named fixture
+C7.toolchain-before-build.unchanged	C1 no write before decision	F7	named fixture
+C8.build	C1/C9 build	F8	named fixture
+C8.form.modules	C2/C9 registry form	F8	named fixture
+C8.form.modules.unchanged	C1 no write before decision	F8	named fixture
+C8.form.notices	C2/C9 registry form	F8	named fixture
+C8.form.notices.unchanged	C1 no write before decision	F8	named fixture
+C8.form.removed	C2/C9 registry form	F8	named fixture
+C8.form.removed.unchanged	C1 no write before decision	F8	named fixture
+C8.form.root-helper	C2/C9 reached constant	F8	named fixture
+C8.form.root-helper.unchanged	C1 no write before decision	F8	named fixture
+C8.form.entry	C2/C9 entry form	F8	named fixture
+C8.form.entry.unchanged	C1 no write before decision	F8	named fixture
+C8.d4.inline-entry	C2/C9; D4 entry references only	F8	named fixture
+C8.d4.inline-entry.unchanged	C1 no write before decision	F8	named fixture
+C8.d4.outside-helper	C2/C9; D4 module-of-origin boundary	F8	named fixture
+C8.d4.outside-helper.unchanged	C1 no write before decision	F8	named fixture
+C8.d4.order-modules	C2/C9; D4 read order before V1	F8	named fixture
+C8.d4.order-modules.unchanged	C1 no write before decision	F8	named fixture
+C8.d4.order-profiles	C2/C9; D4 read order before V1	F8	named fixture
+C8.d4.order-profiles.unchanged	C1 no write before decision	F8	named fixture
+C8.d4.order-notices	C2/C9; D4 read order before V1	F8	named fixture
+C8.d4.order-notices.unchanged	C1 no write before decision	F8	named fixture
+C8.form.type-layout	C2/C9 structure fields + certificate	F8	named fixture
+C8.form.type-layout.unchanged	C1 no write before decision	F8	named fixture
+C8.form.profile-elements	C2 profiles elements unread; C3 V10; C9	F8	named fixture
+C8.form.profile-elements.unchanged	C1 no write before decision	F8	named fixture
+C8.load	C1/C9 load	F8	named fixture
+C3.status.proven	C5/C6 derived status	F3	named fixture
+C3.warning.proven	C5/C9 warnings + order	F3	named fixture
+C3.status.sorry	C5/C6 derived status	F3	named fixture
+C3.warning.sorry	C5/C9 warnings + order	F3	named fixture
+C3.status.custom	C5/C6 derived status	F3	named fixture
+C3.warning.custom	C5/C9 warnings + order	F3	named fixture
+C3.status.missing-registry	C5/C6 derived status	F3	named fixture
+C3.warning.missing-registry	C5/C9 warnings + order	F3	named fixture
+C3.status.unreadable	C5/C6 derived status	F3	named fixture
+C3.warning.unreadable	C5/C9 warnings + order	F3	named fixture
+C3.status.unmapped	C5/C6 derived status	F3	named fixture
+C3.warning.unmapped	C5/C9 warnings + order	F3	named fixture
+C3.status.twice	C5/C6 derived status	F3	named fixture
+C3.warning.twice	C5/C9 warnings + order	F3	named fixture
+C3.status.not-theorem	C5/C6 derived status	F3	named fixture
+C3.warning.not-theorem	C5/C9 warnings + order	F3	named fixture
+C3.status.outside	C5/C6 derived status	F3	named fixture
+C3.warning.outside	C5/C9 warnings + order	F3	named fixture
+C3.status.wrong-statement	C5/C6 derived status	F3	named fixture
+C3.warning.wrong-statement	C5/C9 warnings + order	F3	named fixture
+C3.warning.registry-order	C5/C9 full warning order	F3	named fixture
+C3.replay.forged	C1/C5/C9 replay	F3	named fixture
+C4.compat.proven	C5/C6 compat	F4	named fixture
+C4.warning.proven	C9 compat warning	F4	named fixture
+C4.compat.wrong	C5/C6 compat	F4	named fixture
+C4.warning.wrong	C9 compat warning	F4	named fixture
+C4.compat.unmapped	C5/C6 compat	F4	named fixture
+C4.warning.unmapped	C9 compat warning	F4	named fixture
+C4.compat.ignored	C5/C6 compat	F4	named fixture
+C4.warning.ignored	C9 compat warning	F4	named fixture
+C5.notice.unknown	C3 V8/V9; C9	F5	named fixture
+C5.notice.unknown.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.replacement	C3 V8/V9; C9	F5	named fixture
+C5.notice.replacement.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.empty	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.empty.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.control	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.control.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.del	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.del.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.nel	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.nel.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.large	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.large.unchanged	C1 no write before decision	F5	named fixture
+C5.notice.reason.multibyte-large	C3 V8/V9; C9	F5	named fixture
+C5.notice.reason.multibyte-large.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.listed	C3 V8/V9; C9	F5	named fixture
+C5.removed.listed.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.duplicate	C3 V8/V9; C9	F5	named fixture
+C5.removed.duplicate.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.kind	C3 V8/V9; C9	F5	named fixture
+C5.removed.kind.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.digest	C3 V8/V9; C9	F5	named fixture
+C5.removed.digest.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.lastCommit	C3 V8/V9; C9	F5	named fixture
+C5.removed.lastCommit.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.toolchain	C3 V8/V9; C9	F5	named fixture
+C5.removed.toolchain.unchanged	C1 no write before decision	F5	named fixture
+C5.removed.notice	C3 V8/V9; C9	F5	named fixture
+C5.removed.notice.unchanged	C1 no write before decision	F5	named fixture
+C5.logs.order	C6 registry log order	F5	named fixture
+C5.notice.cap	C3 V8/C6 bound	F5	named fixture
+C2.identity.reference-frames	C4; U3 H2/H3	F2	minimal known three-file closure; baseline + each file perturbed
+C2.identity.comment	C4 byte sensitivity	F2	named fixture
+C2.identity.proof	C4 proof exclusion	F2	named fixture
+C2.identity.shared	C4 shared closure	F2	named fixture
+C2.identity.closure-boundary	C4 dependency closure	F2	named fixture
+C2.identity.unrelated	C4 independent entry	F2	named fixture
+C12.schema.new-version-after-index	C1 fresh build; C6 registry completeness	F12	named fixture
+C2.identity.alternate-root	C4 canonical source path	F2	named fixture
+C2.identity.alternate-root.unchanged	C1 no write before decision	F2	named fixture
+C6.purity.idempotent	C1 purity + pinned fresh build	F6	named fixture
+C6.purity.check-readonly	C1 purity + pinned fresh build	F6	named fixture
+C6.purity.drift-readonly	C1 purity + pinned fresh build	F6	named fixture
+C6.purity.environment-artifact	C1 purity + pinned fresh build	F6	named fixture
+C6.purity.absolute-path	C1 purity + pinned fresh build	F6	named fixture
+C6.purity.check-current	C1/C9 --check	F6	named fixture
+C6.purity.check-drift	C1/C9 --check	F6	named fixture
+C6.purity.check-absent	C1/C9 --check	F6	named fixture
+C6.no-writer-lock	C1 no writer lock	F6	named fixture
+C6.concurrent	C1 concurrent unchanged tree	F6	two requests released together; global subprocess width remains bounded
+C6.io.read	C1/C9 read failure	F6	named fixture
+C6.io.write	C1/C9 replace failure	F6	named fixture
+C9.help	C9 help before presence; interface §1	F9	named fixture
+C9.usage.0	C9 usage before presence; interface §1	F9	named fixture
+C9.usage.1	C9 usage before presence; interface §1	F9	named fixture
+C9.usage.2	C9 usage before presence; interface §1	F9	named fixture
+C9.usage.3	C9 usage before presence; interface §1	F9	named fixture
+C9.usage.4	C9 usage before presence; interface §1	F9	named fixture
+C9.usage.5	C9 usage before presence; interface §1	F9	named fixture
+C9.presentation.lake-progress	C9/D3 rev2 progress escaping	F9	named fixture
+C12.schema.launch	C6/C9 exact schema 1	F12	named fixture
+C12.bound.obligation-name	C6 out-of-domain producer; interface §2; D3 rev2	F12	named fixture
+C12.bound.axiom-name	C6 out-of-domain producer; interface §2; D3 rev2	F12	named fixture
+C12.bound.removed-toolchain-cc	C6 out-of-domain producer; interface §2; D3 rev2	F12	named fixture
+C12.bound.removed-toolchain-long	C6 out-of-domain producer; interface §2; D3 rev2	F12	named fixture
+C12.schema.empty	C6 empty index; C9 count	F12	named fixture
+C12.schema.numeric-order	C6 numeric versions; C9 count	F12	named fixture
+C12.registry.accepted-forms	C2 forms + certificate	F12	named fixture
+C11.roundtrip.full	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.roundtrip.empty	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=93
+C11.roundtrip.noncanonical	C6/C9 decode; U3 D5	F11	input bytes=1365
+C11.root-kind.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=4
+C11.root-kind.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=4
+C11.root-kind.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1
+C11.root-kind.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=2
+C11.root-kind.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=2
+C11.schema.missing	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=923
+C11.schema.zero	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.schema.two	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.schema.string	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.schema.bool	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.schema.null	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.missing.root.schema	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=923
+C11.missing.root.toolchain	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=895
+C11.missing.root.operations	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=488
+C11.missing.root.notices	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=740
+C11.missing.root.removed	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=691
+C11.unknown.root	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.root.schema.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.kind.root.schema.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.kind.root.schema.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.kind.root.schema.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.kind.root.schema.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.kind.root.toolchain.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=912
+C11.kind.root.toolchain.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=913
+C11.kind.root.toolchain.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=909
+C11.kind.root.toolchain.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=910
+C11.kind.root.toolchain.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=910
+C11.kind.root.operations.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=506
+C11.kind.root.operations.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=507
+C11.kind.root.operations.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=503
+C11.kind.root.operations.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=504
+C11.kind.root.operations.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=504
+C11.kind.root.notices.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=755
+C11.kind.root.notices.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=756
+C11.kind.root.notices.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=752
+C11.kind.root.notices.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=753
+C11.kind.root.notices.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=753
+C11.kind.root.removed.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=706
+C11.kind.root.removed.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=707
+C11.kind.root.removed.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=703
+C11.kind.root.removed.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=704
+C11.kind.root.removed.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=704
+C11.missing.operations-0.id	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=913
+C11.missing.operations-0.version	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.missing.operations-0.digest	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=858
+C11.missing.operations-0.compat	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=920
+C11.missing.operations-0.obligations	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=872
+C11.unknown.operations-0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.operations-0.id.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=923
+C11.kind.operations-0.id.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=924
+C11.kind.operations-0.id.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=920
+C11.kind.operations-0.id.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.kind.operations-0.id.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.kind.operations-0.version.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.operations-0.version.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.operations-0.version.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-0.version.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.operations-0.version.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.operations-0.digest.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=872
+C11.kind.operations-0.digest.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=873
+C11.kind.operations-0.digest.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=869
+C11.kind.operations-0.digest.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=870
+C11.kind.operations-0.digest.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=870
+C11.kind.operations-0.compat.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.kind.operations-0.compat.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.operations-0.compat.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.operations-0.compat.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.operations-0.obligations.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=891
+C11.kind.operations-0.obligations.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=892
+C11.kind.operations-0.obligations.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=888
+C11.kind.operations-0.obligations.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=889
+C11.kind.operations-0.obligations.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=889
+C11.missing.operations-0-obligations-0.name	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=920
+C11.missing.operations-0-obligations-0.status	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.missing.operations-0-obligations-0.axioms	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=922
+C11.unknown.operations-0-obligations-0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.operations-0-obligations-0.name.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.operations-0-obligations-0.name.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=933
+C11.kind.operations-0-obligations-0.name.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.operations-0-obligations-0.name.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.kind.operations-0-obligations-0.name.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.kind.operations-0-obligations-0.status.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.kind.operations-0-obligations-0.status.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.operations-0-obligations-0.status.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=927
+C11.kind.operations-0-obligations-0.status.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-0-obligations-0.status.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-0-obligations-0.axioms.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.kind.operations-0-obligations-0.axioms.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.kind.operations-0-obligations-0.axioms.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=933
+C11.kind.operations-0-obligations-0.axioms.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.kind.operations-0-obligations-0.axioms.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.missing.operations-1-compat.axioms	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=922
+C11.missing.operations-1-compat.status	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.missing.operations-1-compat.version	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.unknown.operations-1-compat	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.operations-1-compat.axioms.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.kind.operations-1-compat.axioms.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.kind.operations-1-compat.axioms.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=933
+C11.kind.operations-1-compat.axioms.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.kind.operations-1-compat.axioms.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.kind.operations-1-compat.status.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.kind.operations-1-compat.status.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.operations-1-compat.status.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=927
+C11.kind.operations-1-compat.status.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-1-compat.status.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-1-compat.version.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.operations-1-compat.version.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.operations-1-compat.version.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.operations-1-compat.version.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.operations-1-compat.version.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.missing.notices-0.id	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=913
+C11.missing.notices-0.version	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.missing.notices-0.reason	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=904
+C11.missing.notices-0.replacement	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=912
+C11.unknown.notices-0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.notices-0.id.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=923
+C11.kind.notices-0.id.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=924
+C11.kind.notices-0.id.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=920
+C11.kind.notices-0.id.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.kind.notices-0.id.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.kind.notices-0.version.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.notices-0.version.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.notices-0.version.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.notices-0.version.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.notices-0.version.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.notices-0.reason.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=918
+C11.kind.notices-0.reason.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=919
+C11.kind.notices-0.reason.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=915
+C11.kind.notices-0.reason.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.kind.notices-0.reason.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.kind.notices-0.replacement.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.notices-0.replacement.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.notices-0.replacement.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.notices-0.replacement.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.notices-0.replacement.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.missing.removed-0.id	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=914
+C11.missing.removed-0.version	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.missing.removed-0.kind	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=915
+C11.missing.removed-0.digest	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=858
+C11.missing.removed-0.toolchain	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=895
+C11.missing.removed-0.last_commit	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=877
+C11.unknown.removed-0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.kind.removed-0.id.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=924
+C11.kind.removed-0.id.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=925
+C11.kind.removed-0.id.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.kind.removed-0.id.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=922
+C11.kind.removed-0.id.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=922
+C11.kind.removed-0.version.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=931
+C11.kind.removed-0.version.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.kind.removed-0.version.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.removed-0.version.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.removed-0.version.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.kind.removed-0.kind.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=927
+C11.kind.removed-0.kind.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=928
+C11.kind.removed-0.kind.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=924
+C11.kind.removed-0.kind.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=925
+C11.kind.removed-0.kind.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=925
+C11.kind.removed-0.digest.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=872
+C11.kind.removed-0.digest.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=873
+C11.kind.removed-0.digest.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=869
+C11.kind.removed-0.digest.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=870
+C11.kind.removed-0.digest.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=870
+C11.kind.removed-0.toolchain.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=912
+C11.kind.removed-0.toolchain.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=913
+C11.kind.removed-0.toolchain.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=909
+C11.kind.removed-0.toolchain.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=910
+C11.kind.removed-0.toolchain.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=910
+C11.kind.removed-0.last_commit.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=896
+C11.kind.removed-0.last_commit.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=897
+C11.kind.removed-0.last_commit.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=893
+C11.kind.removed-0.last_commit.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=894
+C11.kind.removed-0.last_commit.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=894
+C11.bad.id.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=921
+C11.bad.id.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.bad.id.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.id.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.bad.id.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.id.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.bad.version.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=929
+C11.bad.version.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.bad.version.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.bad.version.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.version.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=940
+C11.bad.version.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.version.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.digest.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=870
+C11.bad.digest.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=933
+C11.bad.digest.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.bad.digest.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.bad.digest.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.version.cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=65816
+C11.id.cap-valid	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=65808
+C11.text.id-over-cap	C6/J1 65536-byte string boundary	F11	input bytes=65809
+C11.text.version-over-cap	C6/J1 65536-byte string boundary	F11	input bytes=65817
+C11.key.cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=65553
+C11.text.key-over-cap	C9/J1 key byte cap before schema	F11	input bytes=65554
+C11.bad.obligation.name.empty	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=930
+C11.bad.obligation.name.nul	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.bad.obligation.name.del	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.bad.obligation.name.over	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1955
+C11.bad.obligation.name.utf8-over	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1956
+C11.accept.obligation.name.cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1954
+C11.accept.obligation.name.utf8-cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1954
+C11.toolchain.empty	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=910
+C11.toolchain.control	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=913
+C11.toolchain.over	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1935
+C11.toolchain.cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1934
+C11.reason.empty	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=916
+C11.reason.control	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=925
+C11.reason.del	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=925
+C11.reason.cap	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=66452
+C11.removed.commit.upper	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.removed.commit.short	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=933
+C11.removed.commit.long	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.removed.kind	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.status.obligation.proven.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.obligation.proven.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.obligation.proven.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.obligation.proven.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=954
+C11.status.obligation.proven.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.proven.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.proven.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.obligation.proven.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.status.obligation.proven.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.obligation.open.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.status.obligation.open.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.open.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.obligation.open.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=952
+C11.status.obligation.open.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.obligation.open.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.obligation.open.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.obligation.open.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.obligation.open.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.trusts.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.obligation.trusts.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.obligation.trusts.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.obligation.trusts.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=954
+C11.status.obligation.trusts.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.trusts.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.obligation.trusts.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.obligation.trusts.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.status.obligation.trusts.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.obligation.unknown.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.status.obligation.unknown.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.obligation.unknown.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=945
+C11.status.obligation.unknown.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=955
+C11.status.obligation.unknown.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.obligation.unknown.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.obligation.unknown.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.status.obligation.unknown.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.obligation.unknown.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.compat.proven.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.compat.proven.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.compat.proven.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.compat.proven.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=954
+C11.status.compat.proven.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.proven.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.proven.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.compat.proven.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.status.compat.proven.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.compat.open.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=932
+C11.status.compat.open.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.open.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.compat.open.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=952
+C11.status.compat.open.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.compat.open.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.compat.open.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.compat.open.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.compat.open.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.trusts.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.status.compat.trusts.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.compat.trusts.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.compat.trusts.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=954
+C11.status.compat.trusts.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.trusts.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=941
+C11.status.compat.trusts.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=936
+C11.status.compat.trusts.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=938
+C11.status.compat.trusts.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=943
+C11.status.compat.unknown.0	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=935
+C11.status.compat.unknown.1	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.status.compat.unknown.2	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=945
+C11.status.compat.unknown.3	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=955
+C11.status.compat.unknown.4	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.compat.unknown.5	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=942
+C11.status.compat.unknown.6	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=937
+C11.status.compat.unknown.7	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=939
+C11.status.compat.unknown.8	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=944
+C11.operations.reversed	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=934
+C11.operations.duplicate	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=889
+C11.obligations.duplicate	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=980
+C11.relation.notice-membership	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=843
+C11.relation.replacement	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=845
+C11.relation.removed-listed	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=843
+C11.relation.removed-duplicate	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=1165
+C11.relation.removed-no-notice	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=845
+C11.order.discriminator	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=24
+C11.order.unknown-before-missing	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=21
+C11.order.missing-before-value	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=53
+C11.order.member-bytes	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=321
+C11.order.element-before-order	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=873
+C11.order.walk-before-relation	C6/C9 decode; U3 D5; D1/D2	F11	input bytes=819
+C11.text.empty	C9 decode; U3 J1–J3 priority	F11	input bytes=0
+C11.text.syntax	C9 decode; U3 J1–J3 priority	F11	input bytes=1
+C11.text.fraction	C9 decode; U3 J1–J3 priority	F11	input bytes=14
+C11.text.exponent	C9 decode; U3 J1–J3 priority	F11	input bytes=14
+C11.text.negative-zero	C9 decode; U3 J1–J3 priority	F11	input bytes=13
+C11.text.big-int	C9 decode; U3 J1–J3 priority	F11	input bytes=27
+C11.text.bom	C9 decode; U3 J1–J3 priority	F11	input bytes=5
+C11.text.trailing	C9 decode; U3 J1–J3 priority	F11	input bytes=935
+C11.text.surrogate	C9 decode; U3 J1–J3 priority	F11	input bytes=25
+C11.text.utf8	C9 decode; U3 J1–J3 priority	F11	input bytes=22
+C11.text.depth	C9 decode; U3 J1–J3 priority	F11	input bytes=33
+C11.text.depth-priority	C9 decode; U3 J1–J3 priority	F11	input bytes=34
+C11.text.string-cap	C9 decode; U3 J1–J3 priority	F11	input bytes=65556
+C11.text.duplicate	C9 decode; U3 J1–J3 priority	F11	input bytes=23
+C11.text.duplicate-escaped	C9 decode; U3 J1–J3 priority	F11	input bytes=28
+C11.text.duplicate-nested	C9 decode; U3 J1–J3 priority	F11	input bytes=25
+C11.presentation.key.00	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.00	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.01	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.01	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.02	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.02	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.03	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.03	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.04	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.04	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.05	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.05	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.06	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.06	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.07	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.07	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.08	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.08	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.09	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.09	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.0a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.0a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.0b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.0b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.0c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.0c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.0d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.0d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.0e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.0e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.0f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.0f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.10	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.10	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.11	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.11	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.12	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.12	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.13	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.13	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.14	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.14	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.15	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.15	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.16	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.16	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.17	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.17	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.18	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.18	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.19	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.19	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.1f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.1f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.7f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.value.7f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=917
+C11.presentation.key.80	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.80	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.81	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.81	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.82	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.82	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.83	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.83	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.84	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.84	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.85	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.85	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.86	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.86	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.87	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.87	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.88	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.88	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.89	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.89	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.8f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.8f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.90	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.90	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.91	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.91	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.92	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.92	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.93	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.93	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.94	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.94	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.95	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.95	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.96	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.96	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.97	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.97	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.98	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.98	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.99	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.99	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9a	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9b	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9c	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9d	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9e	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.key.9f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=23
+C11.presentation.value.9f	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.presentation.value-choice.63	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=971
+C11.presentation.value-choice.64	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=972
+C11.presentation.value-choice.65	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=973
+C11.presentation.literal-backslash-n	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=24
+C11.presentation.non-cc-separators	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=27
+C11.presentation.duplicate.lf	C9/D3 controls after RFC6901 + before final LF	F11	input bytes=34
+C11.presentation.duplicate.del	C9/D3 controls after RFC6901 + before final LF	F11	input bytes=42
+C11.presentation.duplicate.nel	C9/D3 controls after RFC6901 + before final LF	F11	input bytes=34
+C11.c1-control.name	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=933
+C11.c1-control.reason	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=919
+C11.c1-control.toolchain	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=913
+C11.c1-control.axiom	C6/C9 decode; U3 D5; D1/D2; D3 Cc + last-stage escaping	F11	input bytes=939
+C11.property.roundtrip	C6/C9 canonical typed round trip	F11	48 fixed-seed valid schema values; 0..5 operations; every wire status
+C11.property.normalize	C6/C9 canonical typed round trip	F11	48 fixed-seed valid schema values; 0..5 operations; every wire status
+C11.usage-unreadable	C9 driver decode	F11	named fixture
+C10.root-absent	C7/C9 history	F10	named fixture
+C10.root-index	C7/C9 history	F10	named fixture
+C10.parent-absent	C7/C9 history	F10	named fixture
+C10.working-malformed	C7/C9 history	F10	named fixture
+C10.working-absent	C7/C9 history	F10	named fixture
+C10.changed	C7/C9 history	F10	named fixture
+C10.vanished	C7/C9 history	F10	named fixture
+C10.removed-good	C7/C9 history	F10	named fixture
+C10.removed-same-toolchain	C7/C9 history	F10	named fixture
+C10.removed-wrong-last	C7/C9 history	F10	named fixture
+C10.removed-digest-first	C7/C9 history	F10	named fixture
+C10.committed-removal	C7/C9 history	F10	named fixture
+C10.preserved-removal	C7/C9 history	F10	named fixture
+C10.head-then-parent	C7/C9 history	F10	named fixture
+C10.notice-edited	C7/C9 history	F10	named fixture
+C10.notice-appended	C7/C9 history	F10	named fixture
+C10.removed-edited	C7/C9 history	F10	named fixture
+C10.removed-vanished	C7/C9 history	F10	named fixture
+C10.baseline-undecodable	C7/C9 history	F10	named fixture
+C10.shallow-precedence	C7/C9 history	F10	named fixture
+C10.parent-unreadable	C7/C9 infrastructure precedence	F10	named fixture
+C10.not-worktree	C9 history worktree	F10	named fixture
+C10.presentation.control-path	C9/D3 history path escaping	F10	named fixture
+C10.parents-notices-diverge	C7/C9 history	F10	named fixture
+C10.parents-removed-diverge	C7/C9 history	F10	named fixture
+C10.removal-witness-preserved-across-parent	C7/C9 history	F10	named fixture
+C10.explicit-dir	C9 history cwd/dir	F10	named fixture

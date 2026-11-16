@@ -3,6 +3,7 @@ import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Assemble.Proof.Claims
+import FvdepAudit.Index.Command.Proof.Claims
 import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
@@ -35,14 +36,18 @@ def cliStreams : Prop :=
 /-- U2 X5: a completed run of the CLI plan performs exactly the outcome's outputs, then exits with
 its code. -/
 def cliPlanComplete : Prop :=
-  ∀ (args : List String) (evs : List (Eff × Response)) (code : UInt32),
-    Plan.Runs (Cli.plan args) evs (some code) ↔
-      evs = Cli.outputs (Cli.run args) ∧ code = (Cli.run args).exit
+  ∀ (args : List String),
+    ¬Cli.IndexArgs args →
+      ∀ (evs : List (Eff × Response)) (code : UInt32),
+        Plan.Runs (Cli.plan args) evs (some code) ↔
+          evs = Cli.outputs (Cli.run args) ∧ code = (Cli.run args).exit
 
 /-- U2 X5: an interrupted run performs a prefix of the outcome's outputs. -/
 def cliPlanInterrupted : Prop :=
-  ∀ (args : List String) (evs : List (Eff × Response)),
-    Plan.Runs (Cli.plan args) evs none → evs <+: Cli.outputs (Cli.run args)
+  ∀ (args : List String),
+    ¬Cli.IndexArgs args →
+      ∀ (evs : List (Eff × Response)),
+        Plan.Runs (Cli.plan args) evs none → evs <+: Cli.outputs (Cli.run args)
 
 /-- U2 X1: a finished plan performs nothing + yields its value. -/
 def planPure : Prop :=
@@ -1236,6 +1241,55 @@ def historyExact : Prop :=
 
 end FvdepLedger.Rows.HistoryClaims
 
+namespace FvdepLedger.Rows.CommandClaims
+
+open FvdepCore FvdepAudit.Index.Command.Spec
+
+/-- U4 C1 + C9 + C8 `IndexExact`: a completed run of `fvdep index [--check]` = exactly a run written
+apart (`IndexRun`): the presence probe, the toolchain, the observations + the registry's judgment in
+C9's order (build, load, registry form, certificate, entry rules), the replay, statuses + warnings +
+the schema, then `--check`'s read + comparison or the replace of `index.json` by the decided bytes,
+then the result line; each refusal = its messages on stderr + exit 2. -/
+def indexExact : Prop :=
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (Eff × Response)) (code : UInt32),
+    Plan.Runs (Index.Command.plan h check) evs (some code) ↔ IndexRun h check evs code
+
+/-- U2 X5 for `fvdep index`: an interrupted run performed a prefix of a completed run written
+apart. -/
+def indexPrefix : Prop :=
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (Eff × Response)),
+    Plan.Runs (Index.Command.plan h check) evs none →
+      ∃ rest code, IndexRun h check (evs ++ rest) code
+
+/-- U4 C1: every run, completed or interrupted, reads `index.json` alone + only with `--check`, and
+replaces `index.json` alone + only without it. -/
+def indexFiles : Prop :=
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (Eff × Response)) (r : Option UInt32),
+    Plan.Runs (Index.Command.plan h check) evs r →
+      ∀ x ∈ evs,
+        (∀ f, x.1 = .read f → f = .index ∧ check = true) ∧
+          ∀ f b, x.1 = .replace f b → f = .index ∧ check = false
+
+/-- Interface §1's line rule for `fvdep index`: every output write of every run = one or more
+lines, each ending in LF, with no Unicode `Cc` character inside a line. -/
+def indexLines : Prop :=
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (Eff × Response)) (r : Option UInt32),
+    Plan.Runs (Index.Command.plan h check) evs r →
+      ∀ x ∈ evs,
+        ∀ s,
+          (x.1 = .out s ∨ x.1 = .err s) →
+            ∃ ls : List String,
+              ls ≠ [] ∧
+                s = String.join (ls.map (· ++ "\n")) ∧
+                ∀ l ∈ ls, ∀ c ∈ l.toList, ¬(c.toNat < 32 ∨ 127 ≤ c.toNat ∧ c.toNat ≤ 159)
+
+/-- `fvdep index [--check]` runs the index plan with SHA-256 hex digests. -/
+def indexCli : Prop :=
+  Cli.plan ["index"] = Index.Command.plan Cli.sha false ∧
+    Cli.plan ["index", "--check"] = Index.Command.plan Cli.sha true
+
+end FvdepLedger.Rows.CommandClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -1318,6 +1372,34 @@ def residue : List Residue :=
           ``FvdepIO.Sys.Native.unlink, ``FvdepIO.Sys.Native.lock, ``FvdepIO.Sys.Native.writerNew,
           ``FvdepIO.Sys.Native.writerAcquire, ``FvdepIO.Sys.Native.writerMarkClosed,
           ``FvdepIO.Sys.Native.writerRelease] },
+    { id := "lean-env"
+      what :=
+        "`fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + " ++
+          "`lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files " ++
+          "of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory " ++
+          "`.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + " ++
+          "marked irregular, a special file never opened); the build (Lake from fvdep's " ++
+          "toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) " ++
+          "+ its first `error:` line, Lake's progress relayed through the line rule; the load " ++
+          "(`importModules` over the built oleans) + the facts read from that environment " ++
+          "(declarations, marks, module imports + files, entry files, ABI application types, " ++
+          "spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry " ++
+          "record fields, the kernel's verdict on each certificate literal (`Kernel.check` + " ++
+          "`isDefEq`, synchronous); `leanchecker` over the built modules + its first " ++
+          "rejection; `index.json`'s read + replace (`FvdepIO.Sys`)"
+      reason :=
+        "the toolchain's environment + Lake and `leanchecker` as processes have no Lean " ++
+          "semantics to prove against: the observations are the plan claims' premise " ++
+          "(Decisions U4 C-rules: `Facts`); tested by tester-5's blind suite (stage " ++
+          "`index-suite`, 701 cases through the built `fvdep`: each C9 refusal class with its " ++
+          "message, the schema-1 bytes + the entry count, identity (digest inputs: comments, " ++
+          "proofs + unrelated entries), purity (planted artifacts, environment + an absolute " ++
+          "path leave the bytes unchanged; `--check` + drift leave `index.json` untouched), two " ++
+          "concurrent runs, load + write faults injected by an `LD_PRELOAD` library, Lake's " ++
+          "progress through the line rule) + `tests/cli/smoke.sh` (`index --help`, `help " ++
+          "index`, usage)"
+      ruling := "`fvdep index`'s observation filler (tested)"
+      boundary := [] },
     { id := "literal"
       what := "literal data (the version string `Fvdep.version`)"
       reason :=
@@ -1330,17 +1412,17 @@ def cliRow : Row :=
   { component := `FvdepCore.Cli
     contract := "U1 K2; docs/interface.md §1–§2; U2 X5"
     claim :=
-      "Every invocation writes one stream alone: exit 0 with stderr empty, or exit 2 with the " ++
-        "usage on stderr + stdout empty. The plan performs exactly the outcome's outputs " ++
-        "(stdout, then stderr), an interrupted run a prefix of them; it never reads or replaces " ++
-        "a file."
+      "Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`), every invocation " ++
+        "writes one stream alone: exit 0 with stderr empty, or exit 2 with the usage on stderr " ++
+        "+ stdout empty. The plan performs exactly the outcome's outputs (stdout, then " ++
+        "stderr), an interrupted run a prefix of them; it never reads or replaces a file."
     claims :=
       [(``cliStreams, ``Cli.run_streams), (``cliPlanComplete, ``Cli.plan_complete),
         (``cliPlanInterrupted, ``Cli.plan_interrupted)]
     subject := ``Cli.plan
     path := [``main, ``Cli.plan]
     noCaller := ""
-    residue := ["interpreter", "runtime"]
+    residue := ["interpreter", "hacl-sha256", "runtime"]
     unproven := [] }
 
 def planRow : Row :=
@@ -1414,7 +1496,7 @@ def idsRow : Row :=
         (``IdsClaims.commitCanonical, ``FvdepCore.Ids.Commit.toString_parse)]
     subject := ``FvdepCore.Ids.ModuleId.parse
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -1560,7 +1642,7 @@ def jsonPrintRow : Row :=
         (``JsonClaims.canonicalInjective, ``FvdepAudit.Json.Proof.canonical_injective)]
     subject := ``FvdepCore.Json.print
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -1670,7 +1752,7 @@ def hashFrameRow : Row :=
         (``HashClaims.unframeExact, ``FvdepAudit.Hash.Proof.unframe_exact)]
     subject := ``FvdepCore.Hash.frame
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -1791,7 +1873,7 @@ def sysNamesRow : Row :=
         (``SysClaims.lockPathText, ``FvdepAudit.Sys.Proof.lockPath_text)]
     subject := ``FvdepIO.Sys.tempPath
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -1844,7 +1926,7 @@ def sysDirectoryRow : Row :=
         (``SysClaims.closeOnceDirectory, ``FvdepAudit.Sys.Proof.close_once_directory)]
     subject := ``FvdepIO.Sys.Policy.directory
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -1874,7 +1956,7 @@ def sysReplaceRow : Row :=
         (``SysClaims.replaceCausal, ``FvdepAudit.Sys.Proof.replace_causal)]
     subject := ``FvdepIO.Sys.Policy.replace
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["os", "runtime", "sys-shim"]
     unproven := [] }
 
@@ -1890,7 +1972,7 @@ def sysReadRow : Row :=
     claims := [(``SysClaims.readExact, ``FvdepAudit.Sys.Proof.read_exact)]
     subject := ``FvdepIO.Sys.Policy.readFile
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -1924,7 +2006,7 @@ def sysNativeRow : Row :=
     claims := []
     subject := ``FvdepIO.Sys.replace
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["os", "runtime"]
     unproven := ["sys-shim"] }
 
@@ -1960,7 +2042,7 @@ def protocolSigRow : Row :=
     claims := [(``ProtocolClaims.sigExact, ``FvdepAudit.Protocol.Proof.sigOf_iff)]
     subject := ``FvdepCore.Protocol.sigOf
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2008,7 +2090,7 @@ def indexEncodeRow : Row :=
         (``IndexClaims.indexKindsExact, ``FvdepAudit.Index.Proof.index_kinds)]
     subject := ``FvdepCore.Index.encodeIndex
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2041,7 +2123,7 @@ def registryProofsRow : Row :=
     claims := [(``RegistryClaims.registryProofsExact, ``FvdepAudit.Registry.Proof.registry_proofs)]
     subject := ``FvdepCore.Index.Registry.readProofs
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2058,7 +2140,7 @@ def registryLiteralRow : Row :=
           ``FvdepAudit.Registry.Proof.registry_certificate)]
     subject := ``FvdepCore.Index.Registry.listLiteral
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2074,7 +2156,7 @@ def registryCertificateRow : Row :=
           ``FvdepAudit.Registry.Proof.registry_certificate)]
     subject := ``FvdepCore.Index.Registry.certificate
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2094,7 +2176,7 @@ def validateRow : Row :=
         (``RulesClaims.reachExact, ``FvdepAudit.Index.Rules.Proof.reach_exact)]
     subject := ``FvdepCore.Index.Rules.validate
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2107,7 +2189,7 @@ def closureRow : Row :=
     claims := [(``RulesClaims.closureExact, ``FvdepAudit.Index.Rules.Proof.closure_exact)]
     subject := ``FvdepCore.Index.Rules.closure
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2124,7 +2206,7 @@ def statusesRow : Row :=
     claims := [(``StatusesClaims.statusesExact, ``FvdepAudit.Index.Statuses.Proof.statuses_exact)]
     subject := ``FvdepCore.Index.Statuses.statuses
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2141,7 +2223,7 @@ def closureFilesRow : Row :=
           ``FvdepAudit.Index.Statuses.Proof.closureFiles_distinct)]
     subject := ``FvdepCore.Index.Statuses.closureFiles
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2158,7 +2240,7 @@ def assembleRow : Row :=
     claims := [(``AssembleClaims.assembleExact, ``FvdepAudit.Index.Assemble.Proof.assemble_exact)]
     subject := ``FvdepCore.Index.Assemble.assemble
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2178,6 +2260,46 @@ def historyRow : Row :=
     residue := []
     unproven := [] }
 
+def indexCommandRow : Row :=
+  { component := `FvdepCore.Index.Command
+    contract := "U4 C1 + C9 + C8; docs/interface.md §1"
+    claim :=
+      "`fvdep index [--check]`: a completed run of the plan = exactly a run written apart — " ++
+        "C9's stages in order (library presence, toolchain, build, load, registry form, " ++
+        "certificate, entry rules, replay, statuses + warnings, schema), each refusal its " ++
+        "messages on stderr + exit 2, then `--check`'s read + comparison (`index.json is " ++
+        "current` 0, `differs` 1) or the replace of `index.json` by the decided bytes; an " ++
+        "interrupted run = a prefix of a completed one; every run reads `index.json` alone + " ++
+        "only with `--check`, replaces it alone + only without; every output write = whole " ++
+        "lines, no Unicode `Cc` character inside a line; `fvdep index [--check]` runs this " ++
+        "plan with SHA-256 hex digests."
+    claims :=
+      [(``CommandClaims.indexExact, ``FvdepAudit.Index.Command.Proof.index_exact),
+        (``CommandClaims.indexPrefix, ``FvdepAudit.Index.Command.Proof.index_prefix),
+        (``CommandClaims.indexFiles, ``FvdepAudit.Index.Command.Proof.index_files),
+        (``CommandClaims.indexLines, ``FvdepAudit.Index.Command.Proof.index_lines),
+        (``CommandClaims.indexCli, ``Cli.plan_index)]
+    subject := ``FvdepCore.Index.Command.plan
+    path := [``main, ``Cli.plan, ``FvdepCore.Index.Command.plan]
+    noCaller := ""
+    residue := ["interpreter", "lean-env", "hacl-sha256", "runtime"]
+    unproven := [] }
+
+def indexFillerRow : Row :=
+  { component := `FvdepIO.Index
+    contract := "U4 C1 + C2 + C8 + C9"
+    claim :=
+      "`fvdep index`'s observations: the presence probe; a fresh build of the working copy's " ++
+        "snapshot, its load + the facts, axiom lists, record fields + the kernel's verdict on " ++
+        "each certificate literal; the toolchain's `leanchecker` over the built modules; " ++
+        "`index.json`'s read + replace."
+    claims := []
+    subject := ``FvdepIO.Index.libraryFacts
+    path := []
+    noCaller := "support"
+    residue := ["os", "runtime"]
+    unproven := ["lean-env"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2191,7 +2313,7 @@ def ledger : Ledger :=
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
-        historyRow]
+        historyRow, indexCommandRow, indexFillerRow]
     residue := residue }
 
 end FvdepLedger.Rows

@@ -7,7 +7,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepCore.Cli`
 
 - Contract: U1 K2; docs/interface.md §1–§2; U2 X5
-- Claim: Every invocation writes one stream alone: exit 0 with stderr empty, or exit 2 with the usage on stderr + stdout empty. The plan performs exactly the outcome's outputs (stdout, then stderr), an interrupted run a prefix of them; it never reads or replaces a file.
+- Claim: Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`), every invocation writes one stream alone: exit 0 with stderr empty, or exit 2 with the usage on stderr + stdout empty. The plan performs exactly the outcome's outputs (stdout, then stderr), an interrupted run a prefix of them; it never reads or replaces a file.
 - Subject: `FvdepCore.Cli.plan`
 - Path: `main` → `FvdepCore.Cli.plan`
 - Statement `FvdepLedger.Rows.cliStreams` (hash 0x6de8561e), proved by `FvdepCore.Cli.run_streams`:
@@ -18,21 +18,26 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
       (FvdepCore.Cli.run args).exit = 2 ∧
         (FvdepCore.Cli.run args).stdout = "" ∧ (FvdepCore.Cli.run args).stderr = FvdepCore.Cli.usage
   ```
-- Statement `FvdepLedger.Rows.cliPlanComplete` (hash 0x52617af2), proved by `FvdepCore.Cli.plan_complete`:
+- Statement `FvdepLedger.Rows.cliPlanComplete` (hash 0x88d8755e), proved by `FvdepCore.Cli.plan_complete`:
 
   ```lean
-  ∀ (args : List String) (evs : List (FvdepCore.Eff × FvdepCore.Response)) (code : UInt32),
-    (FvdepCore.Cli.plan args).Runs evs (some code) ↔
-      evs = FvdepCore.Cli.outputs (FvdepCore.Cli.run args) ∧ code = (FvdepCore.Cli.run args).exit
+  ∀ (args : List String),
+    ¬FvdepCore.Cli.IndexArgs args →
+      ∀ (evs : List (FvdepCore.Eff × FvdepCore.Response)) (code : UInt32),
+        (FvdepCore.Cli.plan args).Runs evs (some code) ↔
+          evs = FvdepCore.Cli.outputs (FvdepCore.Cli.run args) ∧ code = (FvdepCore.Cli.run args).exit
   ```
-- Statement `FvdepLedger.Rows.cliPlanInterrupted` (hash 0x4af6c908), proved by `FvdepCore.Cli.plan_interrupted`:
+- Statement `FvdepLedger.Rows.cliPlanInterrupted` (hash 0xe53eff03), proved by `FvdepCore.Cli.plan_interrupted`:
 
   ```lean
-  ∀ (args : List String) (evs : List (FvdepCore.Eff × FvdepCore.Response)),
-    (FvdepCore.Cli.plan args).Runs evs none → evs <+: FvdepCore.Cli.outputs (FvdepCore.Cli.run args)
+  ∀ (args : List String),
+    ¬FvdepCore.Cli.IndexArgs args →
+      ∀ (evs : List (FvdepCore.Eff × FvdepCore.Response)),
+        (FvdepCore.Cli.plan args).Runs evs none →
+          evs <+: FvdepCore.Cli.outputs (FvdepCore.Cli.run args)
   ```
-- Uninterpreted: none
-- Residue: `interpreter` (the IO interpreter's effect → primitive mapping (`FvdepIO.Run`)), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Uninterpreted: `FvdepIO.Hash.sha256`
+- Residue: `interpreter` (the IO interpreter's effect → primitive mapping (`FvdepIO.Run`)), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: none
 
 ## `FvdepCore.Plan`
@@ -102,7 +107,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U2 I1–I6; docs/library.md Naming; docs/interface.md §3 + §7
 - Claim: Module ids, entry versions, module references + commits parse only their canonical text and print back to it; versions are ordered numerically by field (total, antisymmetric, transitive, `compare` agreeing); distinct entries never share a Lean module; a reserved consumer module name is decided by its first component alone (string, numeric or none).
 - Subject: `FvdepCore.Ids.ModuleId.parse`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.IdsClaims.moduleIdRoundTrip` (hash 0xe3dc2c3d), proved by `FvdepCore.Ids.ModuleId.parse_toString`:
 
   ```lean
@@ -845,7 +850,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 J4 + J6; Decisions Data formats
 - Claim: `print` emits exactly the reviewed canonical text; a valid value's text decodes back to it (by the grammar + through the shipped decoder); canonical text tells valid values apart.
 - Subject: `FvdepCore.Json.print`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.JsonClaims.printExact` (hash 0x517210), proved by `FvdepAudit.Json.Proof.print_exact`:
 
   ```lean
@@ -1081,7 +1086,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 H1–H4
 - Claim: `hex` writes each byte as two lowercase hex digits, high nibble first; `frame` emits exactly H2's layout (tag, count, then the files in path order; UTF-8 lengths as 8-byte big-endian numbers); inside H2's domain `unframe` returns the tag + the files in path order, so equal frames have equal tags + the same files; `unframe` accepts exactly frames (domain, strictly ascending paths, every byte consumed).
 - Subject: `FvdepCore.Hash.frame`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.HashClaims.hexExact` (hash 0x29a94a63), proved by `FvdepAudit.Hash.Proof.hex_exact`:
 
   ```lean
@@ -1262,7 +1267,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 F2 + F4
 - Claim: `tempPath`, `Path.at` + `lockPath` spell F2's names: `<dir>/.<name>.tmp-<pid>-<n>`, `<dir>/<name>`, `<dir>/.fvdep-writer.lock` (the texts the protocol claims name).
 - Subject: `FvdepIO.Sys.tempPath`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.tempPathText` (hash 0x522da8e6), proved by `FvdepAudit.Sys.Proof.tempPath_text`:
 
   ```lean
@@ -1388,7 +1393,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 F3 + F4
 - Claim: `directory` (`syncDir`: open, fsync, one close): its result is exactly the one `Directory` assigns to its calls; it closes the directory it opened exactly once.
 - Subject: `FvdepIO.Sys.Policy.directory`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.directoryExact` (hash 0x16dad88e), proved by `FvdepAudit.Sys.Proof.directory_exact`:
 
   ```lean
@@ -1421,7 +1426,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 F2 + F4
 - Claim: `replace`'s calls + result follow F2's protocol written apart (temp walk, all bytes, fsync, one close, one rename step, `syncDir`; cleanup closes once, then unlinks only its own temp; causes in order; `durability`), which fixes the result; one rename step is the only call naming the target; over the directory model the target holds its old state or the new bytes after any run or interruption (new on success), which is U2 X4's `Holds` step for a present target; a run reads its answers in order (call k + whether it is issued depend on answers 0…k−1 alone). Assumed (F4; residues `os` + `sys-shim`): a stable directory, cooperative writers (fvdep processes under the writer lock), an atomic rename, Linux `close` (the descriptor released on every return; POSIX.1-2024 lets `EINTR` keep it open), the native run issuing the policy's requests in order, each answered once (row `sysNative`); with these, a process stopped after k calls issued the first k calls of a complete run on the same answers (F4's model step).
 - Subject: `FvdepIO.Sys.Policy.replace`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.replaceExact` (hash 0xa38d85f2), proved by `FvdepAudit.Sys.Proof.replace_exact`:
 
   ```lean
@@ -1564,7 +1569,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 F2
 - Claim: `readFile`'s calls + result follow the protocol written apart (ENOENT = absent, reads of ≤ 2^20 bytes until 0, the caller's byte cap (`FvdepIO.Sys.readFile`'s default 2^30), one close, the close's failure as primary or secondary cause), which fixes the result.
 - Subject: `FvdepIO.Sys.Policy.readFile`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.readExact` (hash 0x38d79eac), proved by `FvdepAudit.Sys.Proof.read_exact`:
 
   ```lean
@@ -1604,7 +1609,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U3 F1–F2
 - Claim: `replace`, `readFile`, `withWriterLock`, `Writer` + `syncDir` run the proven policy over `syscalls` (each request → its one syscall export, run in the policy's order + answered once; the native writer guard: `Writer.create` registers the created descriptor (`writerNew`), each later `Writer` operation runs between `writerAcquire` + `writerRelease`, a guarded close marks the guard closed (`writerMarkClosed`) before its one close, the guard's finalizer closes a descriptor still open; residue `sys-shim`).
 - Subject: `FvdepIO.Sys.replace`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Sys.Native.read`, `FvdepIO.Sys.Native.openRead`
 - Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close))
@@ -1667,7 +1672,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 B1 (C's encodability rule V3)
 - Claim: `sigOf` returns a spec type's argument + result types exactly when the type is non-dependent arrows over §8's types (`Option X` result = `option`), read as `Expr` shapes without reduction, metadata transparent; else `none`.
 - Subject: `FvdepCore.Protocol.sigOf`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProtocolClaims.sigExact` (hash 0xe82c66dd), proved by `FvdepAudit.Protocol.Proof.sigOf_iff`:
 
   ```lean
@@ -1763,7 +1768,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C6 + C8; Decisions Data formats
 - Claim: `encodeIndex` refuses an index outside schema 1 with the first violation of its layout (the walk's, else the first relational one), else returns its canonical text + LF; an index's JSON is exactly its C6 layout; a well-formed index's JSON is J1-valid; `IndexFile.wellFormed` decides `IndexWellFormed`; each field's general type in the schema data = C6's.
 - Subject: `FvdepCore.Index.encodeIndex`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.IndexClaims.indexEncodeBytes` (hash 0x9cfecd68), proved by `FvdepAudit.Index.Proof.encode_index_iff`:
 
   ```lean
@@ -1848,7 +1853,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C2 + C5
 - Claim: `readProofs` returns exactly the obligation → theorem map (+ compat theorem) the proof registry constant denotes.
 - Subject: `FvdepCore.Index.Registry.readProofs`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RegistryClaims.registryProofsExact` (hash 0x7e509209), proved by `FvdepAudit.Registry.Proof.registry_proofs`:
 
   ```lean
@@ -1864,7 +1869,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C2 + C8
 - Claim: `listLiteral` (a registry list's literal: constructor applications in field order) decodes back to exactly the values written, for plain forms (no `entry` or `any` position) + values of their shape — the certificate's lists among them.
 - Subject: `FvdepCore.Index.Registry.listLiteral`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RegistryClaims.registryReencodeExact` (hash 0x8b9a0d5b), proved by `FvdepAudit.Registry.Proof.registry_reencode`:
 
   ```lean
@@ -1895,7 +1900,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C2 + C8
 - Claim: `certificate` (the lists C-command's kernel check compares with the registry constants: `modules`' records with their entry annotations dropped, `profiles` while empty, `notices`, `removed`) writes values whose literals decode back to exactly those values.
 - Subject: `FvdepCore.Index.Registry.certificate`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RegistryClaims.registryCertificateExact` (hash 0x15a832c6), proved by `FvdepAudit.Registry.Proof.registry_certificate`:
 
   ```lean
@@ -1916,7 +1921,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C3 + C4 + C9 + C8
 - Claim: Entry rules: `validate` accepts exactly the registries for which every row of C9's order holds — each listed entry's own file observed; per entry (in `modules` order) V1–V7 + C4's file check, V3's flags over `reach`'s checked constants; the unlisted entry files; V8 notices; V9 removed records; V10 profiles — the rows written apart; a refusal is what the first failing row may report; `reach` holds exactly the library constants reached from an entry's roots through definition values.
 - Subject: `FvdepCore.Index.Rules.validate`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RulesClaims.validateAccepts` (hash 0x9b1a5333), proved by `FvdepAudit.Index.Rules.Proof.validate_accepts`:
 
   ```lean
@@ -1947,7 +1952,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C4 + C8
 - Claim: `closure F M` holds exactly the modules reachable from `M` through the import edges of `M` + the `Fvdep` modules it reaches, each once.
 - Subject: `FvdepCore.Index.Rules.closure`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RulesClaims.closureExact` (hash 0x45e14f28), proved by `FvdepAudit.Index.Rules.Proof.closure_exact`:
 
   ```lean
@@ -1964,7 +1969,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C5 + C9 + C8
 - Claim: Statuses: after `validate` accepted the lists, `statuses` returns exactly each entry's obligation statuses + axioms (C5's first failing condition → open with no axioms + its warning; else proven, trusts or open from the observed axioms outside the standard three, strictly ascending), its compat edge, and C9's warnings in order, written apart; with no such statuses (a counted theorem without an observed axiom list) it refuses.
 - Subject: `FvdepCore.Index.Statuses.statuses`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.StatusesClaims.statusesExact` (hash 0x63499049), proved by `FvdepAudit.Index.Statuses.Proof.statuses_exact`:
 
   ```lean
@@ -1984,7 +1989,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C4
 - Claim: Digest input: `closureFiles` (the files an entry's digest frames) holds exactly the closure modules' (canonical path, observed bytes); its paths are distinct when every closure module is plain (string components without `/`), the frame's path premise.
 - Subject: `FvdepCore.Index.Statuses.closureFiles`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.StatusesClaims.closureFilesExact` (hash 0xce62a38b), proved by `FvdepAudit.Index.Statuses.Proof.closureFiles_exact`:
 
   ```lean
@@ -2013,7 +2018,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C4 + C6 + C9 + C8
 - Claim: Index value: after `validate` accepted the lists, `assemble` returns exactly the index value written apart — the entries' statuses, the operations = those entries strictly ascending in C6's (id, version) order, each with its digest `h` of the H3 `fvdep/entry/1` frame of its closure files, notices + removed records in registry order, the `lean-toolchain` text without surrounding whitespace — + C9's warnings in `modules` order; with no such statuses it refuses.
 - Subject: `FvdepCore.Index.Assemble.assemble`
-- Path: none yet (wired by U4)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.AssembleClaims.assembleExact` (hash 0x7920e63), proved by `FvdepAudit.Index.Assemble.Proof.assemble_exact`:
 
   ```lean
@@ -2046,6 +2051,77 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Command`
+
+- Contract: U4 C1 + C9 + C8; docs/interface.md §1
+- Claim: `fvdep index [--check]`: a completed run of the plan = exactly a run written apart — C9's stages in order (library presence, toolchain, build, load, registry form, certificate, entry rules, replay, statuses + warnings, schema), each refusal its messages on stderr + exit 2, then `--check`'s read + comparison (`index.json is current` 0, `differs` 1) or the replace of `index.json` by the decided bytes; an interrupted run = a prefix of a completed one; every run reads `index.json` alone + only with `--check`, replaces it alone + only without; every output write = whole lines, no Unicode `Cc` character inside a line; `fvdep index [--check]` runs this plan with SHA-256 hex digests.
+- Subject: `FvdepCore.Index.Command.plan`
+- Path: `main` → `FvdepCore.Cli.plan` → `FvdepCore.Index.Command.plan`
+- Statement `FvdepLedger.Rows.CommandClaims.indexExact` (hash 0xe04e9906), proved by `FvdepAudit.Index.Command.Proof.index_exact`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (FvdepCore.Eff × FvdepCore.Response))
+    (code : UInt32),
+    (FvdepCore.Index.Command.plan h check).Runs evs (some code) ↔
+      FvdepAudit.Index.Command.Spec.IndexRun h check evs code
+  ```
+- Statement `FvdepLedger.Rows.CommandClaims.indexPrefix` (hash 0xa4e3758e), proved by `FvdepAudit.Index.Command.Proof.index_prefix`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (FvdepCore.Eff × FvdepCore.Response)),
+    (FvdepCore.Index.Command.plan h check).Runs evs none →
+      ∃ rest code, FvdepAudit.Index.Command.Spec.IndexRun h check (evs ++ rest) code
+  ```
+- Statement `FvdepLedger.Rows.CommandClaims.indexFiles` (hash 0x1c51a962), proved by `FvdepAudit.Index.Command.Proof.index_files`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (FvdepCore.Eff × FvdepCore.Response))
+    (r : Option UInt32),
+    (FvdepCore.Index.Command.plan h check).Runs evs r →
+      ∀ (x : FvdepCore.Eff × FvdepCore.Response),
+        x ∈ evs →
+          (∀ (f : FvdepCore.ProjectFile),
+              x.fst = FvdepCore.Eff.read f → f = FvdepCore.ProjectFile.index ∧ check = true) ∧
+            ∀ (f : FvdepCore.ProjectFile) (b : ByteArray),
+              x.fst = FvdepCore.Eff.replace f b → f = FvdepCore.ProjectFile.index ∧ check = false
+  ```
+- Statement `FvdepLedger.Rows.CommandClaims.indexLines` (hash 0xc03dd8ba), proved by `FvdepAudit.Index.Command.Proof.index_lines`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (check : Bool) (evs : List (FvdepCore.Eff × FvdepCore.Response))
+    (r : Option UInt32),
+    (FvdepCore.Index.Command.plan h check).Runs evs r →
+      ∀ (x : FvdepCore.Eff × FvdepCore.Response),
+        x ∈ evs →
+          ∀ (s : String),
+            x.fst = FvdepCore.Eff.out s ∨ x.fst = FvdepCore.Eff.err s →
+              ∃ ls,
+                ls ≠ [] ∧
+                  s = String.join (List.map (fun x => x ++ "\n") ls) ∧
+                    ∀ (l : String),
+                      l ∈ ls →
+                        ∀ (c : Char), c ∈ l.toList → ¬(c.toNat < 32 ∨ 127 ≤ c.toNat ∧ c.toNat ≤ 159)
+  ```
+- Statement `FvdepLedger.Rows.CommandClaims.indexCli` (hash 0xf8bf5bd0), proved by `FvdepCore.Cli.plan_index`:
+
+  ```lean
+  FvdepCore.Cli.plan ["index"] = FvdepCore.Index.Command.plan FvdepCore.Cli.sha false ∧
+    FvdepCore.Cli.plan ["index", "--check"] = FvdepCore.Index.Command.plan FvdepCore.Cli.sha true
+  ```
+- Uninterpreted: none
+- Residue: `interpreter` (the IO interpreter's effect → primitive mapping (`FvdepIO.Run`)), `lean-env` (`fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + `lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory `.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + marked irregular, a special file never opened); the build (Lake from fvdep's toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) + its first `error:` line, Lake's progress relayed through the line rule; the load (`importModules` over the built oleans) + the facts read from that environment (declarations, marks, module imports + files, entry files, ABI application types, spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry record fields, the kernel's verdict on each certificate literal (`Kernel.check` + `isDefEq`, synchronous); `leanchecker` over the built modules + its first rejection; `index.json`'s read + replace (`FvdepIO.Sys`)), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepIO.Index`
+
+- Contract: U4 C1 + C2 + C8 + C9
+- Claim: `fvdep index`'s observations: the presence probe; a fresh build of the working copy's snapshot, its load + the facts, axiom lists, record fields + the kernel's verdict on each certificate literal; the toolchain's `leanchecker` over the built modules; `index.json`'s read + replace.
+- Subject: `FvdepIO.Index.libraryFacts`
+- Path: none (a supporting component)
+- Uninterpreted: none
+- Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `lean-env` (`fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + `lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory `.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + marked irregular, a special file never opened); the build (Lake from fvdep's toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) + its first `error:` line, Lake's progress relayed through the line rule; the load (`importModules` over the built oleans) + the facts read from that environment (declarations, marks, module imports + files, entry files, ABI application types, spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry record fields, the kernel's verdict on each certificate literal (`Kernel.check` + `isDefEq`, synchronous); `leanchecker` over the built modules + its first rejection; `index.json`'s read + replace (`FvdepIO.Sys`))
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
@@ -2054,4 +2130,5 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - `hacl-sha256` — SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`): C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance claim); the shim + orchestration are small, reviewed + tested: `lake test` (FIPS 180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching) + S5's blind suite (stage `codec-suite`, 1,212 cases: NIST CAVP short, long + Monte vectors, `sha256sum` differentials, update splits, chunk arithmetic + the total limit at lowered ceilings, `ofReader`, `sha256File`, concurrent Tasks; the C core under gcc ASan + UBSan, zero leaks) (ruling: "HACL* (verified upstream) + FFI wrapper (tested)")
 - `toml-parse` — Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message: toolchain code (Decisions: trusted); `ofLake` names any key of another shape; `fvdep.toml` ≤ 64 KiB bounds its recursion depth (T1); tested by `lake test` (a printed manifest reads back, syntax + repeated keys refuse with Lake's line, a BOM refuses first) + T6's blind suite (stage `manifest-suite`: 1,850 credited cases through Lake's parser, `ofLake` + `validate`; the 4 `T.worst.*` cap cases = uncredited evidence of the parser at the cap: no fvdep mutant reaches them + a driver stack down to 256 KiB leaves them green) (ruling: "Lake.Toml + Lake comparison code (toolchain)")
 - `sys-shim` — the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close): C + the OS have no Lean semantics: each export is one reviewed syscall; the policy over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake test` (replace over absent, present, symlink + directory targets, missing directory, read back, absent + empty reads, the caller's read cap, writer lock contention + exception, Writer lifecycle) + F6's blind suite (stage `sys-suite`, 2,819 credited cases through the dev driver `fvdep-dev`: an LD_PRELOAD fault injector scripting each syscall (every op × errno, `EINTR` budgets, short + zero reads and writes), a crash cut at every syscall of a `replace`, lock contention between processes, ZFS + the gate host's filesystem, the shim + guard under gcc ASan + UBSan) + fuzz target `sys-actions` (action sequences over the shim + guard; corpus replayed under gcc ASan + UBSan by stage `fuzz-replay`) (ruling: "the persistence syscall shim + writer guard (tested)")
+- `lean-env` — `fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + `lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory `.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + marked irregular, a special file never opened); the build (Lake from fvdep's toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) + its first `error:` line, Lake's progress relayed through the line rule; the load (`importModules` over the built oleans) + the facts read from that environment (declarations, marks, module imports + files, entry files, ABI application types, spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry record fields, the kernel's verdict on each certificate literal (`Kernel.check` + `isDefEq`, synchronous); `leanchecker` over the built modules + its first rejection; `index.json`'s read + replace (`FvdepIO.Sys`): the toolchain's environment + Lake and `leanchecker` as processes have no Lean semantics to prove against: the observations are the plan claims' premise (Decisions U4 C-rules: `Facts`); tested by tester-5's blind suite (stage `index-suite`, 701 cases through the built `fvdep`: each C9 refusal class with its message, the schema-1 bytes + the entry count, identity (digest inputs: comments, proofs + unrelated entries), purity (planted artifacts, environment + an absolute path leave the bytes unchanged; `--check` + drift leave `index.json` untouched), two concurrent runs, load + write faults injected by an `LD_PRELOAD` library, Lake's progress through the line rule) + `tests/cli/smoke.sh` (`index --help`, `help index`, usage) (ruling: "`fvdep index`'s observation filler (tested)")
 - `literal` — literal data (the version string `Fvdep.version`): a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both lakefiles (ruling: "Literal data (the version string) is checked by the gate's `meta` stage")
