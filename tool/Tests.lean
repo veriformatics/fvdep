@@ -665,6 +665,186 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Rules
 
+/-! Compiled-code smoke for statuses + warnings (contract U4 C5, C9) and the digest's input files
+(C4): the proofs cover the definitions (`StatusExact`, `closureFiles`); these cases pin C9's texts +
+orders through the compiled code. -/
+
+namespace Statuses
+
+open Lean FvdepCore.Index.Registry FvdepCore.Index.Rules FvdepCore.Index.Statuses
+
+def nameT : Expr := .const ``Lean.Name []
+
+def pairT : Expr := .app (.app (.const ``Prod [.zero, .zero]) nameT) nameT
+
+/-- A proof registry literal `Proofs.mk [(o, t), …] compat` (C2's forms). -/
+def proofsLit (obls : List (Name × Name)) (compat : Option Name := none) : Expr :=
+  let pairE (x : Name × Name) : Expr :=
+    .app (.app (.app (.app (.const ``Prod.mk [.zero, .zero]) nameT) nameT) (nameExpr x.1))
+      (nameExpr x.2)
+  let opt : Expr :=
+    match compat with
+    | none => .app (.const ``Option.none [.zero]) nameT
+    | some t => .app (.app (.const ``Option.some [.zero]) nameT) (nameExpr t)
+  .app
+    (.app (.const ``Fvdep.Registry.Types.V1.Proofs.mk [])
+      (obls.foldr (fun x acc => Registry.consE pairT (pairE x) acc) (Registry.nilE pairT)))
+    opt
+
+def proofsM : Name := `FvdepProofs.Base64.Encode.V1_0_0
+
+def bits : Name := .str Rules.specM "bits"
+
+/-- The theorem `FvdepProofs.Base64.Encode.V1_0_0.<s>` of type `ty`. -/
+def thm (s : String) (ty : Expr := .const bits []) (m : Name := proofsM) : Decl :=
+  { Rules.defn s with
+    name := .str proofsM s
+    module := m
+    kind := .thm
+    value := none
+    type := ty }
+
+/-- A proof registry constant `c` (`docs/library.md` Registry: entry module
+`Fvdep.Registry.<Dep>.<Op>.V…` → `FvdepProofs.Registry.<Dep>.<Op>.V….proofs`), spelled apart from
+the shipped `proofsName`. -/
+def registry (c : Name) (v : Expr) : Decl :=
+  { Rules.defn "proofs" v with
+    name := c
+    module := c.getPrefix }
+
+def t : Name := .str proofsM "bits_eq"
+
+/-- The one-entry library: `bits` mapped to `t`, + `extra` declarations (`reg := false` drops the
+proof registry). -/
+def lib (reg : Option Expr := some (proofsLit [(bits, t)])) (extra : List Decl := [thm "bits_eq"]) :
+    Facts :=
+  Rules.facts []
+    ((reg.map (registry `FvdepProofs.Registry.Base64.Encode.V1_0_0.proofs)).toList ++ extra)
+
+def statusOf (F : Facts) (ax : List (Name × List Name)) (es : List Entry := [Rules.entry]) :
+    Option EntryStatus :=
+  match statuses F ax (Rules.lists es) with
+  | .ok xs => xs.getLast?.map (·.2)
+  | .error _ => none
+
+def warnings (F : Facts) (ax : List (Name × List Name)) (es : List Entry := [Rules.entry]) :
+    List String :=
+  ((statusOf F ax es).map fun s => s.warnings.map Warning.render).getD ["(refused)"]
+
+def opened (why : String) : List String :=
+  [s!"Warning: base64.encode@1.0.0: obligation {bits} counts as open: {why}."]
+
+/-- The version-1.1.0 entry declaring compat with 1.0.0, its spec + the compat theorem `c` of type
+`ty` (`none` = no compat theorem mapped). -/
+def newEntry : Entry :=
+  { Rules.entry with
+    version := "1.1.0"
+    module := `Fvdep.Registry.Base64.Encode.V1_1_0
+    spec := `Fvdep.Base64.Encode.V1_1_0.encode
+    obligations := []
+    compat := some "1.0.0" }
+
+def specT : Expr := .forallE `x (Rules.listT ``UInt8) (Rules.listT ``Char) .default
+
+def eqNewOld (new old : Name) : Expr :=
+  .app (.app (.app (.const ``Eq [.succ .zero]) specT) (.const new [])) (.const old [])
+
+def compatLib (c : Option Name) (ty : Expr) : Facts :=
+  let F := lib
+  { F with
+    decls :=
+      F.decls ++
+        [{ Rules.defn "encode" with
+            name := newEntry.spec
+            module := `Fvdep.Base64.Encode.V1_1_0
+            type := specT },
+          registry `FvdepProofs.Registry.Base64.Encode.V1_1_0.proofs (proofsLit [] c),
+          thm "compat" ty] }
+
+def cases : List (String × (Unit → Bool)) :=
+  [("statuses: the standard axioms alone → proven, no axioms, no warning", fun _ =>
+      statusOf lib [(t, [``propext, ``Quot.sound])] ==
+        some { obligations := [(bits, .proven, [])], compat := none, warnings := [] }),
+    ("statuses: other axioms → trusts, printed names strictly ascending, each once", fun _ =>
+      (statusOf lib [(t, [`Z.ax, ``propext, `A.ax, `Z.ax])]).map (·.obligations) ==
+        some [(bits, .trusts, ["A.ax", "Z.ax"])]),
+    ("statuses: an axiom list observed twice for a theorem → the first one counts", fun _ =>
+      (statusOf lib [(t, [``propext]), (t, [``sorryAx])]).map (·.obligations) ==
+        some [(bits, .proven, [])]),
+    ("statuses: `sorryAx` among the axioms → open with its axioms, no warning", fun _ =>
+      statusOf lib [(t, [``sorryAx, `B.ax, ``Classical.choice])] ==
+        some
+          { obligations := [(bits, .«open», ["B.ax", "sorryAx"])], compat := none,
+            warnings := [] }),
+    ("statuses: no proof registry → open, no axioms + C9's warning", fun _ =>
+      (statusOf (lib (reg := none)) []).map (·.obligations) == some [(bits, .«open», [])] &&
+        warnings (lib (reg := none)) [] == opened "no proof registry"),
+    ("statuses: a registry outside C2's forms → `its proof registry cannot be read`", fun _ =>
+      warnings (lib (reg := some (.lit (.natVal 0)))) [] ==
+        opened "its proof registry cannot be read"),
+    ("statuses: no theorem mapped → `no theorem is mapped`", fun _ =>
+      warnings (lib (reg := some (proofsLit []))) [] == opened "no theorem is mapped"),
+    ("statuses: two theorems mapped → `two theorems are mapped`", fun _ =>
+      warnings (lib (reg := some (proofsLit [(bits, t), (bits, .str proofsM "other")]))) [] ==
+        opened "two theorems are mapped"),
+    ("statuses: a mapped definition → `<t> is not a theorem`", fun _ =>
+      warnings (lib (extra := [{ thm "bits_eq" with kind := .defn }])) [(t, [])] ==
+        opened s!"{t} is not a theorem"),
+    ("statuses: a theorem outside FvdepProofs or absent → `<t> is outside FvdepProofs`", fun _ =>
+      warnings (lib (extra := [thm "bits_eq" (m := `Fvdep.X)])) [(t, [])] ==
+          opened s!"{t} is outside FvdepProofs" &&
+        warnings (lib (extra := [])) [(t, [])] == opened s!"{t} is outside FvdepProofs"),
+    ("statuses: a theorem of another statement → `<t> proves another statement`", fun _ =>
+      warnings (lib (extra := [thm "bits_eq" (.const `Other [])])) [(t, [])] ==
+        opened s!"{t} proves another statement"),
+    ("statuses: a counted theorem without an observed axiom list → load refusal (C9 text)", fun _ =>
+      match statuses lib [] (Rules.lists [Rules.entry]) with
+      | .error f =>
+        render f ==
+          s!"Could not load the built library: no axiom list of {t} observed for " ++
+            "base64.encode@1.0.0."
+      | .ok _ => false),
+    ("statuses: the compat edge `@Eq T new old` (T = the new spec's type) → its status + version",
+      fun _ =>
+      let c := Name.str proofsM "compat"
+      statusOf (compatLib (some c) (eqNewOld newEntry.spec Rules.entry.spec))
+          [(t, []), (c, [``propext, `K.ax])] [Rules.entry, newEntry] ==
+        some { obligations := [], compat := some ("1.0.0", .trusts, ["K.ax"]), warnings := [] }),
+    ("statuses: a compat theorem of another statement → compat open + C9's warning", fun _ =>
+      let c := Name.str proofsM "compat"
+      (warnings (compatLib (some c) (eqNewOld newEntry.spec newEntry.spec)) [(t, []), (c, [])]
+          [Rules.entry, newEntry]) ==
+        [s!"Warning: base64.encode@1.1.0: compat counts as open: {c} proves another statement."]),
+    ("statuses: a mapped compat theorem with no compat declared → `ignored` (C9 text)", fun _ =>
+      let c := Name.str proofsM "compat"
+      warnings (lib (reg := some (proofsLit [(bits, t)] (some c)))) [(t, [])] ==
+        [s!"Warning: base64.encode@1.0.0: the compat theorem {c} is ignored: " ++
+            "no compat is declared."]),
+    ("statuses: an obligation's warning before the ignored compat theorem's (C9's order)", fun _ =>
+      let c := Name.str proofsM "compat"
+      warnings (lib (reg := some (proofsLit [] (some c)))) [] ==
+        opened "no theorem is mapped" ++
+          [s!"Warning: base64.encode@1.0.0: the compat theorem {c} is ignored: " ++
+              "no compat is declared."]),
+    ("statuses: warnings in C9's order — obligations in entry order, then the compat edge", fun _ =>
+      let e := { newEntry with obligations := [.str Rules.specM "z", .str Rules.specM "a"] }
+      warnings (compatLib none (.sort .zero)) [(t, [])] [Rules.entry, e] ==
+        [s!"Warning: base64.encode@1.1.0: obligation {Rules.specM}.z counts as open: " ++
+            "no theorem is mapped.",
+          s!"Warning: base64.encode@1.1.0: obligation {Rules.specM}.a counts as open: " ++
+            "no theorem is mapped.",
+          "Warning: base64.encode@1.1.0: compat counts as open: no theorem is mapped."]),
+    ("closureFiles: each closure module with a file → (its path, its bytes), none without", fun _ =>
+      let paths (F : Facts) := (closureFiles F Rules.entryM).map (·.1)
+      let all :=
+        ["Fvdep/Registry/Base64/Encode/V1_0_0.lean", "Fvdep/Base64/Encode/V1_0_0.lean",
+          "Fvdep/Registry/Types/V1.lean"]
+      let F := Rules.withSpecModule (Rules.facts []) ⟨Rules.specM, [], none⟩
+      (paths (Rules.facts [])).length == 3 && all.all (paths (Rules.facts [])).contains &&
+        paths F == (paths (Rules.facts [])).filter (· != "Fvdep/Base64/Encode/V1_0_0.lean"))]
+
+end Statuses
+
 /-! Compiled-code smoke for hashing (contract U3 S3, S5, H1–H3): FIPS 180-4 example digests through
 HACL*'s C, streaming = one-shot over splits + shared states, hex + frame bytes, `unframe` refusals.
 The blind suite (`tests/codec/`) carries NIST CAVP + the `sha256sum` differential. -/
@@ -1087,6 +1267,7 @@ def main : IO UInt32 := do
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
             (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++
                   Rules.cases ++
+                  Statuses.cases ++
                   Hash.cases ++
                   Manifest.cases).map
               fun c => check c.1 c.2).mapM

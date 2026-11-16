@@ -3,7 +3,8 @@ import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Proof.Claims
-import FvdepAudit.Index.Rules.Proof.Claims
+import FvdepAudit.Index.Statuses.Proof.Claims
+import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
@@ -12,7 +13,6 @@ import FvdepAudit.Manifest.Proof.Text
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
-import FvdepAudit.Registry.Proof.Claims
 import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
@@ -1176,6 +1176,34 @@ def reachExact : Prop :=
 
 end FvdepLedger.Rows.RulesClaims
 
+namespace FvdepLedger.Rows.StatusesClaims
+
+open Lean FvdepCore.Index.Registry FvdepCore.Index.Rules FvdepCore.Index.Statuses
+open FvdepAudit.Index.Rules.Spec FvdepAudit.Index.Statuses.Spec
+
+/-- U4 C5 + C9 + C8 `StatusExact`: after `validate` accepted the lists, `statuses` returns exactly
+the entries' statuses written apart (`StatusesSpec`: per entry in `modules` order, each obligation's
+status + axioms, the compat edge, C9's warnings in order); with no such statuses (a counted theorem
+without an observed axiom list) it refuses. -/
+def statusesExact : Prop :=
+  ∀ (F : Facts) (ax : List (Name × List Name)) (l : Lists) (_h : validate F l = none)
+    (rs : List (Entry × EntryStatus)), statuses F ax l = .ok rs ↔ StatusesSpec F ax l rs
+
+/-- U4 C4: `closureFiles F M` holds exactly the closure modules' (canonical path, observed
+bytes). -/
+def closureFilesExact : Prop :=
+  ∀ (F : Facts) (M : Name) (p : String) (b : ByteArray),
+    (p, b) ∈ closureFiles F M ↔
+      ∃ m, ImportReach F M m ∧ modulePath m = p ∧ ∃ x, modFacts? F m = some x ∧ x.file = some b
+
+/-- U4 C4: `closureFiles`' paths are distinct when every closure module is plain (the frame's path
+premise, `FrameDomain`). -/
+def closureFilesDistinct : Prop :=
+  ∀ (F : Facts) (M : Name) (_h : ∀ m, ImportReach F M m → PlainModule m),
+    ((closureFiles F M).map fun x => x.1).Nodup
+
+end FvdepLedger.Rows.StatusesClaims
+
 namespace FvdepLedger.Rows
 
 open FvdepCore
@@ -2051,6 +2079,40 @@ def closureRow : Row :=
     residue := []
     unproven := [] }
 
+def statusesRow : Row :=
+  { component := `FvdepCore.Index.Statuses
+    contract := "U4 C5 + C9 + C8"
+    claim :=
+      "Statuses: after `validate` accepted the lists, `statuses` returns exactly each entry's " ++
+        "obligation statuses + axioms (C5's first failing condition → open with no axioms + its " ++
+        "warning; else proven, trusts or open from the observed axioms outside the standard " ++
+        "three, strictly ascending), its compat edge, and C9's warnings in order, written " ++
+        "apart; " ++
+        "with no such statuses (a counted theorem without an observed axiom list) it refuses."
+    claims := [(``StatusesClaims.statusesExact, ``FvdepAudit.Index.Statuses.Proof.statuses_exact)]
+    subject := ``FvdepCore.Index.Statuses.statuses
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
+def closureFilesRow : Row :=
+  { component := `FvdepCore.Index.Statuses
+    contract := "U4 C4"
+    claim :=
+      "Digest input: `closureFiles` (the files an entry's digest frames) holds exactly the " ++
+        "closure modules' (canonical path, observed bytes); its paths are distinct when every " ++
+        "closure module is plain (string components without `/`), the frame's path premise."
+    claims :=
+      [(``StatusesClaims.closureFilesExact, ``FvdepAudit.Index.Statuses.Proof.closureFiles_exact),
+        (``StatusesClaims.closureFilesDistinct,
+          ``FvdepAudit.Index.Statuses.Proof.closureFiles_distinct)]
+    subject := ``FvdepCore.Index.Statuses.closureFiles
+    path := []
+    noCaller := "U4"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2063,7 +2125,7 @@ def ledger : Ledger :=
         manifestPrintRow, tomlReadRow, sysNamesRow, sysCreateRow, sysWriterRow, sysDirectoryRow,
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
-        registryCertificateRow, validateRow, closureRow]
+        registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow]
     residue := residue }
 
 end FvdepLedger.Rows

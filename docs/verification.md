@@ -1959,6 +1959,55 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Statuses`
+
+- Contract: U4 C5 + C9 + C8
+- Claim: Statuses: after `validate` accepted the lists, `statuses` returns exactly each entry's obligation statuses + axioms (C5's first failing condition → open with no axioms + its warning; else proven, trusts or open from the observed axioms outside the standard three, strictly ascending), its compat edge, and C9's warnings in order, written apart; with no such statuses (a counted theorem without an observed axiom list) it refuses.
+- Subject: `FvdepCore.Index.Statuses.statuses`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.StatusesClaims.statusesExact` (hash 0x63499049), proved by `FvdepAudit.Index.Statuses.Proof.statuses_exact`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (ax : List (Lean.Name × List Lean.Name))
+    (l : FvdepCore.Index.Registry.Lists),
+    FvdepCore.Index.Rules.validate F l = none →
+      ∀ (rs : List (FvdepCore.Index.Registry.Entry × FvdepCore.Index.Statuses.EntryStatus)),
+        FvdepCore.Index.Statuses.statuses F ax l = Except.ok rs ↔
+          FvdepAudit.Index.Statuses.Spec.StatusesSpec F ax l rs
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Index.Statuses`
+
+- Contract: U4 C4
+- Claim: Digest input: `closureFiles` (the files an entry's digest frames) holds exactly the closure modules' (canonical path, observed bytes); its paths are distinct when every closure module is plain (string components without `/`), the frame's path premise.
+- Subject: `FvdepCore.Index.Statuses.closureFiles`
+- Path: none yet (wired by U4)
+- Statement `FvdepLedger.Rows.StatusesClaims.closureFilesExact` (hash 0xce62a38b), proved by `FvdepAudit.Index.Statuses.Proof.closureFiles_exact`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (M : Lean.Name) (p : String) (b : ByteArray),
+    (p, b) ∈ FvdepCore.Index.Statuses.closureFiles F M ↔
+      ∃ m,
+        FvdepAudit.Index.Rules.Spec.ImportReach F M m ∧
+          FvdepCore.Index.Rules.modulePath m = p ∧
+            ∃ x, FvdepCore.Index.Rules.modFacts? F m = some x ∧ x.file = some b
+  ```
+- Statement `FvdepLedger.Rows.StatusesClaims.closureFilesDistinct` (hash 0xb7e8c734), proved by `FvdepAudit.Index.Statuses.Proof.closureFiles_distinct`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (M : Lean.Name),
+    (∀ (m : Lean.Name),
+        FvdepAudit.Index.Rules.Spec.ImportReach F M m →
+          FvdepAudit.Index.Statuses.Spec.PlainModule m) →
+      (List.map (fun x => x.fst) (FvdepCore.Index.Statuses.closureFiles F M)).Nodup
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
