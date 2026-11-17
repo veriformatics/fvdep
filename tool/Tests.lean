@@ -1,7 +1,9 @@
 import FvdepCore
+import FvdepIO.Cache
 import FvdepIO.Sha256
 import FvdepIO.Step
 import FvdepIO.Toml
+import FvdepIO.Toolchain
 
 /-! `lake test` driver (contract U1 K3): PASS/FAIL per case, the slowest case, exit = failures.
 Generated cases use a fixed seed (printed; `FVDEP_TEST_SEED` overrides it for exploration), so a
@@ -1539,6 +1541,176 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Step
 
+/-! ## U5 K6 + T1: the manifest + fingerprint records (canonical intake), K2's ownership rule,
+the cache shim (`c/fvdep_cache.c`) -/
+
+namespace Cache
+
+open FvdepCore.Build
+
+/-- JSON's hard cases: escapes, control characters, non-ASCII, the metadata names. -/
+def strs : Array String :=
+  #["", "a", "Fvdep.A.B", "\"", "\\", "\n\t", "é∀", "\x01", "/", "x y", "manifest.json", "used",
+    "𝔽"]
+
+def nats : Array Nat := #[0, 1, 7, 4096, 9007199254740991]
+
+/-- One draw from `xs` (nonempty) + the next state. -/
+def pick {α : Type} [Inhabited α] (xs : Array α) (s : UInt64) : α × UInt64 :=
+  let (r, s) := splitmix s
+  (xs[(r % xs.size.toUInt64).toNat]!, s)
+
+/-- A manifest from state `s`: every string + number drawn from the pools (within J's bounds). -/
+def genManifest (s : UInt64) : Manifest × UInt64 :=
+  Id.run do
+    let mut s := s
+    let mut draw : Array String := #[]
+    for _ in [0:12] do
+      let (x, s') := pick strs s
+      draw := draw.push x
+      s := s'
+    let (n1, s1) := pick nats s
+    let (n2, s2) := pick nats s1
+    let (k, s3) := splitmix s2
+    let imports :=
+      (List.range (k % 4).toNat).map fun i =>
+        { module := draw[i]!
+          isPublic := i % 2 == 0
+          isMeta := i % 3 == 0
+          all := i == 1
+          key := draw[i + 1]! : Import }
+    let arts :=
+      (List.range ((k >>> 8) % 4).toNat).map fun i =>
+        { path := draw[i + 4]!, size := if i == 0 then n2 else i, sha256 := draw[i + 5]! : FileRec }
+    let recipe : Recipe :=
+      { id := draw[0]!
+        release := draw[1]!
+        fingerprint := draw[2]!
+        argv := [draw[3]!, draw[4]!]
+        leanPath := [draw[5]!]
+        env := [(draw[6]!, draw[7]!)]
+        options := [draw[8]!]
+        threads := n1 }
+    let input : KeyInput :=
+      { recipe
+        module := draw[9]!
+        path := draw[10]!
+        source := draw[11]!
+        imports }
+    return ({ schema := n1 % 3, input, artifacts := arts }, s3)
+
+def sample : Manifest := (genManifest 7).1
+
+def cases : List (String × (Unit → Bool)) :=
+  [("cache: 500 generated manifests read back from their canonical text (manifestOf ∘ " ++
+        "manifestText)",
+      fun _ =>
+      (List.range 500).foldl
+          (fun (acc : Bool × UInt64) _ =>
+            let (m, s) := genManifest acc.2
+            (acc.1 && manifestOf (manifestText m) == some m, s))
+          (true, 0x5EEDCAC4E0000001) |>.1),
+    ("cache: a manifest spelled another way, with a member added or dropped, is no manifest",
+      fun _ =>
+      let t := FvdepCore.Index.Command.textOfBytes (manifestText sample)
+      let spaced := (t.replace "\":" "\": ").toUTF8
+      let ms :=
+        match manifestValue sample with
+        | .obj ms => ms
+        | _ => []
+      let added := FvdepCore.Json.print (.obj (ms ++ [("zzz", .str "x")]))
+      let dropped := FvdepCore.Json.print (.obj (ms.filter (·.1 != "schema")))
+      (manifestOf spaced).isNone && (manifestOf added).isNone && (manifestOf dropped).isNone &&
+        (manifestOf (manifestText sample)).isSome),
+    ("cache: the fingerprint record reads back; another spelling or schema does not", fun _ =>
+      let f : Fingerprint :=
+        { release := "4.35.0+eb6c"
+          value := "ab"
+          stamp := { files := 15284, bytes := 2859424511, sec := 1791823296, nsec := 7 } }
+      let t := FvdepCore.Index.Command.textOfBytes (fingerprintRecord f)
+      fingerprintOf (fingerprintRecord f) == some f &&
+        (fingerprintOf (t.replace "\"schema\":1" "\"schema\":2").toUTF8).isNone &&
+        (fingerprintOf (t ++ "\n").toUTF8).isNone),
+    ("cache: the fingerprint's list is order-free (sorted by path)", fun _ =>
+      let a : FileRec := { path := "lib/lean/Init.olean", size := 3, sha256 := "a" }
+      let b : FileRec := { path := "bin/lean", size := 9, sha256 := "b" }
+      fingerprintText [a, b] == fingerprintText [b, a]),
+    ("cache: Init, Std, Lean + Lake modules are the toolchain's, every other the library's",
+      fun _ =>
+      ["Init", "Init.Data.List", "Std.Data", "Lean", "Lake.Build"].all toolchainModule &&
+        !["Fvdep.Base64", "Initial", "LeanX.Y", "Fvdep.Init"].any toolchainModule)]
+
+def ioCases : List (String × IO Bool) :=
+  [("cache: link + touch refuse an interior NUL (EINVAL)", do
+      return (← FvdepIO.Cache.link "a\x00b" "c") matches .error 22 &&
+          (← FvdepIO.Cache.link "a" "c\x00d") matches .error 22 &&
+          (← FvdepIO.Cache.touch "a\x00b") matches .error 22),
+    ("cache: touch stamps a file now; link gives its bytes a second name", do
+      let dir ← IO.FS.createTempDir
+      try
+        let f := dir / "used"
+        IO.FS.writeFile f "x"
+        let old := (← f.metadata).modified
+        IO.sleep 20
+        let touched ← FvdepIO.Cache.touch f.toString
+        let now := (← f.metadata).modified
+        let linked ← FvdepIO.Cache.link f.toString (dir / "second").toString
+        let again ← FvdepIO.Cache.link f.toString (dir / "second").toString
+        return touched matches .ok () &&
+            (old.sec < now.sec || (old.sec == now.sec && old.nsec < now.nsec)) &&
+            linked matches .ok () &&
+            again matches .error 17 &&
+            (← IO.FS.readFile (dir / "second")) == "x"
+      finally
+        IO.FS.removeDirAll dir),
+    ("cache: T1's record is believed while the toolchain's stamp holds, recomputed once it " ++
+        "moves; " ++
+        "a link in the toolchain refused",
+      do
+      let dir ← IO.FS.createTempDir
+      try
+        let sys := dir / "sys"
+        let cache := dir / "cache"
+        IO.FS.createDirAll (sys / "bin")
+        IO.FS.createDirAll (sys / "lib" / "lean" / "Init")
+        let files :=
+          [("bin/lean", "lean"), ("bin/leanexport", "leanexport"),
+            ("lib/lean/Init/Core.olean", "olean")]
+        for (p, t) in files do
+          IO.FS.writeFile (sys / p) t
+        let want :=
+          FvdepIO.Hash.sha256Hex
+            (fingerprintText
+              (files.map fun (p, t) =>
+                { path := p, size := t.utf8ByteSize, sha256 := FvdepIO.Hash.sha256Hex t.toUTF8 }))
+        let first ← FvdepIO.Toolchain.fingerprint cache sys
+        let record := cache / "toolchains" / "v1" / (FvdepIO.Toolchain.release ++ ".json")
+        let some f := fingerprintOf (← IO.FS.readBinFile record)
+          | return false
+        IO.FS.writeBinFile record (fingerprintRecord { f with value := "planted" })
+        let believed ← FvdepIO.Toolchain.fingerprint cache sys
+        IO.FS.writeFile (sys / "lib" / "lean" / "Init" / "Core.olean") "olean, rebuilt"
+        let moved ← FvdepIO.Toolchain.fingerprint cache sys
+        discard <|
+            IO.Process.output
+              { cmd := "ln",
+                args :=
+                  #["-s", "Core.olean", (sys / "lib" / "lean" / "Init" / "L.olean").toString] }
+        let linked ← FvdepIO.Toolchain.fingerprint cache sys
+        let ok (r : Except String String) (v : String) : Bool :=
+          match r with
+          | .ok w => w == v
+          | .error _ => false
+        return ok first want && ok believed "planted" &&
+            (match moved with
+            | .ok v => v != want && v != "planted"
+            | .error _ => false) &&
+            linked matches .error _
+      finally
+        IO.FS.removeDirAll dir)]
+
+end Cache
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -1579,10 +1751,13 @@ def main : IO UInt32 := do
                   Hash.cases ++
                   Manifest.cases ++
                   Sandbox.cases ++
-                  Step.cases).map
+                  Step.cases ++
+                  Cache.cases).map
               fun c => check c.1 c.2).mapM
         id
-  let ioResults ← (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases).mapM fun c => checkIO c.1 c.2
+  let ioResults ←
+    (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases).mapM fun c =>
+        checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

@@ -1622,7 +1622,7 @@ def residue : List Residue :=
           "state (K5, K6), the effects are tested by K7's work counts + tester-6's cache cases " ++
           "(U5-C)"
       ruling := "the build cache's filesystem effects"
-      boundary := [] },
+      boundary := [``FvdepIO.Cache.link, ``FvdepIO.Cache.touch] },
     { id := "sandbox-spawn"
       what :=
         "the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by " ++
@@ -2801,6 +2801,54 @@ def runnerRow : Row :=
     residue := ["bwrap", "os", "runtime"]
     unproven := ["sandbox-spawn"] }
 
+/-- U5 K2–K5 + K7: the build cache's effects (D3's `fvdep-dev cache` today; U5b's oracle = K's first
+shipped caller). -/
+def cacheRow : Row :=
+  { component := `FvdepIO.Cache
+    contract := "U5 K2–K5, K7"
+    claim :=
+      "A closure's entries resolved in `plan` order: valid (`validate` over the observed files, " ++
+        "the manifest taken in canonical form alone) + pinned under `LOCK_SH`, else filled " ++
+        "under `LOCK_EX` (within `lockWait`) by one step against a view of hard links + " ++
+        "published durably (temp, fsync, rename, directory fsync); eviction = `evictPlan` over " ++
+        "the observed entries under `evict.lock`, each removal under its key's lock."
+    claims := []
+    subject := ``FvdepIO.Cache.build
+    path := []
+    noCaller := "U5b"
+    residue := ["bwrap", "lean-toolchain", "hacl-sha256", "sys-shim", "os", "runtime"]
+    unproven := ["cache-fs", "sandbox-spawn"] }
+
+/-- U5 K2: a module's header observation (Lean's own header parser). -/
+def headerRow : Row :=
+  { component := `FvdepIO.Header
+    contract := "U5 K2"
+    claim :=
+      "A module's `module` keyword + its imports in header order with their flags (a " ++
+        "non-`prelude` header's implicit `Init` + `meta Init` included), over the bytes read " ++
+        "once; a header with a parse error or an import without a plain module name is refused."
+    claims := []
+    subject := ``FvdepIO.Header.observe
+    path := []
+    noCaller := "U5b"
+    residue := ["os", "runtime"]
+    unproven := ["lean-toolchain"] }
+
+/-- U5 T1: the toolchain fingerprint. -/
+def toolchainRow : Row :=
+  { component := `FvdepIO.Toolchain
+    contract := "U5 T1"
+    claim :=
+      "SHA-256 of `fingerprintText` over `bin/lean`, `bin/leanexport` + every file under " ++
+        "`lib/lean` (a link or special file refused), kept in " ++
+        "`FVDEP_CACHE/toolchains/v1/<release>.json` while the tree's stat stamp holds."
+    claims := []
+    subject := ``FvdepIO.Toolchain.fingerprint
+    path := []
+    noCaller := "U5b"
+    residue := ["hacl-sha256", "sys-shim", "os", "runtime"]
+    unproven := ["cache-fs"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2817,7 +2865,7 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow]
+        runnerRow, cacheRow, headerRow, toolchainRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

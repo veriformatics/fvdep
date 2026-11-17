@@ -1,9 +1,11 @@
 import FvdepCore.Ids
+import FvdepCore.Json.Decode
 import FvdepCore.Json.Print
 
-/-! The library build cache's pure parts (contract `docs/contracts/U5-sandbox.md` T2, K1, K2, K5,
-K6): recipes, key preimages, the build plan over a module graph, the eviction policy, entry
-validation. Hashing (`FvdepIO.Hash.sha256Hex`) + the filesystem = residue `cache-fs`. -/
+/-! The library build cache's pure parts (contract `docs/contracts/U5-sandbox.md` T1–T3, K1, K2,
+K5, K6): recipes, key preimages, the build plan over a module graph, the eviction policy, entry
+validation + the manifest codec, the toolchain fingerprint's record. Hashing
+(`FvdepIO.Hash.sha256Hex`) + the filesystem = residue `cache-fs`. -/
 
 namespace FvdepCore.Build
 
@@ -246,5 +248,189 @@ def validate (h : ByteArray → String) (dir : String) (m : Manifest) (files : L
     metadata.all (fun n => files.any (·.path == n)) &&
     m.artifacts.all (fun a => files.any fun f => f == a) &&
     files.all fun f => metadata.contains f.path || (m.artifacts.map (·.path)).contains f.path
+
+/-! ## K6 manifest codec -/
+
+def fileValue (f : FileRec) : Value :=
+  .obj [("path", .str f.path), ("sha256", .str f.sha256), ("size", .int f.size)]
+
+/-- K6: `manifest.json`'s value (keys ascending at every level; `input` = K1's `keyValue`). -/
+def manifestValue (m : Manifest) : Value :=
+  .obj
+    [("artifacts", .arr (m.artifacts.map fileValue)), ("input", keyValue m.input),
+      ("schema", .int m.schema)]
+
+/-- K6: `manifest.json`'s bytes = the canonical JSON text of `manifestValue`. -/
+def manifestText (m : Manifest) : ByteArray := print (manifestValue m)
+
+/-- An object's member values when its keys are exactly `keys`, in that (ascending) order. -/
+def members (keys : List String) : Value → Option (List Value)
+  | .obj ms => if ms.map (·.1) == keys then some (ms.map (·.2)) else none
+  | _ => none
+
+def natOf : Value → Option Nat
+  | .int n => if 0 ≤ n then some n.toNat else none
+  | _ => none
+
+def strOf : Value → Option String
+  | .str s => some s
+  | _ => none
+
+def boolOf : Value → Option Bool
+  | .bool b => some b
+  | _ => none
+
+def arrOf : Value → Option (List Value)
+  | .arr xs => some xs
+  | _ => none
+
+def strsOf (v : Value) : Option (List String) := do
+  (← arrOf v).mapM strOf
+
+def pairOf : Value → Option (String × String)
+  | .arr [.str k, .str v] => some (k, v)
+  | _ => none
+
+def recipeOf (v : Value) : Option Recipe := do
+  let [argv, env, fingerprint, id, leanPath, options, release, threads] ←
+    members ["argv", "env", "fingerprint", "id", "leanPath", "options", "release", "threads"]
+        v | none
+  pure {
+        id := ← strOf id
+        release := ← strOf release
+        fingerprint := ← strOf fingerprint
+        argv := ← strsOf argv
+        leanPath := ← strsOf leanPath
+        env := ← (← arrOf env).mapM pairOf
+        options := ← strsOf options
+        threads := ← natOf threads }
+
+def importOf (v : Value) : Option Import := do
+  let [all, key, isMeta, module, isPublic] ←
+    members ["all", "key", "meta", "module", "public"] v | none
+  pure {
+        module := ← strOf module
+        isPublic := ← boolOf isPublic
+        isMeta := ← boolOf isMeta
+        all := ← boolOf all
+        key := ← strOf key }
+
+/-- K6: `keyValue`'s inverse on its image. -/
+def keyInputOf (v : Value) : Option KeyInput := do
+  let [imports, kind, module, path, recipe, source] ←
+    members ["imports", "kind", "module", "path", "recipe", "source"] v | none
+  unless kind == .str "fvdep/build/1" do
+    none
+  pure {
+        recipe := ← recipeOf recipe
+        module := ← strOf module
+        path := ← strOf path
+        source := ← strOf source
+        imports := ← (← arrOf imports).mapM importOf }
+
+def fileOf (v : Value) : Option FileRec := do
+  let [path, sha256, size] ← members ["path", "sha256", "size"] v | none
+  pure {
+        path := ← strOf path
+        size := ← natOf size
+        sha256 := ← strOf sha256 }
+
+/-- K6's intake: the manifest `b` decodes to, accepted only when `b` is exactly its canonical text
+(another spelling of the same value, an unknown or missing member → `none`: an entry with it is a
+miss, rebuilt; like the step frame's status record, R8). -/
+def manifestOf (b : ByteArray) : Option Manifest := do
+  let v ← (FvdepCore.Json.decode b).toOption
+  let [artifacts, input, schema] ← members ["artifacts", "input", "schema"] v | none
+  let m : Manifest :=
+    { schema := ← natOf schema
+      input := ← keyInputOf input
+      artifacts := ← (← arrOf artifacts).mapM fileOf }
+  if manifestText m == b then
+    some m
+  else
+    none
+
+/-! ## T1 toolchain fingerprint -/
+
+/-- T1: the fingerprint's preimage = the canonical JSON array `[[path, size, sha256]…]` of the
+toolchain's files (`bin/lean`, `bin/leanexport`, every file under `lib/lean`) in path order (code
+point order = UTF-8 byte order); the fingerprint = its SHA-256 (hex). -/
+def fingerprintText (files : List FileRec) : ByteArray :=
+  print
+    (.arr
+      ((files.mergeSort fun a b => decide (a.path ≤ b.path)).map fun f =>
+        .arr [.str f.path, .int f.size, .str f.sha256]))
+
+/-- T1: the toolchain tree's stat stamp (file count, total bytes, newest modification time as
+seconds + nanoseconds: J's integers stop at 2^53 − 1); a change triggers a recompute. -/
+structure Stamp where
+  files : Nat
+  bytes : Nat
+  sec : Nat
+  nsec : Nat
+  deriving DecidableEq, Repr
+
+/-- T1's record `FVDEP_CACHE/toolchains/v1/<release>.json`: the fingerprint of the toolchain whose
+tree had this stamp. -/
+structure Fingerprint where
+  release : String
+  value : String
+  stamp : Stamp
+  deriving DecidableEq, Repr
+
+def fingerprintValue (f : Fingerprint) : Value :=
+  .obj
+    [("fingerprint", .str f.value), ("release", .str f.release), ("schema", .int 1),
+      ("stamp",
+        .obj
+          [("bytes", .int f.stamp.bytes), ("files", .int f.stamp.files),
+            ("nsec", .int f.stamp.nsec), ("sec", .int f.stamp.sec)])]
+
+def fingerprintRecord (f : Fingerprint) : ByteArray := print (fingerprintValue f)
+
+/-- T1's record intake: canonical text alone (anything else = no record: recompute). -/
+def fingerprintOf (b : ByteArray) : Option Fingerprint := do
+  let v ← (FvdepCore.Json.decode b).toOption
+  let [value, release, schema, stamp] ←
+    members ["fingerprint", "release", "schema", "stamp"] v | none
+  unless schema == .int 1 do
+    none
+  let [bytes, files, nsec, sec] ← members ["bytes", "files", "nsec", "sec"] stamp | none
+  let f : Fingerprint :=
+    { release := ← strOf release
+      value := ← strOf value
+      stamp :=
+        { files := ← natOf files
+          bytes := ← natOf bytes
+          sec := ← natOf sec
+          nsec := ← natOf nsec } }
+  if fingerprintRecord f == b then
+    some f
+  else
+    none
+
+/-! ## K3 + K5 cache settings -/
+
+/-- K5's default soft target: 4 GiB (`@[noinline]`: a literal ≥ 2^32 is parsed at each use). -/
+@[noinline]
+def defaultCacheBytes : Nat := 4294967296
+
+/-- T3's cache limits (U5 defaults; U7 qualifies the production values): a fill's own deadline
+(seconds), the wait for a key's exclusive lock (seconds: past another process's whole fill), K5's
+soft target (bytes; `FVDEP_CACHE_BYTES`, 0 allowed). -/
+structure CacheLimits where
+  fillBudget : Nat := 600
+  lockWait : Nat := 660
+  cacheBytes : Nat := defaultCacheBytes
+  deriving DecidableEq, Repr
+
+/-- K2: a module the toolchain provides — first component `Init`, `Std`, `Lean` or `Lake` (the
+reserved consumer names, Decisions U2) — never a library entry: its key in an import vector = the
+recipe's fingerprint. -/
+def toolchainModule (m : String) : Bool :=
+  ["Init", "Std", "Lean", "Lake"].contains ((m.splitOn ".").headD "")
+
+/-- K7's trace line for one compiled module. -/
+def traceLine (key module : String) : String := key ++ " " ++ module ++ "\n"
 
 end FvdepCore.Build

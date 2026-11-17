@@ -2485,6 +2485,36 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`))
 
+## `FvdepIO.Cache`
+
+- Contract: U5 K2–K5, K7
+- Claim: A closure's entries resolved in `plan` order: valid (`validate` over the observed files, the manifest taken in canonical form alone) + pinned under `LOCK_SH`, else filled under `LOCK_EX` (within `lockWait`) by one step against a view of hard links + published durably (temp, fsync, rename, directory fsync); eviction = `evictPlan` over the observed entries under `evict.lock`, each removal under its key's lock.
+- Subject: `FvdepIO.Cache.build`
+- Path: none yet (wired by U5b)
+- Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.writerRelease`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.writerNew`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Cache.touch`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.writerAcquire`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Cache.link`, `FvdepIO.Sys.Native.read`, `FvdepIO.Hash.sha256`, `FvdepIO.Sys.Native.openRead`
+- Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`))
+
+## `FvdepIO.Header`
+
+- Contract: U5 K2
+- Claim: A module's `module` keyword + its imports in header order with their flags (a non-`prelude` header's implicit `Init` + `meta Init` included), over the bytes read once; a header with a parse error or an import without a plain module name is refused.
+- Subject: `FvdepIO.Header.observe`
+- Path: none yet (wired by U5b)
+- Uninterpreted: none
+- Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes)
+
+## `FvdepIO.Toolchain`
+
+- Contract: U5 T1
+- Claim: SHA-256 of `fingerprintText` over `bin/lean`, `bin/leanexport` + every file under `lib/lean` (a link or special file refused), kept in `FVDEP_CACHE/toolchains/v1/<release>.json` while the tree's stat stamp holds.
+- Subject: `FvdepIO.Toolchain.fingerprint`
+- Path: none yet (wired by U5b)
+- Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Sys.Native.read`, `FvdepIO.Hash.sha256`, `FvdepIO.Hash.Sha256.initState`, `FvdepIO.Sys.Native.openRead`
+- Residue: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over)
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

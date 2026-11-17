@@ -31,6 +31,10 @@ SPEC = SPEC_MODULE + ".encode"
 HEX = r"[0-9a-f]{64}"
 CAP = 32 * 1024 * 1024
 CASES: list[Case] = []
+# T1's toolchain record, computed once per run (`fvdep-dev cache fingerprint`: ≈ 14 CPU-s over the
+# 2.9 GB toolchain) + copied into each case's empty cache: setup built once, no case's assertions
+# touched (none checks T1; MAIN's `lake test` covers its recompute).
+TOOLCHAIN_SEED: Path | None = None
 
 
 def need(ok: object, why: str) -> None:
@@ -136,6 +140,8 @@ class Context:
             if k.startswith("FVDEP_") and k not in {"FVDEP_TEST_SEED"}:
                 self.env.pop(k)
         self.env.update(FVDEP_CACHE=str(self.cache), FVDEP_LIBRARY_URL=str(ROOT))
+        if TOOLCHAIN_SEED is not None:
+            shutil.copytree(TOOLCHAIN_SEED, self.cache / "toolchains")
 
     def call(self, args: list[str], *, env: dict[str, str] | None = None,
              timeout: int = 240, binary: Path = DEV) -> Result:
@@ -1275,6 +1281,21 @@ def incomplete_bundle(c: Context) -> None:
     need("Fvdep/BundleFill/" in again.all_text, "rerun does not name an omitted view artifact")
 
 
+def seed_toolchain(parent: Path) -> None:
+    """TOOLCHAIN_SEED = the toolchain record of one `cache fingerprint` run (left unset when it fails:
+    each case then computes its own)."""
+    global TOOLCHAIN_SEED
+    cache = parent / "seed-cache"
+    cache.mkdir()
+    env = {k: v for k, v in os.environ.items() if not k.startswith("FVDEP_")}
+    p = subprocess.run([str(DEV), "cache", "fingerprint"], env=env | {"FVDEP_CACHE": str(cache)},
+                       stdout=subprocess.PIPE, stderr=subprocess.PIPE, timeout=600, check=False)
+    if p.returncode == 0 and (cache / "toolchains").is_dir():
+        TOOLCHAIN_SEED = cache / "toolchains"
+    print(f"TOOLCHAIN-SEED {'ready' if TOOLCHAIN_SEED else 'absent (exit ' + str(p.returncode) + ')'}",
+          flush=True)
+
+
 def coverage_text() -> str:
     return "id\tpart\tclause\texpected\n" + "".join(
         f"{c.id}\t{c.part}\t{c.clause}\t{c.expected}\n" for c in CASES)
@@ -1282,7 +1303,7 @@ def coverage_text() -> str:
 
 def main() -> int:
     parser = argparse.ArgumentParser(description=__doc__)
-    parser.add_argument("--case", default=os.environ.get("FVDEP_SANDBOX_CASE", ""), help="id substring")
+    parser.add_argument("--case", action="append", help="id substring (repeatable: a case matching any runs)")
     parser.add_argument("--exact", help="one exact case id")
     parser.add_argument("--coverage", action="store_true", help="print the deterministic coverage table")
     parser.add_argument("--evidence", type=Path)
@@ -1297,7 +1318,8 @@ def main() -> int:
         print(f"AUDIT {len(CASES)} cases, {len(CASES)} coverage rows")
         audit_artifacts()
         return 0
-    selected = [c for c in CASES if args.case in c.id and (args.exact is None or c.id == args.exact)]
+    cases = args.case or [os.environ.get("FVDEP_SANDBOX_CASE", "")]
+    selected = [c for c in CASES if any(s in c.id for s in cases) and (args.exact is None or c.id == args.exact)]
     need(selected, "case filter matched no cases")
     need(DEV.is_file() and BIN.is_file(), "run.sh must build fvdep-dev + fvdep before the suite")
     print(f"SEED {SEED}", flush=True)
@@ -1305,6 +1327,8 @@ def main() -> int:
     evidence: list[dict[str, Any]] = []
     with tempfile.TemporaryDirectory(prefix="fvdep-sandbox-suite-") as tmp:
         parent = Path(tmp)
+        if any(c.part != "D2" for c in selected):
+            seed_toolchain(parent)
         for n, spec in enumerate(selected):
             home = parent / f"case-{n:03}"
             home.mkdir()

@@ -128,6 +128,20 @@ partial def copyTree (src dst : System.FilePath) : IO Unit := do
     | _ =>
       IO.eprintln s!"fvdep-dev: --src: skipped {e.path} (a link or special file)"
 
+/-- R8: a copy of the step helper beside the running executable, at `<run>/step/fvdep-step` (the
+directory bound at `/fvdep/step`). -/
+def installHelper (run : System.FilePath) : IO (Except String Unit) := do
+  let helper := ((← IO.appPath).parent.getD ".") / "fvdep-step"
+  unless ← helper.pathExists do
+    return .error s!"fvdep-step is missing beside fvdep-dev ({helper})"
+  IO.FS.createDirAll (run / "step")
+  IO.FS.writeBinFile (run / "step" / "fvdep-step") (← IO.FS.readBinFile helper)
+  IO.setAccessRights (run / "step" / "fvdep-step")
+      { user := { read := true, write := true, execution := true }
+        group := { read := true, execution := true }
+        other := { read := true, execution := true } }
+  return .ok ()
+
 def outcomeLine : Outcome → String
   | .exited n => s!"outcome exited {n}"
   | .timedOut => "outcome timed_out"
@@ -174,16 +188,9 @@ def step (o : Options) : IO UInt32 := do
         say [s!"infra tool_missing: {e}"]
         return 2
       | .ok sys =>
-        let helper := ((← IO.appPath).parent.getD ".") / "fvdep-step"
-        unless ← helper.pathExists do
-          say [s!"infra tool_missing: fvdep-step is missing beside fvdep-dev ({helper})"]
+        if let .error e← installHelper run then
+          say [s!"infra tool_missing: {e}"]
           return 2
-        IO.FS.createDirAll (run / "step")
-        IO.FS.writeBinFile (run / "step" / "fvdep-step") (← IO.FS.readBinFile helper)
-        IO.setAccessRights (run / "step" / "fvdep-step")
-            { user := { read := true, write := true, execution := true }
-              group := { read := true, execution := true }
-              other := { read := true, execution := true } }
         match o.src with
         | some d =>
           copyTree d (run / "src")

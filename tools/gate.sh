@@ -319,12 +319,15 @@ sandbox_closure() {
         tool/StepMain.lean
 }
 
-# The blind sandbox suite's D2 cases (tester-6; U5 R + D2: `fvdep-dev sandbox run`, one step each:
-# outcomes, pumps, frames, preflight); its D1, D3 + D4 cases merge with U5-C + U5-D. Its steps run
-# fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID namespace of the job's own.
+# The blind sandbox suite's D2 + D3 cases (tester-6; U5 R + D2: `fvdep-dev sandbox run`, one step
+# each: outcomes, pumps, frames, preflight; K + D3: `fvdep-dev cache`, fills, pins, eviction); its D1
+# + D4 cases merge with U5-D. Its steps run fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID
+# namespace of the job's own.
 sandbox_suite() {
+    local cases=(--case R. --case K.)
+    [[ -z "${FVDEP_SANDBOX_CASE:-}" ]] || cases=(--case "$FVDEP_SANDBOX_CASE")
     suite sandbox-suite "$(sandbox_closure tests/sandbox)" "${FVDEP_SANDBOX_CASE:-}" \
-        bash tests/sandbox/run.sh --case "${FVDEP_SANDBOX_CASE:-R.}"
+        bash tests/sandbox/run.sh "${cases[@]}"
 }
 
 # The isolation cases (MAIN's; U5 G1, G3, G4 + R8's descriptor 4: D2 steps + the helper alone in a
