@@ -156,5 +156,34 @@ rc=$?
 rm -rf "$fake"
 check filter-failure "rc $rc, want 125" test "$rc" -eq 125
 
+# Each unit = its own PID namespace: PID 1 = flock, no kernel thread visible (the host's namespace
+# shows kthreadd); a copy without PrivatePIDs fails closed (125, naming it) before its command runs.
+# shellcheck disable=SC2016
+"$run" bash -c 'test "$(cat /proc/1/comm)" = flock && ! grep -qx kthreadd /proc/[0-9]*/comm' \
+    >/dev/null 2>&1
+rc=$?
+check pid-namespace "rc $rc, want 0" test "$rc" -eq 0
+# Every process of a unit starts with RLIMIT_CORE = 1: the kernel skips a `core_pattern` pipe
+# (vflab: apport, as root) at that limit alone.
+"$run" python3 -I -c 'import resource, sys; sys.exit(resource.getrlimit(resource.RLIMIT_CORE) != (1, 1))' \
+    >/dev/null 2>&1
+rc=$?
+check core-limit "rc $rc, want 0" test "$rc" -eq 0
+mkdir -p "$root/.scratch"
+nopid="$root/.scratch/probe-vflab-run-nopidns"
+grep -v -- '--property=PrivatePIDs=yes' "$run" >"$nopid"
+chmod +x "$nopid"
+err="$("$nopid" bash -c 'mkdir -p .gate && touch .gate/probe-nopidns-ran' 2>&1 >/dev/null)"
+rc=$?
+rm -f "$nopid"
+named=0
+grep -q 'is not in its own PID namespace' <<<"$err" && named=1
+# shellcheck disable=SC2016
+"$run" bash -c 'test ! -e .gate/probe-nopidns-ran; r=$?; rm -f .gate/probe-nopidns-ran; exit $r' \
+    >/dev/null 2>&1
+absent=$?
+check pidns-fail-closed "rc $rc, named $named, ran-absent rc $absent, want 125 + 1 + 0" \
+    test "$rc" -eq 125 -a "$named" -eq 1 -a "$absent" -eq 0
+
 printf 'vflab-run-probe: %d probe(s) failed\n' "$missed"
 exit "$missed"

@@ -194,13 +194,15 @@ def main() -> int:
             if result.exists():
                 for line in result.read_text().splitlines():
                     id, _, value = line.partition('\t'); observed[id] = value
-        env = {**os.environ, 'ASAN_OPTIONS':'detect_leaks=1:abort_on_error=1', 'UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1', 'LEAN_ABORT_ON_PANIC':'1'}
+        # disable_coredump=0: ASan would lower RLIMIT_CORE to 0, and a `core_pattern` pipe (vflab:
+        # apport, as root) still takes a dump at 0; the kernel skips it at exactly 1.
+        env = {**os.environ, 'ASAN_OPTIONS':'detect_leaks=1:abort_on_error=1:disable_coredump=0', 'UBSAN_OPTIONS':'halt_on_error=1:print_stacktrace=1', 'LEAN_ABORT_ON_PANIC':'1'}
         for i, c in enumerate(cases):
             if c.executable in ['normal', 'small']: continue
             path = work / f'process.{i}.input'; path.write_bytes(c.payload)
             if c.executable.startswith('abort-'):
                 binary = driver_dir / ('codec-driver-small' if c.executable == 'abort-small' else 'codec-driver')
-                cmd = ['bash', '-c', 'ulimit -c 0; exec "$@"', 'sha-abort', str(binary), '--sha-abort', c.mode, str(path)]
+                cmd = ['prlimit', '--core=1:1', '--', str(binary), '--sha-abort', c.mode, str(path)]
             else:
                 cmd = [str(ROOT / 'tests/sha256/.build' / c.executable.replace('c-', 'core-', 1)), c.mode, c.argument if c.mode == 'refuse' else str(path)]
                 if c.argument and c.mode != 'refuse': cmd.append(c.argument)

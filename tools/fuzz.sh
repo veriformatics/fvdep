@@ -261,7 +261,11 @@ replay() {
             rc=1
             continue
         }
-        if "$bin" "${inputs[@]}" >/dev/null 2>"$log"; then
+        # RLIMIT_CORE = 1: a crash (a Lean target's panic aborts) then dumps no core + never
+        # reaches a `core_pattern` pipe (vflab: apport, as root): the kernel skips the pipe at that
+        # limit alone (0 still pipes). disable_coredump=0: ASan would lower the limit to 0.
+        if ASAN_OPTIONS="${ASAN_OPTIONS:+$ASAN_OPTIONS:}disable_coredump=0" \
+            prlimit --core=1:1 -- "$bin" "${inputs[@]}" >/dev/null 2>"$log"; then
             printf 'fuzz-replay: %s: %d inputs\n' "$t" "${#inputs[@]}"
         else
             n=$?

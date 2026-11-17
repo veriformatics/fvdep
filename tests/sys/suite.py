@@ -325,7 +325,7 @@ class Harness:
         script.write_text("".join(q.text() for q in rules), encoding="ascii")
         log.write_bytes(b"")
         env = {**os.environ, "FVDEP_SYS_ROOT": str(root), "FVDEP_SYS_SCRIPT": str(script), "FVDEP_SYS_TRACE": str(log),
-               "LEAN_ABORT_ON_PANIC": "1", "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1", "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"}
+               "LEAN_ABORT_ON_PANIC": "1", "ASAN_OPTIONS": "detect_leaks=1:abort_on_error=1:disable_coredump=0", "UBSAN_OPTIONS": "halt_on_error=1:print_stacktrace=1"}
         if preload:
             env["LD_PRELOAD"] = str(self.fault)
         else:

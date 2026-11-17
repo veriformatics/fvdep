@@ -11,7 +11,12 @@
 # (fvapi's bootstrap): systemd would otherwise create an empty one on demand.
 # The unit is Type=oneshot (a simple service counts SIGTERM as success → a false green) with
 # --expand-environment=no (arguments stay literal) and IgnoreSIGPIPE=no (local shell semantics);
-# its own MemoryMax (below the slice's 40 GiB) keeps an OOM kill inside this run.
+# its own MemoryMax (below the slice's 40 GiB) keeps an OOM kill inside this run. PrivatePIDs=yes
+# (systemd ≥ 257): the unit = its own PID namespace (flock = PID 1, the job's shell = PID 2), so no
+# process of a run can signal fvapi's or another job's processes, a sandbox step helper's
+# `kill(-1)` included (`.claude/rules/sandbox.md`); the job's shell checks that it is PID 2 before
+# anything runs, else 125 (fail closed). LimitCORE=1: a crash (a planted abort, a Lean panic) never
+# reaches vflab's `core_pattern` pipe (apport, as root): the kernel skips the pipe at exactly 1.
 # Output streams live, the remote workspace path mapped back to this worktree; the unit's
 # accounting (result, runtime, CPU time, memory peak) closes stderr as one `vflab-run:` line.
 # Usage: tools/vflab-run <command> [args…]   FVDEP_VFLAB = ssh target (default vflab);
@@ -19,7 +24,8 @@
 # FVDEP_VFLAB_MEMORY = the unit's MemoryMax, a K/M/G/T size below the slice's cap (default 24G).
 # Exit: the command's status (0–255); 2 = usage or a malformed setting (no remote action);
 # 125 = setup, sync or output mapping failed with the command at 0 (a MemoryMax not below the
-# slice's cap included); a signal, OOM kill, timeout or lost connection ≠ 0, never 0.
+# slice's cap + a unit outside its own PID namespace included); a signal, OOM kill, timeout or lost
+# connection ≠ 0, never 0.
 # Remote command lines are composed here on purpose (quoted argv for the remote shell).
 # shellcheck disable=SC2029
 set -uo pipefail
@@ -94,6 +100,7 @@ ws=$1 origin=$2 bundle=$3 head=$4
 shift 4
 trap '\''rm -f "$bundle"'\'' EXIT
 fail() { printf "vflab-run: %s\n" "$1" >&2; exit 125; }
+[ "$$" = 2 ] || fail "the unit is not in its own PID namespace (its shell is PID $$, not 2)"
 if [ -e "$ws.origin" ] && [ "$(cat "$ws.origin")" != "$origin" ]; then
     fail "workspace $ws belongs to $(cat "$ws.origin"), not $origin"
 fi
@@ -116,6 +123,7 @@ remote="sudo systemd-run --uid=$remote_uid --gid=$remote_gid --slice=$slice \
     --wait --pipe --collect --expand-environment=no --property=Type=oneshot \
     --property=TimeoutStartSec=$timeout --property=TimeoutStopSec=30 \
     --property=MemoryMax=$memory --property=MemorySwapMax=0 --property=IgnoreSIGPIPE=no \
+    --property=PrivatePIDs=yes --property=LimitCORE=1 \
     $(quote "--setenv=HOME=$remote_home" \
         "--setenv=PATH=$remote_home/.elan/bin:$ws/.tools/bin:$remote_home/.local/node/bin:/usr/local/bin:/usr/bin:/bin") \
     -- $(quote /usr/bin/flock "$ws.lock" /bin/bash -c "$inner" vflab-run "$ws" "$root" "$bundle" \
