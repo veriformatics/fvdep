@@ -29,8 +29,7 @@ jobs:
       matrix:
         shard: [lean, checks]
     runs-on: ubuntu-26.04
-    # 90 until the lean-shard speedup (spec Tasks) brings each job to ≤ 40 min; then 60 again.
-    timeout-minutes: 90
+    timeout-minutes: 60
     env:
       SHARD: ${{ matrix.shard }}
     steps:

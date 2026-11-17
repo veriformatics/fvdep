@@ -12,6 +12,11 @@ set -uo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "$root" || exit 1
 
+# A keyed stage (gate.sh `suite`) in a copy reuses the tree's green verdict for an identical input
+# closure: control + restored = the tree's closure, so the planted run alone executes; a plant
+# outside the stage's key would reuse a green there too, which fails the probe.
+export FVDEP_REUSE=1
+
 # lean-style probes share the gate tree's lean-fmt build (tools/lean-style.sh FVDEP_LEAN_FMT).
 (cd tools/lean-fmt && lake build «lean-fmt» >/dev/null 2>&1) || {
     printf 'gate-probe: lean-fmt does not build\n' >&2
@@ -24,14 +29,18 @@ export FVDEP_LEAN_FMT="$root/tools/lean-fmt/.lake/packages/lean-fmt/.lake/build/
 scratch="$(mktemp -d -p "$root/.gate" probe.XXXXXX 2>/dev/null || { mkdir -p "$root/.gate" && mktemp -d -p "$root/.gate" probe.XXXXXX; })"
 export TMPDIR="$scratch"
 
-# A git-tracked scratch copy of the worktree (the checks read `git ls-files`); pinned tools come
-# along (binaries copied: probes corrupt them; downloads hardlinked: only ever replaced whole) so
-# tool stages run offline, and both packages' Lake caches so Lean plants rebuild incrementally.
+# A git-tracked scratch copy of the worktree (the checks read `git ls-files`: `add -f` keeps the
+# tracked files an ignore pattern matches, e.g. fixtures under a `.lake/`, so every closure key in a
+# copy = the tree's); pinned tools come along (binaries copied: probes corrupt them; downloads
+# hardlinked: only ever replaced whole) so tool stages run offline, and the Lake build caches so
+# Lean plants rebuild incrementally — minus each `.lake/config` (Lake's elaborated lakefile: it
+# bakes `__dir__`, so a copy would link the tree's files), which Lake re-elaborates in the copy —
+# + the keyed stages' green marks (FVDEP_REUSE above).
 copy() {
     local dir d
     dir="$(mktemp -d)"
     git ls-files -co --exclude-standard -z | tar --null -T - -cf - | tar -C "$dir" -xf -
-    git -C "$dir" init -q && git -C "$dir" add -A &&
+    git -C "$dir" init -q && git -C "$dir" add -A -f &&
         git -C "$dir" -c user.name=probe -c user.email=probe@invalid commit -q -m probe
     if [[ -d "$root/.tools" ]]; then
         mkdir -p "$dir/.tools"
@@ -39,63 +48,90 @@ copy() {
         [[ -d "$root/.tools/cache" ]] && cp -al "$root/.tools/cache" "$dir/.tools/"
     fi
     for d in .lake tool/.lake; do
-        [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
+        [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d" && rm -rf "$dir/$d/config"
     done
     # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
     # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
     if [[ "${with_suites:-0}" == 1 ]]; then
         for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake \
             tests/library/conformance/.lake tests/sha256/.build tests/sys/.lake tests/sys/.build; do
-            [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d"
+            [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d" &&
+                { [[ "$d" != *.lake ]] || rm -rf "$dir/$d/config"; }
         done
     fi
-    # The suites' green marks (keyed on their inputs): the fast gate in a copy reuses them.
-    for d in ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite \
-        acceptance index; do
-        if [[ -f "$root/.gate/$d.green" ]]; then
-            mkdir -p "$dir/.gate" && cp "$root/.gate/$d.green" "$dir/.gate/"
-        fi
-    done
+    if compgen -G "$root/.gate/*.green" >/dev/null; then
+        mkdir -p "$dir/.gate" && cp "$root"/.gate/*.green "$dir/.gate/"
+    fi
     printf '%s' "$dir"
 }
 
 # probe NAME PLANT EXPECT CHECK… — CHECK passes on a fresh copy, fails after PLANT with EXPECT in
-# its output, passes again after the copy is restored. Probes run in the background, at most
-# $jobs at a time (each owns its copy); results print in declaration order once all finish.
+# its output, passes again after the copy is restored. `probe` queues; `launch` (after the last
+# declaration) runs the queue in the background, at most $jobs at a time (each owns its copy),
+# `first` before the rest: the stage lasts at least its longest probe, so a long one started late
+# sets the tail (the index probes spread out: they share one lock). Results print in declaration
+# order once all finish.
 jobs=4
 results="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 n=0
 run_probe() {
-    local name="$1" plant="$2" expect="$3" dir pristine control planted restored
+    local name="$1" plant="$2" expect="$3" dir pristine control planted restored t took
     shift 3
+    # Wall-clock per phase (whole seconds; this background subshell's own SECONDS).
+    SECONDS=0
+    t=()
     dir="$(copy)"
     pristine="$(mktemp -d)"
     cp -a "$dir/." "$pristine/"
+    t+=("$SECONDS")
     (cd -- "$dir" && "$@") >"$pristine.control" 2>&1
     control=$?
+    t+=("$SECONDS")
     (cd -- "$dir" && "$plant") >/dev/null 2>&1
     (cd -- "$dir" && "$@") >"$pristine.planted" 2>&1
     planted=$?
+    t+=("$SECONDS")
     rsync -a --delete "$pristine/" "$dir/"
     (cd -- "$dir" && "$@") >"$pristine.restored" 2>&1
     restored=$?
+    took="${SECONDS}s (copy ${t[0]}, control $((t[1] - t[0])), planted $((t[2] - t[1])), restored $((SECONDS - t[2])))"
     if [[ $control -eq 0 && $planted -ne 0 && $restored -eq 0 ]] &&
         grep -q -F -- "$expect" "$pristine.planted"; then
-        printf 'PROBE %s: fired (control 0, planted %d naming "%s", restored 0)\n' \
-            "$name" "$planted" "$expect"
+        printf 'PROBE %s: fired (control 0, planted %d naming "%s", restored 0) %s\n' \
+            "$name" "$planted" "$expect" "$took"
     else
-        printf 'PROBE %s: FAILED (control %d, planted %d, restored %d; want 0, ≠0 naming "%s", 0)\n' \
-            "$name" "$control" "$planted" "$restored" "$expect"
+        printf 'PROBE %s: FAILED (control %d, planted %d, restored %d; want 0, ≠0 naming "%s", 0) %s\n' \
+            "$name" "$control" "$planted" "$restored" "$expect" "$took"
         sed 's/^/    control: /' "$pristine.control" | tail -n 10
         sed 's/^/    planted: /' "$pristine.planted" | tail -n 20
     fi
     rm -rf -- "$dir" "$pristine" "$pristine".{control,planted,restored}
 }
+queued=()
+suites_of=()
 probe() {
-    while [[ "$(jobs -rp | wc -l)" -ge $jobs ]]; do wait -n; done
     n=$((n + 1))
-    run_probe "$@" >"$results/$(printf '%03d' "$n")" 2>&1 &
+    printf -v 'queued[n]' '%q ' "$@"
+    suites_of[n]="${with_suites:-0}"
+}
+first=(secrets coverage vendor-upstream index-replay fast-gate codec-suite index-drift library-conformance
+    index-registry)
+launch() {
+    local i name order=() seen=" "
+    for name in "${first[@]}"; do
+        for i in "${!queued[@]}"; do
+            [[ "${queued[i]%% *}" == "$name" ]] && order+=("$i") && seen+="$i "
+        done
+    done
+    for i in "${!queued[@]}"; do
+        [[ "$seen" == *" $i "* ]] || order+=("$i")
+    done
+    for i in "${order[@]}"; do
+        while [[ "$(jobs -rp | wc -l)" -ge $jobs ]]; do wait -n; done
+        with_suites="${suites_of[i]}" eval "run_probe ${queued[i]}" \
+            >"$results/$(printf '%03d' "$i")" 2>&1 &
+    done
 }
 
 plant_marker() { touch .planted; }
@@ -332,8 +368,9 @@ probe imports-proofs plant_proofs_outside "FvdepProofs.lean:1: import Mathlib" \
 # lean-style: a tab in a Lean source; a misformatted declaration lean-fmt would rewrite.
 plant_tab() { printf '\t-- tab\n' >>Fvdep/Version.lean; }
 plant_misformat() { printf '\ndef probeFormat(x:Nat):Nat:=x+1\n' >>Fvdep/Version.lean; }
-probe lean-style plant_tab ": tab" bash tools/lean-style.sh
-probe lean-fmt plant_misformat "Version.lean" bash tools/lean-style.sh
+lean_style_stage() { bash -c 'source tools/gate.sh; lean_style'; }
+probe lean-style plant_tab ": tab" lean_style_stage
+probe lean-fmt plant_misformat "Version.lean" lean_style_stage
 
 # fanout: a missing shard; a disabled gate step; a masked one; SHARD unbound; fail-fast on.
 fanout_stage() { bash -c 'source tools/gate.sh; fanout'; }
@@ -582,7 +619,7 @@ probe fast-gate plant_tool "FAILED: deps" bash tools/fast-gate.sh
 
 # index (C7): the committed index.json one byte off the library → drift; a theorem forged in
 # FvdepProofs (kernel check skipped at elaboration) → the kernel replay rejects its module; a
-# registry list in a form fvdep cannot read → that refusal. Every run builds the library afresh
+# registry list in a form fvdep cannot read → that refusal. A planted run builds the library afresh
 # (≈ 3 GB peak on the launch library) ⇒ one at a time across these probes (CI runners: 16 GB).
 index_stage() { flock "$scratch/index.lock" bash -c 'source tools/gate.sh; index'; }
 plant_index_drift() { printf ' ' >>index.json; }
@@ -663,6 +700,7 @@ probe index-history-notice plant_history_notice "the notices do not extend this 
 probe index-history-diverge plant_history_diverge "the parents' notices diverge" history_stage
 probe index-history-shallow plant_history_shallow "shallow repository" history_stage
 
+launch
 wait
 cat "$results"/*
 missed="$(cat "$results"/* | grep -c '^PROBE .*: FAILED')"

@@ -171,8 +171,14 @@ lean_build() {
     return $rc
 }
 
-# Layout rules + the pinned lean-fmt (format drift + lint findings) over both packages.
-lean_style() { bash tools/lean-style.sh; }
+# Layout rules + the pinned lean-fmt (format drift + lint findings) over both packages; verdict
+# reused like a suite's in the fast gate (input closure = every Lean source, the formatter's
+# configs + pin, the script).
+lean_style() {
+    suite lean-style \
+        "$(closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt)" "" \
+        bash tools/lean-style.sh
+}
 
 lean_test() { (cd tool && lake test); }
 
@@ -181,8 +187,12 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 
 # Coverage ledger (docs/contracts/U2-core.md L1–L8): every claim's theorem type = its statement,
 # axioms ⊆ std, root shape + call paths, compiled = checked, kernel replay (leanchecker), and
-# docs/verification.md = the rendering.
-coverage() { (cd tool && lake exe fvdep-ledger --check ../docs/verification.md); }
+# docs/verification.md = the rendering. Verdict reused like a suite's in the fast gate (input
+# closure = the tool package, the library, the doc + `.agent/spec.md`: `noCaller` names its rows).
+coverage() {
+    suite coverage "$(shipped_closure tool docs/verification.md .agent/spec.md)" "" \
+        bash -c 'cd tool && lake exe fvdep-ledger --check ../docs/verification.md'
+}
 
 # SHA-256 over the tracked + untracked-unignored files under PATH…, both Lake configs + toolchain
 # pins: a suite's input closure (over-inclusive: a missed input would reuse a stale green).
@@ -335,13 +345,17 @@ python() {
     return $rc
 }
 
-# History + every tracked or untracked-unignored file; live validation stays off (no network).
+# History + every tracked or untracked-unignored file; live validation stays off (no network). The
+# files = one directory scan of a staged copy: betterleaks pays ≈ 20 ms per path argument (2,168
+# paths: 47.7 s; the copy: 255 ms, the same 6,955,185 bytes).
 secrets() {
-    local rc=0 leaks
+    local rc=0 leaks files
     leaks="$(pinned betterleaks)" || return 1
     "$leaks" git --no-banner --no-color --redact --verbose . || rc=1
-    git ls-files -co --exclude-standard -z |
-        xargs -0 -r "$leaks" dir --no-banner --no-color --redact --verbose || rc=1
+    files="$(mktemp -d)" || return 1
+    { git ls-files -co --exclude-standard -z | tar --null -T - -cf - | tar -C "$files" -xf -; } &&
+        (cd -- "$files" && "$leaks" dir --no-banner --no-color --redact --verbose .) || rc=1
+    rm -rf -- "$files"
     return $rc
 }
 

@@ -64,6 +64,7 @@ Identity = numeric UID + primary GID + absolute HOME from the SSH login. Probe f
 ## Probes (`tools/gate-probe.sh`, stage `probes`)
 
 - P1 Each purpose-built check passes on a clean scratch copy, fails on its planted input with its own diagnostic, passes again once restored byte for byte: registry, stage exit + several failures, shard usage, missing + tampered tools, `imports` (both policies), `preview`, `lean-style` (style rule + lean-fmt misformat), `fanout` breaches, `deps`, `renovate` breaches, `meta` invariants, `spec`, `cli`, `vulns` list breaches + a planted vulnerable lockfile, `tree-clean`, the three compiler-option probes (K1), `ci_missing`, a failing fast-gate background stage, the ledger (rows + unwritable).
+- P1 reuse: a check with an input closure key (`tools/gate.sh` `suite`) passes on the clean + restored copies by its green verdict for their closure (= the tree's, byte for byte); its planted run executes (a plant outside its key would reuse that green ⇒ the probe fails).
 
 ## Boundary + records
 
