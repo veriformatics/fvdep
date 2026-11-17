@@ -61,9 +61,9 @@ def takeFiles :
     else
       none
 
-/-- H2: the tag + files of exactly H2's layout (valid UTF-8, paths strictly ascending, every byte
-consumed), else `none`. -/
-def unframe (b : ByteArray) : Option (String × List (String × ByteArray)) := do
+/-- H2 over the frame's byte list: the reference the proofs read; the shipped `unframe` = the same
+steps over offsets, proven equal (`FvdepAudit.Hash.Proof.unframe_eq_list`). -/
+def unframeList (b : ByteArray) : Option (String × List (String × ByteArray)) := do
   let (tlen, bs) ← takeU64 b.data.toList
   let (tbytes, bs) ← takeBytes bs tlen
   let tag ← text tbytes
@@ -71,13 +71,49 @@ def unframe (b : ByteArray) : Option (String × List (String × ByteArray)) := d
   let files ← takeFiles count none bs []
   return (tag, files)
 
-/-- H3: digest domains. -/
+/-- `takeU64` at offset `i` of `b`: the number + the offset after it. -/
+def readU64At (b : ByteArray) (i : Nat) : Option (Nat × Nat) :=
+  if i + 8 ≤ b.size then some (be8Value (b.extract i (i + 8)).data.toList, i + 8) else none
+
+/-- `takeBytes` at offset `i` of `b`: the `n` bytes + the offset after them (`b.size - i`
+truncates, as `takeBytes` past the end: `n = 0` succeeds there). -/
+def takeBytesAt (b : ByteArray) (i n : Nat) : Option (ByteArray × Nat) :=
+  if n ≤ b.size - i then some (b.extract i (i + n), i + n) else none
+
+/-- `takeFiles` at offset `i` of `b`. -/
+def takeFilesAt (b : ByteArray) :
+    Nat → Option String → Nat → List (String × ByteArray) → Option (List (String × ByteArray))
+  | 0, _, i, acc => if b.size ≤ i then some acc.reverse else none
+  | k + 1, prev, i, acc => do
+    let (plen, i) ← readU64At b i
+    let (pbytes, i) ← takeBytesAt b i plen
+    let path ← String.fromUTF8? pbytes
+    if prev.all (· < path) then
+      let (blen, i) ← readU64At b i
+      let (bytes, i) ← takeBytesAt b i blen
+      takeFilesAt b k (some path) i ((path, bytes) :: acc)
+    else
+      none
+
+/-- H2: the tag + files of exactly H2's layout (valid UTF-8, paths strictly ascending, every byte
+consumed), else `none`. Reads offsets into `b`: memory = the frame + the decoded files, where the
+byte list `unframeList` walks costs a list cell per byte (contract U5 L: a 17 MB export). -/
+def unframe (b : ByteArray) : Option (String × List (String × ByteArray)) := do
+  let (tlen, i) ← readU64At b 0
+  let (tbytes, i) ← takeBytesAt b i tlen
+  let tag ← String.fromUTF8? tbytes
+  let (count, i) ← readU64At b i
+  let files ← takeFilesAt b count none i []
+  return (tag, files)
+
+/-- H3: frame domains: the digests' + the step helper's output frame (contract U5 R8). -/
 inductive Tag where
   | specClosure
   | implSources
   | proofSources
   | adapter
   | entry
+  | step
   deriving Repr, DecidableEq
 
 /-- H3: the domain tag a digest of this kind frames. -/
@@ -87,6 +123,7 @@ def Tag.spelling : Tag → String
   | .proofSources => "fvdep/proof-sources/1"
   | .adapter => "fvdep/adapter/1"
   | .entry => "fvdep/entry/1"
+  | .step => "fvdep/step/1"
 
 /-- H3: `fvdep/adapter/1`'s `""` payload: `u64be(count) ++` per argument `u64be(|arg|) ++ arg`, argv
 order, repeats kept. -/

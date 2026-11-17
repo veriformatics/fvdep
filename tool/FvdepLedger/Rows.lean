@@ -3,7 +3,6 @@ import FvdepAudit.Build.Proof.Key
 import FvdepAudit.Build.Proof.Plan
 import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
-import FvdepAudit.Hash.Proof.Frame
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Assemble.Proof.Claims
 import FvdepAudit.Index.Command.Proof.Claims
@@ -11,7 +10,6 @@ import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
-import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
@@ -20,6 +18,7 @@ import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
 import FvdepAudit.Sandbox.Proof
+import FvdepAudit.Step.Proof
 import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
@@ -1402,6 +1401,30 @@ def stemInjective : Prop :=
 
 end FvdepLedger.Rows.PhaseClaims
 
+namespace FvdepLedger.Rows.StepClaims
+
+open FvdepCore.Step FvdepCore.Phase FvdepCore.Hash FvdepCore.Json FvdepAudit.Step.Spec
+  FvdepAudit.Hash.Spec
+
+/-- R8: the supervisor reads back exactly the status + the files the helper framed (files in path
+order), when the status fits J's profile, the frame lies in H2's domain + every file path is
+safe. -/
+def frameRead : Prop :=
+  ∀ (s : Status) (files : List (String × ByteArray)) (_hs : StatusFits s)
+    (_hdom : FrameDomain Tag.step.spelling (("", print s.toJson) :: files))
+    (_hsafe : ∀ f ∈ files, safePath f.1 = true), read (frameOf s files) = some ⟨s, byPath files⟩
+
+/-- R8: the supervisor accepts only the helper's frames: whatever `read` accepts lies in
+`frameRead`'s domain + is `frameOf` of the status + files it returns (a status entry in another
+JSON spelling of the same value is refused); with `frameRead`, `read` accepts exactly them. -/
+def frameExact : Prop :=
+  ∀ (b : ByteArray) (o : Output) (_h : read b = some o),
+    StatusFits o.status ∧
+      FrameDomain Tag.step.spelling (("", print o.status.toJson) :: o.files) ∧
+      (∀ f ∈ o.files, safePath f.1 = true) ∧ frameOf o.status o.files = b
+
+end FvdepLedger.Rows.StepClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -2649,6 +2672,28 @@ def phaseStemRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5 R8: the supervisor's reading of the step helper's frame (the encoder `frameOf` gains its
+row with the helper's root, U5-B). -/
+def stepFrameRow : Row :=
+  { component := `FvdepCore.Step
+    contract := "U5 R8"
+    claim :=
+      "The supervisor reads back exactly what the step helper framed: the status record + the " ++
+        "files in path order, when the status fits J's profile, the frame lies in H2's domain " ++
+        "+ every file path is safe (nonempty, `/`-separated components, each nonempty, never " ++
+        "`.` or `..`, no NUL); whatever it accepts lies in that domain + is the helper's " ++
+        "frame of the status + files it returns (the status entry = that status's canonical " ++
+        "JSON: another spelling of the same value is refused), so it accepts exactly the " ++
+        "helper's frames."
+    claims :=
+      [(``StepClaims.frameRead, ``FvdepAudit.Step.Proof.frame_read),
+        (``StepClaims.frameExact, ``FvdepAudit.Step.Proof.frame_exact)]
+    subject := ``FvdepCore.Step.read
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2664,7 +2709,7 @@ def ledger : Ledger :=
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
-        phaseStemRow]
+        phaseStemRow, stepFrameRow]
     residue := residue }
 
 end FvdepLedger.Rows

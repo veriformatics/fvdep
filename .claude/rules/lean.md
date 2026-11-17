@@ -28,3 +28,5 @@ paths:
 - `rw [f]` with a wildcard arm's equation leaves side goals (`… → False`) → `rw [f.eq_def]` + `split`/`dsimp only`, or `simp [f]`; mutual WF soundness = `f.mutual_induct` with `(motive1 := …) (motive2 := …)` + one `?_` per generated case.
 - The kernel from compiled code = `Lean.Kernel.check` / `Kernel.isDefEq` (synchronous, an `Except`): 4.35's `addDecl` checks asynchronously — a kernel rejection is logged, never thrown, so a `try` around it reports success.
 - A nested `try (try … catch …) finally` misparses (`Invalid try`) ⇒ `tryFinally (inner) (finalizer)`.
+- A name an `open` brings in can collide with a root export (`read` vs `MonadReader.read`): `simp [read]` then fails (`Ambiguous term`, `Invalid simp theorem`) ⇒ qualify it (`FvdepCore.Step.read`).
+- `split at h` on a `match` over a pair's component leaves the case equation unreduced (`(a, b).snd = x :: xs`): `rw [he]` finds no occurrence ⇒ `simp only at he`, then `subst he`.

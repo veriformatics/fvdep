@@ -177,14 +177,14 @@ theorem byPath_ascending (fs : List (String × ByteArray)) (hd : (fs.map (·.1))
   rw [List.pairwise_map] at hn ⊢
   exact (hs.and hn).imp fun h => lt_of_le_ne (of_decide_eq_true h.1) h.2
 
-/-- H4 `FrameDecode`. -/
-theorem frame_decode (t : String) (fs : List (String × ByteArray)) (h : FrameDomain t fs) :
-    unframe (frame t fs) = some (t, byPath fs) := by
+/-- H4 `FrameDecode` over the reference decoder. -/
+theorem frame_decode_list (t : String) (fs : List (String × ByteArray)) (h : FrameDomain t fs) :
+    unframeList (frame t fs) = some (t, byPath fs) := by
   obtain ⟨hd, ht, hn, hf⟩ := h
   have hb : Bounded (byPath fs) := fun g hg => hf g ((byPath_perm fs).mem_iff.mp hg)
   have hfiles := takeFiles_entries (byPath fs) none [] (byPath_ascending fs hd) hb
   rw [byPath_length] at hfiles
-  simp only [unframe, frame_layout, frameSpec, List.append_assoc, takeU64_be8 _ _ ht,
+  simp only [unframeList, frame_layout, frameSpec, List.append_assoc, takeU64_be8 _ _ ht,
     Option.bind_eq_bind, Option.bind_some, takeBytes_append _ _ _ rfl, text_utf8,
     takeU64_be8 _ _ hn, hfiles]
   simp
@@ -242,11 +242,11 @@ theorem takeFiles_some (k : Nat) (prev : Option String) (bs : List UInt8)
         · exact hb g hg
     · simp at h
 
-/-- H4 `UnframeExact`. -/
-theorem unframe_exact (b : ByteArray) (t : String) (fs : List (String × ByteArray))
-    (h : unframe b = some (t, fs)) :
+/-- H4 `UnframeExact` over the reference decoder. -/
+theorem unframe_exact_list (b : ByteArray) (t : String) (fs : List (String × ByteArray))
+    (h : unframeList b = some (t, fs)) :
     FrameDomain t fs ∧ (fs.map (·.1)).Pairwise (· < ·) ∧ frame t fs = b := by
-  simp only [unframe, Option.bind_eq_bind, Option.bind_eq_some_iff] at h
+  simp only [unframeList, Option.bind_eq_bind, Option.bind_eq_some_iff] at h
   obtain ⟨⟨tlen, bs1⟩, h1, h⟩ := h
   obtain ⟨⟨tb, bs2⟩, h2, h⟩ := h
   obtain ⟨tag, h3, h⟩ := h
@@ -277,6 +277,88 @@ theorem unframe_exact (b : ByteArray) (t : String) (fs : List (String × ByteArr
   apply Array.toList_inj.mp
   rw [frame_layout, hb1, hbs]
   simp only [frameSpec, hsorted, htag, htbl, hlen, List.append_assoc]
+
+/-! ## The shipped `unframe` (offsets into the frame) = `unframeList` (its byte list's suffixes) -/
+
+theorem takeU64_eq (bs : List UInt8) :
+    takeU64 bs = if 8 ≤ bs.length then some (be8Value (bs.take 8), bs.drop 8) else none := by
+  match bs with
+  | _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ :: _ => simp [takeU64]
+  | [] | [_] | [_, _] | [_, _, _] | [_, _, _, _] | [_, _, _, _, _] | [_, _, _, _, _, _] |
+    [_, _, _, _, _, _, _] => simp [takeU64]
+
+theorem takeU64_drop (b : ByteArray) (i : Nat) :
+    takeU64 (b.data.toList.drop i) =
+      (readU64At b i).map fun p => (p.1, b.data.toList.drop p.2) := by
+  rw [takeU64_eq]
+  simp only [readU64At, List.length_drop, ← size_eq_length]
+  by_cases h : i + 8 ≤ b.size
+  · have h8 : 8 ≤ b.size - i := by omega
+    simp [h, h8, List.drop_drop]
+  · have h8 : ¬8 ≤ b.size - i := by omega
+    simp [h, h8]
+
+theorem takeBytes_drop (b : ByteArray) (i n : Nat) :
+    takeBytes (b.data.toList.drop i) n =
+      (takeBytesAt b i n).map fun p => (p.1.data.toList, b.data.toList.drop p.2) := by
+  simp only [takeBytes, takeBytesAt, List.splitAt_eq, List.length_take, List.length_drop,
+    ← size_eq_length]
+  by_cases h : n ≤ b.size - i
+  · have hn : min n (b.size - i) = n := by omega
+    simp [h, hn, List.drop_drop]
+  · have hn : ¬min n (b.size - i) = n := by omega
+    simp [h, hn]
+
+theorem text_data (x : ByteArray) : text x.data.toList = String.fromUTF8? x := by
+  simp only [text, bytes_eta]
+
+theorem takeFilesAt_eq (b : ByteArray) (k : Nat) (prev : Option String) (i : Nat)
+    (acc : List (String × ByteArray)) :
+    takeFilesAt b k prev i acc = takeFiles k prev (b.data.toList.drop i) acc := by
+  induction k generalizing prev i acc with
+  | zero => simp [takeFilesAt, takeFiles, List.drop_eq_nil_iff]
+  | succ k ih =>
+    rcases h1 : readU64At b i with _ | ⟨plen, i1⟩
+    · simp [takeFilesAt, takeFiles, takeU64_drop, h1]
+    rcases h2 : takeBytesAt b i1 plen with _ | ⟨pb, i2⟩
+    · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2]
+    rcases h3 : String.fromUTF8? pb with _ | path
+    · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2, text_data, h3]
+    by_cases hp : prev.all (· < path)
+    · rcases h4 : readU64At b i2 with _ | ⟨blen, i3⟩
+      · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2, text_data, h3, h4]
+      rcases h5 : takeBytesAt b i3 blen with _ | ⟨bytes, i4⟩
+      · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2, text_data, h3, h4, h5]
+      · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2, text_data, h3, hp, h4,
+          h5, ih]
+    · simp [takeFilesAt, takeFiles, takeU64_drop, h1, takeBytes_drop, h2, text_data, h3, hp]
+
+/-- The shipped decoder = the reference on every input. -/
+theorem unframe_eq_list (b : ByteArray) : unframe b = unframeList b := by
+  have h0 := takeU64_drop b 0
+  simp only [List.drop_zero] at h0
+  rcases h1 : readU64At b 0 with _ | ⟨tlen, i1⟩
+  · simp [unframe, unframeList, h0, h1]
+  rcases h2 : takeBytesAt b i1 tlen with _ | ⟨tb, i2⟩
+  · simp [unframe, unframeList, h0, h1, takeBytes_drop, h2]
+  rcases h3 : String.fromUTF8? tb with _ | tag
+  · simp [unframe, unframeList, h0, h1, takeBytes_drop, h2, text_data, h3]
+  rcases h4 : readU64At b i2 with _ | ⟨count, i3⟩
+  · simp [unframe, unframeList, h0, h1, takeBytes_drop, h2, text_data, h3, takeU64_drop, h4]
+  · simp [unframe, unframeList, h0, h1, takeBytes_drop, h2, text_data, h3, takeU64_drop, h4,
+      takeFilesAt_eq]
+
+/-- H4 `FrameDecode`. -/
+theorem frame_decode (t : String) (fs : List (String × ByteArray)) (h : FrameDomain t fs) :
+    unframe (frame t fs) = some (t, byPath fs) := by
+  rw [unframe_eq_list]
+  exact frame_decode_list t fs h
+
+/-- H4 `UnframeExact`. -/
+theorem unframe_exact (b : ByteArray) (t : String) (fs : List (String × ByteArray))
+    (h : unframe b = some (t, fs)) :
+    FrameDomain t fs ∧ (fs.map (·.1)).Pairwise (· < ·) ∧ frame t fs = b :=
+  unframe_exact_list b t fs (unframe_eq_list b ▸ h)
 
 /-- H4 `FrameInjective`. -/
 theorem frame_injective (t : String) (fs : List (String × ByteArray)) (t' : String)

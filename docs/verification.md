@@ -2391,6 +2391,38 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Step`
+
+- Contract: U5 R8
+- Claim: The supervisor reads back exactly what the step helper framed: the status record + the files in path order, when the status fits J's profile, the frame lies in H2's domain + every file path is safe (nonempty, `/`-separated components, each nonempty, never `.` or `..`, no NUL); whatever it accepts lies in that domain + is the helper's frame of the status + files it returns (the status entry = that status's canonical JSON: another spelling of the same value is refused), so it accepts exactly the helper's frames.
+- Subject: `FvdepCore.Step.read`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.StepClaims.frameRead` (hash 0xdac9fdb3), proved by `FvdepAudit.Step.Proof.frame_read`:
+
+  ```lean
+  ∀ (s : FvdepCore.Step.Status) (files : List (String × ByteArray)),
+    FvdepAudit.Step.Spec.StatusFits s →
+      FvdepAudit.Hash.Spec.FrameDomain FvdepCore.Hash.Tag.step.spelling
+          (("", FvdepCore.Json.print s.toJson) :: files) →
+        (∀ (f : String × ByteArray), f ∈ files → FvdepCore.Step.safePath f.fst = true) →
+          FvdepCore.Step.read (FvdepCore.Step.frameOf s files) =
+            some { status := s, files := FvdepAudit.Hash.Spec.byPath files }
+  ```
+- Statement `FvdepLedger.Rows.StepClaims.frameExact` (hash 0x6589d47d), proved by `FvdepAudit.Step.Proof.frame_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (o : FvdepCore.Step.Output),
+    FvdepCore.Step.read b = some o →
+      FvdepAudit.Step.Spec.StatusFits o.status ∧
+        FvdepAudit.Hash.Spec.FrameDomain FvdepCore.Hash.Tag.step.spelling
+            (("", FvdepCore.Json.print o.status.toJson) :: o.files) ∧
+          (∀ (f : String × ByteArray), f ∈ o.files → FvdepCore.Step.safePath f.fst = true) ∧
+            FvdepCore.Step.frameOf o.status o.files = b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
