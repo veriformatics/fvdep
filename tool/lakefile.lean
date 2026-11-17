@@ -60,6 +60,8 @@ input_file fvdep_sha256.c where path := cDir / "fvdep_sha256.c"
 
 input_file fvdep_sys.c where path := cDir / "fvdep_sys.c"
 
+input_file fvdep_spawn.c where path := cDir / "fvdep_spawn.c"
+
 /-- HACL's upstream build flags; fvdep's shim adds warnings as errors (HACL's generated C keeps its
 own warning policy). -/
 target hacl_sha2.o pkg : FilePath := do
@@ -80,10 +82,16 @@ target fvdep_sys.o pkg : FilePath := do
   buildO (pkg.buildDir / "c" / "fvdep_sys.o") (← fvdep_sys.c.fetch) (← cWeakArgs pkg)
       #["-std=gnu11", "-O3", "-fPIC", "-Wall", "-Wextra", "-Werror"] (← getLeanCc) (cTrace pkg)
 
+/-- U5 R2 + R8's spawn shim: the mechanism alone (pipes, posix_spawn, poll, kill, waitpid, the
+helper's prctl, fcntl, rlimit, statvfs + open). -/
+target fvdep_spawn.o pkg : FilePath := do
+  buildO (pkg.buildDir / "c" / "fvdep_spawn.o") (← fvdep_spawn.c.fetch) (← cWeakArgs pkg)
+      #["-std=gnu11", "-O3", "-fPIC", "-Wall", "-Wextra", "-Werror"] (← getLeanCc) (cTrace pkg)
+
 target libfvdepnative pkg : FilePath := do
   buildStaticLib (pkg.staticLibDir / nameToStaticLib "fvdepnative")
       #[← hacl_sha2.o.fetch, ← fvdep_sha256_core.o.fetch, ← fvdep_sha256.o.fetch,
-        ← fvdep_sys.o.fetch]
+        ← fvdep_sys.o.fetch, ← fvdep_spawn.o.fetch]
 
 /-! ## Lean targets -/
 
@@ -107,6 +115,11 @@ real syscalls through it; never shipped (`Main` imports none of it; gate stage `
 lean_lib FvdepDev where roots := #[`FvdepDev, `DevMain]
 
 lean_exe «fvdep-dev» where root := `DevMain
+
+/-- The step helper (contract U5 R8): pid 2 of every sandbox step, located beside the executable
+that runs the step; `StepMain.main` = `FvdepIO.Step.main`. Every script that runs a step builds it
+by name (`extraDepTargets` on the runner's executable left a stale helper in place). -/
+lean_exe «fvdep-step» where root := `StepMain
 
 /-- Fuzz targets (contract U3 "Fuzz"; `tools/fuzz.sh`): one `@[export]` entry per module, its IR C
 + import closure compiled into the engine + replay builds; never shipped (gate stage `imports`). -/

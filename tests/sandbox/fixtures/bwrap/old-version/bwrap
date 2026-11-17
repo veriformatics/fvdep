@@ -1,0 +1,7 @@
+#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'bubblewrap 0.7.0\n'
+  exit 0
+fi
+printf 'u5-old-bwrap-must-not-run\n' >&2
+exit 97

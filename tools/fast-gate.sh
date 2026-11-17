@@ -14,14 +14,22 @@ registry_ok || exit 2
 start="$(stamp)"
 ledger_begin fast
 
-sequential=(lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite
-    library-suite index-suite fuzz-replay sys-suite acceptance index index-history)
+# Checks that build + run no fvdep code run in parallel; every other selected stage runs after
+# them, one at a time in FAST_STAGES order, `lean-build` first: a stage running its own
+# `lake build` beside `lean-build` races its relink (its driver then finds no binary) ⇒ a stage
+# runs in parallel only when listed here.
+independent=" imports preview spec shell python fanout vendor deps renovate meta "
 # A suite's green verdict stands while its inputs are unchanged (gate.sh `suite`).
 export FVDEP_REUSE=1
 parallel=()
+sequential=()
 for name in $FAST_STAGES; do
-    [[ " ${sequential[*]} " == *" $name "* ]] || parallel+=("$name")
+    if [[ "$independent" == *" $name "* ]]; then parallel+=("$name"); else sequential+=("$name"); fi
 done
+[[ "${sequential[0]:-}" == lean-build ]] || {
+    printf 'fast-gate: lean-build must lead the sequential stages (FAST_STAGES order)\n' >&2
+    exit 2
+}
 
 log="$(mktemp -d)"
 trap 'rm -rf "$log"' EXIT

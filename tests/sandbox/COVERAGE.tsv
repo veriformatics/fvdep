@@ -1,0 +1,120 @@
+id	part	clause	expected
+R.exit.0	D2	D2/R5/R6/R8	exit 0; outcome exited 0; complete frame
+R.exit.1	D2	D2/R5/R6/R8	exit 0; outcome exited 1; complete frame
+R.exit.7	D2	D2/R5/R6/R8	exit 0; outcome exited 7; complete frame
+R.exit.127	D2	D2/R5/R6/R8	exit 0; outcome exited 127; complete frame
+R.exit.255	D2	D2/R5/R6/R8	exit 0; outcome exited 255; complete frame
+R.exit.property	D2	D2/R6	every code 0..255 preserved; driver exit 0
+R.signal	D2	R8/D2	child SIGTERM -> outcome exited 143, exit 0
+R.not-started	D2	R8/D2	missing child -> outcome exited 127, exit 0
+R.timeout	D2	D2/R4/R6	deadline -> timed_out; report exit 0
+R.pump.stdout.0	D2	R3/D2	stdout consumes 0; keeps first/last within 64; exact dropped count
+R.pump.stdout.1	D2	R3/D2	stdout consumes 1; keeps first/last within 64; exact dropped count
+R.pump.stdout.63	D2	R3/D2	stdout consumes 63; keeps first/last within 64; exact dropped count
+R.pump.stdout.64	D2	R3/D2	stdout consumes 64; keeps first/last within 64; exact dropped count
+R.pump.stdout.65	D2	R3/D2	stdout consumes 65; keeps first/last within 64; exact dropped count
+R.pump.stdout.128	D2	R3/D2	stdout consumes 128; keeps first/last within 64; exact dropped count
+R.pump.stdout.4097	D2	R3/D2	stdout consumes 4097; keeps first/last within 64; exact dropped count
+R.pump.stderr.0	D2	R3/D2	stderr consumes 0; keeps first/last within 64; exact dropped count
+R.pump.stderr.1	D2	R3/D2	stderr consumes 1; keeps first/last within 64; exact dropped count
+R.pump.stderr.63	D2	R3/D2	stderr consumes 63; keeps first/last within 64; exact dropped count
+R.pump.stderr.64	D2	R3/D2	stderr consumes 64; keeps first/last within 64; exact dropped count
+R.pump.stderr.65	D2	R3/D2	stderr consumes 65; keeps first/last within 64; exact dropped count
+R.pump.stderr.128	D2	R3/D2	stderr consumes 128; keeps first/last within 64; exact dropped count
+R.pump.stderr.4097	D2	R3/D2	stderr consumes 4097; keeps first/last within 64; exact dropped count
+R.pump.concurrent	D2	R3/D2	both pipe-sized streams drained concurrently; exact caps/counts
+R.line-controls.stdout	D2	D2/interface-1	all C0/C1 except LF escaped; TAB/CR short forms; uppercase hex; no raw Cc
+R.line-controls.stderr	D2	D2/interface-1	all C0/C1 except LF escaped; TAB/CR short forms; uppercase hex; no raw Cc
+R.line-unicode	D2	D2/interface-1	non-Cc Unicode/backslash text unchanged; LF separates relayed lines
+R.files.empty	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.files.zero	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.files.nested	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.files.binary	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.files.unicode	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.files.controls	D2	R8/D2/U3-H1	complete frame; each file path, size and SHA-256 exact
+R.frame.overflow	D2	R3/R8/D2	small frame cap -> frame overflow; report exit 0
+R.frame.invalid	D2	R5/R8/D2	child kills its helper -> reported exited 137 with invalid frame, driver exit 0
+R.setup-failed	D2	T1/R6/D2/addendum	minimum bwrap 0.8.0 accepted; no status -> setup_failed using first stderr line
+R.preflight.old-version	D2	T1/D2/addendum	PATH bwrap 0.7.0 -> infra tool_missing, exit 2 before a step
+R.proxy.frame-junk	D2	R8/D2/addendum	PATH bwrap corrupts/closes frame descriptor -> frame invalid; no files; report exit 0
+R.proxy.frame-closed	D2	R8/D2/addendum	PATH bwrap corrupts/closes frame descriptor -> frame invalid; no files; report exit 0
+R.src	D2	D2	--src copied to /fvdep/src; exact contents relayed
+R.usage.missing-command	D2	D2/interface-1	supported-command control; malformed argv -> exit 2, no outcome
+R.usage.unknown-option	D2	D2/interface-1	supported-command control; malformed argv -> exit 2, no outcome
+R.usage.missing-value	D2	D2/interface-1	supported-command control; malformed argv -> exit 2, no outcome
+R.usage.bad-number	D2	D2/interface-1	supported-command control; malformed argv -> exit 2, no outcome
+R.usage.negative-number	D2	D2/interface-1	supported-command control; malformed argv -> exit 2, no outcome
+P.honest	D1	D1/P2/P3/P4/P6/addendum	two builds; source hashes; exact retained files + canonical ordered manifest; e2 on e1
+P.module-proof	D1	D1/P2/P6/addendum	module-header proof's 7-part family + exact retained layout/manifest
+P.proxy.frame-junk	D1	P5/D1/addendum	after cache warm-up, corrupt/closed phase frame -> infra io; no later phase
+P.proxy.frame-closed	D1	P5/D1/addendum	after cache warm-up, corrupt/closed phase frame -> infra io; no later phase
+P.compile-error.1	D1	D1/P5/B1	Lean error -> exit 1; project-relative first diagnostic; later phase absent
+P.compile-error.2	D1	D1/P5/B1	Lean error -> exit 1; project-relative first diagnostic; later phase absent
+P.missing-root.1	D1	P4/P5/D1	absent consumer root -> phase failed naming root, exit 1
+P.missing-root.2	D1	P4/P5/D1	absent consumer root -> phase failed naming root, exit 1
+P.first-diagnostic	D1	B1/D1	reason selects first error diagnostic, not later errors
+P.diagnostic-line-rule	D1	B1/D1/interface-1	reason retains first message line; controls escaped after path mapping
+P.missing-library-root	D1	P4/P5/D1	absent spec constant -> infra io, exit 2
+P.missing-abi-root	D1	P4/P5/D1	absent ABI root -> infra io, exit 2
+P.override-root.1	D1	D1/P4	--roots override requests a missing constant -> phase failed
+P.override-root.2	D1	D1/P4	--roots override requests a missing constant -> phase failed
+P.extra-spec-import	D1	P4/D1	export imports spec even when consumer modules import neither it nor ABI
+P.deadline.1	D1	P1/P5/D1	sleeping compile + small phase deadline -> infra io in requested phase, never failed
+P.deadline.2	D1	P1/P5/D1	sleeping compile + small phase deadline -> infra io in requested phase, never failed
+P.limit.frame	D1	T3/P4/P5/D1	--frame-bytes 64 -> infra io, never failed
+P.limit.export	D1	T3/P4/P5/D1	--export-bytes 64 -> infra io, never failed
+S.digest.base	D1	S2/D1/U3-H2/H3	impl/proof hashes equal independent frame+SHA-256 oracle
+S.digest.ordered	D1	S2/D1/U3-H2/H3	impl/proof hashes equal independent frame+SHA-256 oracle
+S.digest.reversed	D1	S2/D1/U3-H2/H3	impl/proof hashes equal independent frame+SHA-256 oracle
+S.digest.utf8	D1	S2/D1/U3-H2/H3	impl/proof hashes equal independent frame+SHA-256 oracle
+S.digest.unrelated	D1	S2/D1/U3-H2/H3	impl/proof hashes equal independent frame+SHA-256 oracle
+S.digest.mutation-property	D1	S2/D1/U3-H3	generated comment changes exactly implSources; proofSources stays fixed
+P.reproducible.fn	D1	P7/D1	two fresh launch-trial runs: equal e1 and phase1 artifacts; e2 qualification pair recorded
+P.reproducible.abi	D1	P7/D1	two fresh launch-trial runs: equal e1 and phase1 artifacts; e2 qualification pair recorded
+P.project-unchanged	D1	S/P0/D1	project sources/manifest unchanged; no build files written under project
+P.own-toolchain	D1	I1/D1	consumer lean-toolchain garbage ignored; two phases built
+S.refuse.leaf-link	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.parent-link	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.proof-link	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.missing	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.fifo	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.socket	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.directory	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.impl-large	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.proof-large	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.refuse.total-large	D1	S1/D1	unsafe/oversized module -> infra io naming path; no digest/phase lines
+S.boundary.file	D1	S1/T3/D1	exactly 1 MiB valid source accepted, not off-by-one refusal
+S.boundary.total	D1	S1/T3/D1	exactly 16 MiB total (including proof) accepted
+P.graph.missing-import	D1	K2/S2/P5/D1	consumer graph refusal -> phase failed, exit 1; no later phase
+P.graph.cycle	D1	K2/S2/P5/D1	consumer graph refusal -> phase failed, exit 1; no later phase
+P.graph.header	D1	K2/S2/P5/D1	consumer graph refusal -> phase failed, exit 1; no later phase
+P.graph.external-proof	D1	K2/S2/P5/D1	consumer graph refusal -> phase failed, exit 1; no later phase
+K.closure	D3	K2/K7/D3	each needed module compiled once, dependency first; unneeded omitted
+K.repeat	D3	K7/D3	same closure second command compiles zero modules
+K.pin-move	D3	K1/K7/D3	new git commit + unchanged needed closure compiles zero
+K.shared-change	D3	K1/K7/D3	shared source change recompiles shared+dependents alone
+K.comment-change	D3	K1/K7/D3	byte-only source change invalidates module+dependents
+K.library-refusal.cycle	D3	K2/K3/D3	bad library graph/fill -> exit 2, never consumer failed
+K.library-refusal.missing	D3	K2/K3/D3	bad library graph/fill -> exit 2, never consumer failed
+K.library-refusal.header	D3	K2/K3/D3	bad library graph/fill -> exit 2, never consumer failed
+K.library-refusal.compile	D3	K2/K3/D3	bad library graph/fill -> exit 2, never consumer failed
+K.corrupt.json	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.schema	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.key	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.missing-artifact	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.digest	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.size	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.extra	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.corrupt.missing-used	D3	K3/K6/D3	corrupt cache entry treated as miss; rebuild succeeds and revalidates
+K.module-family	D3	K3/K6/P2/D3	module-header cache entry retains all 7 parts; absent private part is a rebuildable miss
+K.used-stamp	D3	K5/D3	warm use explicitly advances used mtime without changing immutable manifest
+K.single-flight	D3	K3/K7/D3	two simultaneous fills of same closure compile each module exactly once
+K.stale-temp	D3	K3/D3	miss reclaims abandoned free-key fill temp and publishes intact entry
+K.lock-retained	D3	K3/K5/D3	eviction leaves permanent per-key lock file
+K.evict.empty	D3	K5/D3	empty cache eviction reports success with zero/nothing evictable
+K.evict.lru	D3	K5/D3	small target evicts least-used first, key breaks ties, exact charge target
+K.evict.pinned	D3	K3/K5/D3	live shared lock prevents eviction; reports success; unpin makes it evictable
+B.complete.1	B/D4	B2/D1/D4	failure creates complete schema-1 bundle; rerun repeats recorded failed step
+B.complete.2	B/D4	B2/D1/D4	failure creates complete schema-1 bundle; rerun repeats recorded failed step
+B.retention	B/D4	B2/D1	17 failed attempts retain newest 16 bundles, each within 32MiB
+B.incomplete	B/D4	B2/D4	required artifacts >32MiB -> bounded incomplete bundle; rerun exit 2 names omissions

@@ -1,0 +1,15 @@
+schema = 1
+
+[library]
+commit = "0000000000000000000000000000000000000000"
+
+[policy]
+proof = "required"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["SandboxTrial.Impl"]
+proof_modules = ["SandboxTrial.Proof"]
+impl = "SandboxTrial.encode"
+proof = "SandboxTrial.moduleWitness"

@@ -97,6 +97,8 @@ library-suite lean
 index-suite lean
 fuzz-replay lean
 sys-suite   lean
+sandbox-suite lean
+isolation   lean
 acceptance  lean
 index       lean
 index-history lean
@@ -120,12 +122,12 @@ tree-clean  lean checks
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite acceptance index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation acceptance index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
-TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit FvdepLedger
-    «fvdep-ledger» FvdepLedgerFixtures)
+TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-step» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit
+    FvdepLedger «fvdep-ledger» FvdepLedgerFixtures)
 
 # Every shard STAGES names, once each, in first-use order.
 shard_names() { awk 'NF { for (i = 2; i <= NF; i++) if (!seen[$i]++) print $i }' <<<"$STAGES"; }
@@ -285,6 +287,28 @@ sys_suite() {
     key="$(shipped_closure tests/sys tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
     suite sys-suite "$key" "${FVDEP_SYS_CASE:-}" bash tests/sys/run.sh \
         ${FVDEP_SYS_CASE:+--case "$FVDEP_SYS_CASE"}
+}
+
+# Shipped code a sandbox suite's driver builds: the dev driver, the step helper, the runner + shim.
+sandbox_closure() {
+    shipped_closure "$@" tools/pidns-check.sh tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean \
+        tool/StepMain.lean
+}
+
+# The blind sandbox suite's D2 cases (tester-6; U5 R + D2: `fvdep-dev sandbox run`, one step each:
+# outcomes, pumps, frames, preflight); its D1, D3 + D4 cases merge with U5-C + U5-D. Its steps run
+# fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID namespace of the job's own.
+sandbox_suite() {
+    suite sandbox-suite "$(sandbox_closure tests/sandbox)" "${FVDEP_SANDBOX_CASE:-}" \
+        bash tests/sandbox/run.sh --case "${FVDEP_SANDBOX_CASE:-R.}"
+}
+
+# The isolation cases (MAIN's; U5 G1, G3, G4 + R8's descriptor 4: D2 steps + the helper alone in a
+# fresh bwrap namespace), each killed by a mutant of tests/isolation/mutants.py. Its steps run
+# fvdep-step ⇒ tests/isolation/run.sh refuses outside a PID namespace of the job's own.
+isolation() {
+    suite isolation "$(sandbox_closure tests/isolation)" "${FVDEP_ISOLATION_CASE:-}" \
+        bash tests/isolation/run.sh ${FVDEP_ISOLATION_CASE:+--case "$FVDEP_ISOLATION_CASE"}
 }
 
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the

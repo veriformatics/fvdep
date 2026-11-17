@@ -1622,7 +1622,41 @@ def residue : List Residue :=
           "state (K5, K6), the effects are tested by K7's work counts + tester-6's cache cases " ++
           "(U5-C)"
       ruling := "the build cache's filesystem effects"
-      boundary := [] }]
+      boundary := [] },
+    { id := "sandbox-spawn"
+      what :=
+        "the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by " ++
+          "`posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed " ++
+          "(`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty " ++
+          "environment, every signal at its default + unmasked; poll, kill, waitpid) + " ++
+          "`FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the " ++
+          "observation handed to the proven `classify` + `read`)"
+      reason :=
+        "C + the OS have no Lean semantics: each export is one reviewed call; the outcome + " ++
+          "frame reading over the runner's observations are proven (rows `FvdepCore.Sandbox`, " ++
+          "`FvdepCore.Step`); the IO is tested by tester-6's blind D2 cases (stage " ++
+          "`sandbox-suite`) + the isolation cases (stage `isolation`, each killed by a mutant " ++
+          "of `tests/isolation/mutants.py`)"
+      ruling := "the sandbox spawn shim"
+      boundary :=
+        [``FvdepIO.Spawn.bwrap, ``FvdepIO.Spawn.poll, ``FvdepIO.Spawn.kill, ``FvdepIO.Spawn.wait] },
+    { id := "step-helper"
+      what :=
+        "`fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken " ++
+          "only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output " ++
+          "directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), " ++
+          "the `statvfs` samples, the regular files under `/fvdep/work/out` read without " ++
+          "following a link, the frame written on descriptor 4"
+      reason :=
+        "C + the OS have no Lean semantics: the frame it writes reads back exactly (row " ++
+          "`FvdepCore.Step`, `frameRead`); its IO is tested by the isolation cases (stage " ++
+          "`isolation`: G1.helper, G1.grandchild, G1.core, G4.file-cap, R8.channel, " ++
+          "G1.killall-guard, each killed by a mutant) + tester-6's D2 frame cases"
+      ruling := "the step helper's IO"
+      boundary :=
+        [``FvdepIO.Spawn.nodump, ``FvdepIO.Spawn.channel, ``FvdepIO.Spawn.coreLimit,
+          ``FvdepIO.Spawn.fileLimit, ``FvdepIO.Spawn.spawn, ``FvdepIO.Spawn.killAll,
+          ``FvdepIO.Spawn.available, ``FvdepIO.Spawn.openRegular] }]
 
 def cliRow : Row :=
   { component := `FvdepCore.Cli
@@ -2672,8 +2706,7 @@ def phaseStemRow : Row :=
     residue := []
     unproven := [] }
 
-/-- U5 R8: the supervisor's reading of the step helper's frame (the encoder `frameOf` gains its
-row with the helper's root, U5-B). -/
+/-- U5 R8: the supervisor's reading of the step helper's frame (the encoder: `stepFrameOfRow`). -/
 def stepFrameRow : Row :=
   { component := `FvdepCore.Step
     contract := "U5 R8"
@@ -2694,6 +2727,80 @@ def stepFrameRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5 R8: the frame the step helper writes (`fvdep-step`'s root reaches it through its IO). -/
+def stepFrameOfRow : Row :=
+  { component := `FvdepCore.Step
+    contract := "U5 R8"
+    claim :=
+      "The step helper's frame of its status + files reads back exactly (`read` returns that " ++
+        "status + the files in path order) whenever the status fits J's profile, the frame " ++
+        "lies in H2's domain + every file path is safe."
+    claims := [(``StepClaims.frameRead, ``FvdepAudit.Step.Proof.frame_read)]
+    subject := ``FvdepCore.Step.frameOf
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5 R8: `fvdep-step`'s IO (the helper's root = `FvdepIO.Step.main`). -/
+def stepExecuteRow : Row :=
+  { component := `FvdepIO.Step
+    contract := "U5 R8"
+    claim :=
+      "The step helper performs R8 on the real step: non-dumpable, descriptor 4 = the inherited " ++
+        "pipe alone, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE` = the per-file cap, its child, every " ++
+        "other process of the step killed (refused unless it is PID 2), the frame of its " ++
+        "child's status + the regular files under `/fvdep/work/out`, its child's code."
+    claims := []
+    subject := ``FvdepIO.Step.execute
+    path := [``FvdepIO.Step.main, ``FvdepIO.Step.execute]
+    noCaller := ""
+    residue := ["os", "runtime"]
+    unproven := ["step-helper"] }
+
+/-- U5 R8: `fvdep-step`'s arguments. -/
+def stepPlanRow : Row :=
+  { component := `FvdepIO.Step
+    contract := "U5 R8"
+    claim :=
+      "`fvdep-step` reads `[--mkdir <dir>]… [--stdout <path>] [--file-bytes <n>] -- <argv>`, " ++
+        "every path safe, `n` ≥ 1; anything else = a usage error (exit 125)."
+    claims := []
+    subject := ``FvdepIO.Step.plan
+    path := [``FvdepIO.Step.main, ``FvdepIO.Step.plan]
+    noCaller := ""
+    residue := []
+    unproven := ["step-helper"] }
+
+/-- U5 R2 + R8: the spawn shim's Lean side (its externs = the `sandbox-spawn` + `step-helper`
+boundaries). -/
+def spawnRow : Row :=
+  { component := `FvdepIO.Spawn
+    contract := "U5 R2 + R8"
+    claim := "The shim's errno numbers read as their names in fvdep's messages."
+    claims := []
+    subject := ``FvdepIO.Spawn.errnoText
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := ["sandbox-spawn"] }
+
+/-- U5 R2–R7: the sandbox runner (`check` calls it from U8; today the dev driver's D2). -/
+def runnerRow : Row :=
+  { component := `FvdepIO.Sandbox
+    contract := "U5 R2–R7"
+    claim :=
+      "One step = bwrap with `bwrapArgs`, stdout + stderr + the status descriptor + " ++
+        "descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, the frame up to " ++
+        "`frameBytes`), the deadline's SIGKILL + a bounded drain, then `classify` + `read` " ++
+        "over what arrived."
+    claims := []
+    subject := ``FvdepIO.Sandbox.run
+    path := []
+    noCaller := "U8"
+    residue := ["bwrap", "os", "runtime"]
+    unproven := ["sandbox-spawn"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2709,7 +2816,12 @@ def ledger : Ledger :=
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
-        phaseStemRow, stepFrameRow]
-    residue := residue }
+        phaseStemRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
+        runnerRow]
+    residue := residue
+    extraRoots :=
+      [{  main := ``FvdepIO.Step.main
+          interpreter := ``FvdepIO.Step.execute
+          plan := ``FvdepIO.Step.plan }] }
 
 end FvdepLedger.Rows

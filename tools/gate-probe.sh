@@ -461,10 +461,11 @@ plant_doc_drift() { sed -i '1s/^/x/' docs/verification.md; }
 probe coverage plant_doc_drift "ledger: root: doc:" bash -c 'source tools/gate.sh; coverage'
 
 # coverage, extra roots: a further executable's entry not shaped `fun a => interpreter (plan a)`
-# (one root per shipped executable, U2 L1 + L4) → the `root` finding naming it.
+# (one root per shipped executable, U2 L1 + L4; the helper's root bent to `Cli.plan`) → the `root`
+# finding naming it.
 # shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
 plant_extra_root() {
-    sed -i 's/^    residue := residue }$/    residue := residue\n    extraRoots := [{ main := ``Cli.plan, interpreter := ``FvdepIO.execute, plan := ``Cli.plan }] }/' \
+    sed -i 's/^      \[{  main := ``FvdepIO.Step.main$/      [{  main := ``Cli.plan/' \
         tool/FvdepLedger/Rows.lean
 }
 probe coverage-extra-root plant_extra_root 'FvdepCore.Cli.plan is not `fun a =>' \
@@ -477,7 +478,7 @@ plant_extra_reach() {
     printf '\n%s\n\n%s\n' 'def probePlan (args : List String) := FvdepCore.Cli.plan ("probe" :: args)' \
         'def probeMain (args : List String) : IO UInt32 := FvdepIO.execute (probePlan args)' \
         >>tool/Main.lean
-    sed -i 's/^    residue := residue }$/    residue := residue\n    extraRoots := [{ main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }] }/' \
+    sed -i 's/^          plan := ``FvdepIO.Step.plan }] }$/          plan := ``FvdepIO.Step.plan },\n        { main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }] }/' \
         tool/FvdepLedger/Rows.lean
 }
 probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
@@ -541,6 +542,30 @@ probe fuzz-replay plant_fuzz_panic "probe-planted" \
 plant_sys_driver() { sed -i 's/report "syncdir"/report "syncDir"/' tool/FvdepDev/Sys.lean; }
 with_suites=1 probe sys-suite plant_sys_driver "FAIL F.records.syncdir" \
     env FVDEP_SYS_CASE=F.records.syncdir bash -c 'source tools/gate.sh; sys_suite'
+
+# sandbox-suite: a D2 case expecting another code for a child's SIGTERM fails, named (one case).
+plant_sandbox_case() {
+    sed -i 's/signal.SIGTERM)"), "exited 143")/signal.SIGTERM)"), "exited 144")/' tests/sandbox/run.py
+}
+probe sandbox-suite plant_sandbox_case "FAIL R.signal" \
+    env FVDEP_SANDBOX_CASE=R.signal bash -c 'source tools/gate.sh; sandbox_suite'
+
+# isolation: a case expecting another environment inside the step fails, named (one case).
+plant_isolation_case() { sed -i 's/"HOME,LC_ALL,PATH,PWD,TMPDIR"/"HOME,LC_ALL,PATH,TMPDIR"/' tests/isolation/run.py; }
+probe isolation plant_isolation_case "FAIL G1.env" \
+    env FVDEP_ISOLATION_CASE=G1.env bash -c 'source tools/gate.sh; isolation'
+
+# isolation's containment check: a job that sees kthreadd (= the host's PID namespace) refuses
+# before it builds or runs a step (tools/pidns-check.sh, the default proc root planted + the
+# GitHub runner's pass dropped: a CI copy runs the check itself).
+plant_isolation_pidns() {
+    mkdir -p .planted-proc/1 .planted-proc/2 && echo flock >.planted-proc/1/comm &&
+        echo kthreadd >.planted-proc/2/comm &&
+        sed -i -e 's|^proc="${1:-/proc}"$|proc="${1:-$PWD/.planted-proc}"|' -e '/GITHUB_ACTIONS/d' \
+            tools/pidns-check.sh
+}
+probe isolation-pidns plant_isolation_pidns "shares the host's PID namespace" \
+    env FVDEP_ISOLATION_CASE=G1.env bash -c 'source tools/gate.sh; isolation'
 
 # acceptance: a merged case whose expectation no longer holds fails the stage, named.
 plant_acceptance() {

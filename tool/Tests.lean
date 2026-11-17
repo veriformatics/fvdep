@@ -1,6 +1,6 @@
 import FvdepCore
 import FvdepIO.Sha256
-import FvdepIO.Sys
+import FvdepIO.Step
 import FvdepIO.Toml
 
 /-! `lake test` driver (contract U1 K3): PASS/FAIL per case, the slowest case, exit = failures.
@@ -1483,6 +1483,62 @@ def ioCases : List (String × IO Bool) :=
 
 end Sys
 
+/-! ## U5 T3: the step limits' relation (A1) -/
+
+namespace Sandbox
+
+open FvdepCore.Sandbox
+
+def cases : List (String × (Unit → Bool)) :=
+  [("sandbox: the default limits hold T3's relation (the per-file cap = workBytes / 8)", fun _ =>
+      ({} : Limits).check.isNone && ({} : Limits).fileCap == 134217728),
+    ("sandbox: a per-file cap above workBytes / 8 is refused, at it accepted", fun _ =>
+      ({ workBytes := 800000, fileBytes := some 100001 } : Limits).check.isSome &&
+        ({ workBytes := 800000, fileBytes := some 100000 } : Limits).check.isNone),
+    ("sandbox: workBytes below 8 leaves a per-file cap of 0, refused", fun _ =>
+      ({ workBytes := 7 } : Limits).check.isSome && ({ workBytes := 8 } : Limits).check.isNone),
+    ("sandbox: a tmpfs size above bwrap's cap (2^63 − 1) is refused, at it accepted", fun _ =>
+      let cap := 9223372036854775807
+      ({ workBytes := cap + 1 } : Limits).check.isSome &&
+        ({ tmpBytes := cap + 1 } : Limits).check.isSome &&
+        ({ workBytes := cap, tmpBytes := cap } : Limits).check.isNone)]
+
+end Sandbox
+
+/-! ## U5 R2 + R8: the spawn shim's own refusals (`c/fvdep_spawn.c`; signal 0 sends nothing) -/
+
+namespace Spawn
+
+def ioCases : List (String × IO Bool) :=
+  [("spawn: kill refuses pid 0 (the caller's group) + -1 (every process it may signal): EINVAL", do
+      let own ← IO.Process.getPID
+      return (← FvdepIO.Spawn.kill 0 0) matches .error 22 &&
+          (← FvdepIO.Spawn.kill 0xFFFFFFFF 0) matches .error 22 &&
+          (← FvdepIO.Spawn.kill own 0) matches .ok ()),
+    ("spawn: a string with an interior NUL is refused (EINVAL) before any spawn", do
+      return (← FvdepIO.Spawn.bwrap "/nonexistent" #["bwrap", "a\x00b"]) matches .error 22 &&
+          (← FvdepIO.Spawn.bwrap "/nonexistent\x00x" #["bwrap"]) matches .error 22 &&
+          (← FvdepIO.Spawn.spawn #["/nonexistent\x00x"] "") matches .error 22 &&
+          (← FvdepIO.Spawn.spawn #["true"] "out\x00x") matches .error 22 &&
+          (← FvdepIO.Spawn.spawn #["/nonexistent"] "") matches .error 2)]
+
+end Spawn
+
+/-! ## U5 R8: the step helper's arguments (`FvdepIO.Step.plan`) -/
+
+namespace Step
+
+def cases : List (String × (Unit → Bool)) :=
+  [("step: --file-bytes takes 1 … 2^64 − 2 (RLIMIT_FSIZE = n exactly; 2^64 − 1 = RLIM_INFINITY)",
+      fun _ =>
+      (FvdepIO.Step.plan ["--file-bytes", "18446744073709551614", "--", "true"]).toOption.map
+            (·.fileBytes) ==
+          some (some 18446744073709551614) &&
+        ["0", "18446744073709551615", "18446744073709551616", "36893488147419103233"].all fun n =>
+          FvdepIO.Step.plan ["--file-bytes", n, "--", "true"] matches .error _)]
+
+end Step
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -1521,10 +1577,12 @@ def main : IO UInt32 := do
                   Assemble.cases ++
                   History.cases ++
                   Hash.cases ++
-                  Manifest.cases).map
+                  Manifest.cases ++
+                  Sandbox.cases ++
+                  Step.cases).map
               fun c => check c.1 c.2).mapM
         id
-  let ioResults ← (Manifest.ioCases ++ Sys.ioCases).mapM fun c => checkIO c.1 c.2
+  let ioResults ← (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases).mapM fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

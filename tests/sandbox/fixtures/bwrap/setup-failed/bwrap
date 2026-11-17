@@ -1,0 +1,7 @@
+#!/bin/sh
+if [ "$1" = "--version" ]; then
+  printf 'bubblewrap 0.8.0\n'
+  exit 0
+fi
+printf 'u5-setup-failure\nu5-second-setup-line\n' >&2
+exit 1

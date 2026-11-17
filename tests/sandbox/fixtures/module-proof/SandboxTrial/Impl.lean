@@ -1,0 +1,7 @@
+import Fvdep.Base64.Encode.V1_0_0
+
+namespace SandboxTrial
+
+def encode : List UInt8 → List Char := Fvdep.Base64.Encode.V1_0_0.encode
+
+end SandboxTrial

@@ -1,4 +1,5 @@
 import FvdepCore.Ids
+import FvdepCore.Json.Decode
 
 /-! A sandbox step's bwrap arguments + its outcome (contract `docs/contracts/U5-sandbox.md` R1, R5,
 R6): pure. bwrap itself = residue `bwrap` (`FvdepAudit.Sandbox.Spec.bwrapRead` models how it reads
@@ -134,5 +135,69 @@ def classify (lines : List StatusLine) (killed : Bool) (firstErr : String) : Out
   | [n] => .exited n
   | [] => if killed then .timedOut else .setupFailed firstErr
   | _ :: _ :: _ => .protocol
+
+/-- R5: bwrap's status lines, each decoded by J (a line J refuses = `other`): an object whose
+`exit-code` member is a nonnegative integer → `exitCode`. -/
+def statusLines (b : ByteArray) : List StatusLine :=
+  (splitLines b).map fun l =>
+    match FvdepCore.Json.decode l with
+    | .ok v =>
+      match v.get? "exit-code" with
+      | some (.int n) => if 0 ≤ n then .exitCode n.toNat else .other
+      | _ => .other
+    | .error _ => .other
+where
+  /-- The bytes between line feeds (a final unterminated line kept). -/
+  splitLines (b : ByteArray) : List ByteArray :=
+    Id.run do
+      let mut out := #[]
+      let mut start := 0
+      for i in [0:b.size] do
+        if b[i]! == 0x0A then
+          out := out.push (b.extract start i)
+          start := i + 1
+      if start < b.size then
+        out := out.push (b.extract start b.size)
+      return out.toList
+
+/-! ## Limits (T3) -/
+
+/-- T3: a step's limits (U5's defaults; U7 qualifies the production values under stated load):
+the deadline in seconds, the two tmpfs sizes, the bytes a diagnostic stream keeps, the frame cap,
+each ≥ 1 (`bwrap --size 0` = a setup failure), the tmpfs sizes ≤ `tmpfsMax`; `fileBytes` = every
+step process's `RLIMIT_FSIZE` (default `workBytes / 8`, `fileCap`). -/
+structure Limits where
+  deadline : Nat := 600
+  workBytes : Nat := 1073741824
+  tmpBytes : Nat := 268435456
+  diagnosticBytes : Nat := 65536
+  frameBytes : Nat := 268435456
+  fileBytes : Option Nat := none
+  deriving DecidableEq, Repr
+
+/-- The per-file cap a step runs under (`RLIMIT_FSIZE`). -/
+def Limits.fileCap (l : Limits) : Nat := l.fileBytes.getD (l.workBytes / 8)
+
+/-- bwrap's tmpfs size cap: bubblewrap 0.11.1 refuses a larger `--size` at setup (`--size (for
+tmpfs) is limited to 9223372036854775807`), like `--size 0`. -/
+@[noinline]
+def tmpfsMax : Nat := 9223372036854775807
+
+/-- T3's bounds + relation (A1): each tmpfs size ≤ `tmpfsMax`; the per-file cap ≥ 1 and 8 × it ≤
+`workBytes` ⇒ a compile's artifact family (≤ 7 files) never fills `/fvdep/work`: a file past the cap
+ends its writer by `SIGXFSZ` first (a signal death, P5's resource case) — `none` = holds, else the
+reason. -/
+def Limits.check (l : Limits) : Option String :=
+  if tmpfsMax < l.workBytes then
+    some s!"--work-bytes {l.workBytes} is above bwrap's tmpfs cap {tmpfsMax}"
+  else
+    if tmpfsMax < l.tmpBytes then
+      some s!"--tmp-bytes {l.tmpBytes} is above bwrap's tmpfs cap {tmpfsMax}"
+    else
+      if l.fileCap == 0 then some "the per-file cap is 0 (--work-bytes below 8)"
+      else
+        if l.workBytes < 8 * l.fileCap then
+          some s!"--file-bytes {l.fileCap} is above --work-bytes / 8"
+        else none
 
 end FvdepCore.Sandbox
