@@ -1,6 +1,6 @@
 #!/usr/bin/env bash
-# Iteration gate: FAST_STAGES from tools/gate.sh — the independent checks in parallel, then the
-# incremental Lean build + the stages that consume it. Never the claim: the stages it skips (the
+# Iteration gate: FAST_STAGES from tools/gate.sh — the independent checks beside the incremental
+# Lean build, then the stages that consume it, at once. Never the claim: the stages it skips (the
 # registry minus FAST_STAGES) run in tools/gate.sh alone and are printed. Each stage's row lands in
 # the step ledger (kind `fast`). rc 0 iff every selected stage returned 0 + the ledger took every
 # row. Run on vflab: tools/vflab-run bash tools/fast-gate.sh
@@ -11,13 +11,14 @@ cd -- "$root" || exit 1
 # shellcheck source=tools/gate.sh
 source tools/gate.sh
 registry_ok || exit 2
+knobs_ok || exit 2
 start="$(stamp)"
 ledger_begin fast
 
-# Checks that build + run no fvdep code run in parallel; every other selected stage runs after
-# them, one at a time in FAST_STAGES order, `lean-build` first: a stage running its own
-# `lake build` beside `lean-build` races its relink (its driver then finds no binary) ⇒ a stage
-# runs in parallel only when listed here.
+# Checks that build + run no fvdep code run beside `lean-build`; every other selected stage runs
+# after it (gate.sh `run_stages`: at once once it is green): a stage running its own `lake build`
+# beside `lean-build` races its relink (its driver then finds no binary) ⇒ a stage runs beside it
+# only when listed here.
 independent=" imports preview spec shell python fanout vendor deps renovate meta "
 # A suite's green verdict stands while its inputs are unchanged (gate.sh `suite`).
 export FVDEP_REUSE=1
@@ -45,20 +46,16 @@ for name in "${parallel[@]}"; do
     pids+=($!)
 done
 
-for name in "${sequential[@]}"; do
-    stage "$name" "${name//-/_}"
-done
-
+stage lean-build lean_build
+# The independent stages end before the pool starts: its `wait -n` must see its own stages alone.
 for i in "${!parallel[@]}"; do
     wait "${pids[$i]}"
     rc=$?
-    secs="$(cat "$log/${parallel[$i]}.time")"
     printf '\n=== %s ===\n' "${parallel[$i]}"
     cat "$log/${parallel[$i]}"
-    printf '%s rc=%d %ss\n' "${parallel[$i]}" "$rc" "$secs"
-    ledger_row "${parallel[$i]}" "$rc" "$secs"
-    [[ $rc -eq 0 ]] || failed+=("${parallel[$i]}")
+    report "${parallel[$i]}" "$rc" "$(cat "$log/${parallel[$i]}.time")"
 done
+run_stages "${sequential[@]:1}"
 [[ $ledger_ok -eq 1 ]] || failed+=(ledger)
 
 skipped="$(awk -v fast=" $FAST_STAGES " 'NF && index(fast, " " $1 " ") == 0 { s = s (s == "" ? "" : " ") $1 } END { printf "%s", s }' <<<"$STAGES")"

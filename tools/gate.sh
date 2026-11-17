@@ -66,18 +66,22 @@ ledger_row() { # STEP RC SECONDS
     ledger_ok=0
 }
 
+# A finished stage: its rc line, its ledger row, its name among the failures.
+report() { # NAME RC SECONDS
+    printf '%s rc=%d %ss\n' "$1" "$2" "$3"
+    ledger_row "$1" "$2" "$3"
+    [[ $2 -eq 0 ]] || failed+=("$1")
+    return 0
+}
+
 stage() {
-    local name="$1" start rc secs
+    local name="$1" start rc
     shift
     start="$(stamp)"
     printf '\n=== %s ===\n' "$name"
     ("$@")
     rc=$?
-    secs="$(elapsed "$start")"
-    printf '%s rc=%d %ss\n' "$name" "$rc" "$secs"
-    ledger_row "$name" "$rc" "$secs"
-    [[ $rc -eq 0 ]] || failed+=("$name")
-    return 0
+    report "$name" "$rc" "$(elapsed "$start")"
 }
 
 # Stage · CI shards. A full run takes every stage in this order, each running the function of its
@@ -120,6 +124,12 @@ probes      lean
 tree-clean  lean checks
 '
 
+# Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
+# registry order; a stage's weight = its peak memory alone (GiB, anon + tmpfs, rounded up; unlisted
+# = 1). Both from `tools/vflab-run bash tools/gate-measure.sh [STAGE…]` (vflab, no other fvdep job).
+GATE_FIRST='index-suite acceptance sys-suite coverage'
+GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 ledger-suite=3 sys-suite=3'
+
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
 FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation acceptance index index-history'
@@ -132,9 +142,10 @@ TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-step» «fvdep-tests» Fvd
 # Every shard STAGES names, once each, in first-use order.
 shard_names() { awk 'NF { for (i = 2; i <= NF; i++) if (!seen[$i]++) print $i }' <<<"$STAGES"; }
 
-# STAGES is nonempty; each row = a unique stage whose function exists + ≥ 1 shard.
+# STAGES is nonempty; each row = a unique stage whose function exists + ≥ 1 shard; GATE_FIRST +
+# GATE_WEIGHTS name its stages, each weight whole GiB ≥ 1 (a stale name would weigh 1 unseen).
 registry_ok() {
-    local rc=0 rows row name shards
+    local rc=0 rows row name shards names w
     mapfile -t rows < <(awk 'NF' <<<"$STAGES")
     if [[ ${#rows[@]} -eq 0 ]]; then
         printf 'gate: STAGES is empty\n' >&2
@@ -155,6 +166,19 @@ registry_ok() {
         printf 'gate: duplicate stage names\n' >&2
         rc=1
     fi
+    names=" $(awk 'NF { printf "%s ", $1 }' <<<"$STAGES")"
+    for w in $GATE_FIRST; do
+        if [[ "$names" != *" $w "* ]]; then
+            printf 'gate: GATE_FIRST names no stage %s\n' "$w" >&2
+            rc=1
+        fi
+    done
+    for w in $GATE_WEIGHTS; do
+        if [[ "$names" != *" ${w%%=*} "* || ! "${w#*=}" =~ ^[1-9][0-9]*$ ]]; then
+            printf 'gate: GATE_WEIGHTS entry %s is not <stage>=<GiB>\n' "$w" >&2
+            rc=1
+        fi
+    done
     return $rc
 }
 
@@ -322,9 +346,9 @@ acceptance() {
 # C7: the committed index.json = the bytes `fvdep index` makes of the library sources (a fresh
 # snapshot build, its observations + the kernel replay; `--check` never writes); verdict reused like
 # the suites'. Drift after a library change → regenerate: bash tools/update-index.sh (desktop).
+index_key() { shipped_closure index.json tool/Main.lean; }
 index() {
-    suite index "$(shipped_closure index.json tool/Main.lean)" "" \
-        "$root/tool/.lake/build/bin/fvdep" index --check
+    suite index "$(index_key)" "" "$root/tool/.lake/build/bin/fvdep" index --check
 }
 
 # C7 + C9 `history`: the working tree's index.json against HEAD's + each of HEAD's parents' committed
@@ -504,8 +528,101 @@ tree_clean() {
     fi
 }
 
+# Concurrent stages: FVDEP_GATE_JOBS, else the CPU count.
+gate_jobs() { printf '%s' "${FVDEP_GATE_JOBS:-$(nproc)}"; }
+
+# Memory budget (GiB) of concurrent stages: FVDEP_GATE_MEMORY, else 4/5 of the run's cap (its
+# cgroup's memory.max, else MemTotal: vflab's unit cap 24G → 19, a 16 GB CI runner → 12).
+gate_budget() {
+    local cap max
+    if [[ -n "${FVDEP_GATE_MEMORY:-}" ]]; then
+        printf '%s' "$FVDEP_GATE_MEMORY"
+        return
+    fi
+    cap="$(awk '$1 == "MemTotal:" { print $2 * 1024 }' /proc/meminfo)"
+    max="$(cat "/sys/fs/cgroup$(cut -d: -f3 /proc/self/cgroup 2>/dev/null)/memory.max" 2>/dev/null)"
+    [[ "$max" =~ ^[0-9]+$ && $max -lt $cap ]] && cap=$max
+    cap=$((cap * 4 / 5 / 1024 ** 3))
+    printf '%d' $((cap > 0 ? cap : 1))
+}
+
+# Both run-phase knobs = positive integers (G1: else rc 2 before any stage; `pool` does arithmetic
+# on them).
+knobs_ok() {
+    [[ "$(gate_jobs)" =~ ^[1-9][0-9]*$ && "$(gate_budget)" =~ ^[1-9][0-9]*$ ]] && return 0
+    printf 'gate: FVDEP_GATE_JOBS + FVDEP_GATE_MEMORY (GiB) must be positive integers\n' >&2
+    return 1
+}
+
+# STAGE… at once (G1; bash ≥ 5.1: `wait -n -p`): at most `gate_jobs` running, their weights
+# (GATE_WEIGHTS) summed within `gate_budget` (a stage over it starts alone), started GATE_FIRST
+# first, then in the given order, each started as soon as it fits; each stage's block, rc line +
+# ledger row print in the given order once it + every earlier one has ended.
+pool() {
+    local names=("$@") todo=() next=() name w p rc used=0 shown=0 jobs budget out
+    local -A weight=() pid=() began=() result=()
+    jobs="$(gate_jobs)"
+    budget="$(gate_budget)"
+    for w in $GATE_WEIGHTS; do weight[${w%=*}]="${w#*=}"; done
+    for name in $GATE_FIRST; do [[ " $* " == *" $name "* ]] && todo+=("$name"); done
+    for name in "$@"; do [[ " $GATE_FIRST " == *" $name "* ]] || todo+=("$name"); done
+    out="$(mktemp -d)" || return 1
+    while [[ ${#todo[@]} -gt 0 || ${#pid[@]} -gt 0 ]]; do
+        next=()
+        for name in "${todo[@]}"; do
+            w="${weight[$name]:-1}"
+            if [[ ${#pid[@]} -eq 0 ]] || ((${#pid[@]} < jobs && used + w <= budget)); then
+                began[$name]="$(stamp)"
+                "${name//-/_}" >"$out/$name" 2>&1 &
+                pid[$!]="$name"
+                used=$((used + w))
+            else
+                next+=("$name")
+            fi
+        done
+        todo=("${next[@]}")
+        wait -n -p p
+        rc=$?
+        name="${pid[$p]}"
+        unset "pid[$p]"
+        used=$((used - ${weight[$name]:-1}))
+        result[$name]="$rc $(elapsed "${began[$name]}")"
+        while [[ $shown -lt ${#names[@]} && -n "${result[${names[shown]}]:-}" ]]; do
+            name="${names[shown]}"
+            printf '\n=== %s ===\n' "$name"
+            cat -- "$out/$name"
+            # shellcheck disable=SC2086  # "RC SECONDS" splits into report's two arguments
+            report "$name" ${result[$name]}
+            shown=$((shown + 1))
+        done
+    done
+    rm -rf -- "$out"
+}
+
+# The selected stages in their phases (G1): the build phase (`tools`, `lean-build`) in order; then
+# the rest at once (`pool`) — after a red build phase one at a time (a stage's own build of a
+# shared package would race another's writes); `probes` after them (its copies reuse their fresh
+# green marks), `tree-clean` last.
+run_stages() {
+    local name build=() rest=() last=()
+    for name in "$@"; do
+        case "$name" in
+        tools | lean-build) build+=("$name") ;;
+        probes | tree-clean) last+=("$name") ;;
+        *) rest+=("$name") ;;
+        esac
+    done
+    for name in "${build[@]}"; do stage "$name" "${name//-/_}"; done
+    if [[ " ${failed[*]} " != *" tools "* && " ${failed[*]} " != *" lean-build "* ]]; then
+        pool "${rest[@]}"
+    else
+        for name in "${rest[@]}"; do stage "$name" "${name//-/_}"; done
+    fi
+    for name in "${last[@]}"; do stage "$name" "${name//-/_}"; done
+}
+
 main() {
-    local start shard="" rows row name shards
+    local start shard="" rows row name shards selected=()
     registry_ok || exit 2
     if [[ $# -gt 0 ]]; then
         if [[ $# -ne 2 || "$1" != --shard ]] || ! shard_names | grep -x -F -- "$2" >/dev/null; then
@@ -514,16 +631,17 @@ main() {
         fi
         shard="$2"
     fi
+    knobs_ok || exit 2
     start="$(stamp)"
     if [[ -n "$shard" ]]; then ledger_begin "shard:$shard"; else ledger_begin gate; fi
-    # An array, not a `while read` loop: stages keep the caller's stdin.
     mapfile -t rows <<<"$STAGES"
     for row in "${rows[@]}"; do
         read -r name shards <<<"$row"
         if [[ -n "$name" && ( -z "$shard" || " $shards " == *" $shard "* ) ]]; then
-            stage "$name" "${name//-/_}"
+            selected+=("$name")
         fi
     done
+    run_stages "${selected[@]}"
     printf '\n=== gate%s ===\n' "${shard:+ (shard $shard)}"
     [[ $ledger_ok -eq 1 ]] || failed+=(ledger)
     if [[ ${#failed[@]} -ne 0 ]]; then

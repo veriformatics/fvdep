@@ -29,36 +29,55 @@ export FVDEP_LEAN_FMT="$root/tools/lean-fmt/.lake/packages/lean-fmt/.lake/build/
 scratch="$(mktemp -d -p "$root/.gate" probe.XXXXXX 2>/dev/null || { mkdir -p "$root/.gate" && mktemp -d -p "$root/.gate" probe.XXXXXX; })"
 export TMPDIR="$scratch"
 
+# The tree's ignored directories a copy takes (no probe writes the tree's: each restore takes them
+# afresh from there): pinned tools (binaries copied: probes corrupt them; downloads hardlinked: only
+# ever replaced whole) so tool stages run offline; unless the probe runs no Lean (with_build=0: 750
+# MB less per copy, measured), the Lake build caches so Lean plants rebuild incrementally — minus
+# each `.lake/config` (Lake's elaborated lakefile: it bakes `__dir__`, so a copy would link the
+# tree's files), which Lake re-elaborates in the copy; a suite probe (with_suites=1) also the test
+# packages' builds, so its planted + restored runs rebuild incrementally.
+taken() {
+    local d
+    for d in .tools/bin .tools/cache; do [[ -d "$root/$d" ]] && printf '%s\n' "$d"; done
+    [[ "${with_build:-1}" == 1 ]] || return 0
+    for d in .lake tool/.lake; do [[ -d "$root/$d" ]] && printf '%s\n' "$d"; done
+    [[ "${with_suites:-0}" == 1 ]] || return 0
+    for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake tests/library/conformance/.lake \
+        tests/sha256/.build tests/sys/.lake tests/sys/.build; do
+        [[ -d "$root/$d" ]] && printf '%s\n' "$d"
+    done
+    return 0
+}
+
+# DIR's `taken` directories made the tree's, each `.lake/config` dropped: copied when absent (`cp`
+# outpaces rsync on a first copy), else synced (a restore rewrites what the run changed alone).
+take() { # DIR
+    local d
+    while read -r d; do
+        if [[ ! -d "$1/$d" ]]; then
+            mkdir -p "$(dirname -- "$1/$d")"
+            if [[ "$d" == .tools/cache ]]; then cp -al "$root/$d" "$1/$d"; else cp -a "$root/$d" "$1/$d"; fi
+            [[ "$d" != *.lake ]] || rm -rf "$1/$d/config"
+        elif [[ "$d" == .tools/cache ]]; then
+            rsync -a --delete --link-dest="$root/$d" "$root/$d/" "$1/$d/"
+        elif [[ "$d" == *.lake ]]; then
+            rsync -a --delete --exclude=/config --delete-excluded "$root/$d/" "$1/$d/"
+        else
+            rsync -a --delete "$root/$d/" "$1/$d/"
+        fi
+    done < <(taken)
+}
+
 # A git-tracked scratch copy of the worktree (the checks read `git ls-files`: `add -f` keeps the
 # tracked files an ignore pattern matches, e.g. fixtures under a `.lake/`, so every closure key in a
-# copy = the tree's); pinned tools come along (binaries copied: probes corrupt them; downloads
-# hardlinked: only ever replaced whole) so tool stages run offline, and the Lake build caches so
-# Lean plants rebuild incrementally — minus each `.lake/config` (Lake's elaborated lakefile: it
-# bakes `__dir__`, so a copy would link the tree's files), which Lake re-elaborates in the copy —
-# + the keyed stages' green marks (FVDEP_REUSE above).
+# copy = the tree's) + its `taken` directories + the keyed stages' green marks (FVDEP_REUSE above).
 copy() {
-    local dir d
+    local dir
     dir="$(mktemp -d)"
     git ls-files -co --exclude-standard -z | tar --null -T - -cf - | tar -C "$dir" -xf -
     git -C "$dir" init -q && git -C "$dir" add -A -f &&
         git -C "$dir" -c user.name=probe -c user.email=probe@invalid commit -q -m probe
-    if [[ -d "$root/.tools" ]]; then
-        mkdir -p "$dir/.tools"
-        [[ -d "$root/.tools/bin" ]] && cp -a "$root/.tools/bin" "$dir/.tools/"
-        [[ -d "$root/.tools/cache" ]] && cp -al "$root/.tools/cache" "$dir/.tools/"
-    fi
-    for d in .lake tool/.lake; do
-        [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d" && rm -rf "$dir/$d/config"
-    done
-    # A suite probe (with_suites=1) also takes the test packages' builds: its pristine copy is then
-    # built, so the planted + restored runs rebuild incrementally (other probes skip the bytes).
-    if [[ "${with_suites:-0}" == 1 ]]; then
-        for d in tests/codec/.lake tests/manifest/.lake tests/library/.lake \
-            tests/library/conformance/.lake tests/sha256/.build tests/sys/.lake tests/sys/.build; do
-            [[ -d "$root/$d" ]] && cp -a "$root/$d" "$dir/$d" &&
-                { [[ "$d" != *.lake ]] || rm -rf "$dir/$d/config"; }
-        done
-    fi
+    take "$dir"
     if compgen -G "$root/.gate/*.green" >/dev/null; then
         mkdir -p "$dir/.gate" && cp "$root"/.gate/*.green "$dir/.gate/"
     fi
@@ -66,7 +85,8 @@ copy() {
 }
 
 # probe NAME PLANT EXPECT CHECK… — CHECK passes on a fresh copy, fails after PLANT with EXPECT in
-# its output, passes again after the copy is restored. `probe` queues; `launch` (after the last
+# its output, passes again after the copy is restored byte for byte (its own files + git from a
+# pristine copy, its `taken` directories from the tree). `probe` queues; `launch` (after the last
 # declaration) runs the queue in the background, at most $jobs at a time (each owns its copy),
 # `first` before the rest: the stage lasts at least its longest probe, so a long one started late
 # sets the tail (the index probes spread out: they share one lock). Results print in declaration
@@ -76,14 +96,15 @@ results="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 n=0
 run_probe() {
-    local name="$1" plant="$2" expect="$3" dir pristine control planted restored t took
+    local name="$1" plant="$2" expect="$3" dir pristine control planted restored t took skip
     shift 3
     # Wall-clock per phase (whole seconds; this background subshell's own SECONDS).
     SECONDS=0
     t=()
     dir="$(copy)"
     pristine="$(mktemp -d)"
-    cp -a "$dir/." "$pristine/"
+    mapfile -t skip < <(taken | sed 's|^|--exclude=/|')
+    rsync -a "${skip[@]}" "$dir/" "$pristine/"
     t+=("$SECONDS")
     (cd -- "$dir" && "$@") >"$pristine.control" 2>&1
     control=$?
@@ -92,7 +113,8 @@ run_probe() {
     (cd -- "$dir" && "$@") >"$pristine.planted" 2>&1
     planted=$?
     t+=("$SECONDS")
-    rsync -a --delete "$pristine/" "$dir/"
+    rsync -a --delete "${skip[@]}" "$pristine/" "$dir/"
+    take "$dir"
     (cd -- "$dir" && "$@") >"$pristine.restored" 2>&1
     restored=$?
     took="${SECONDS}s (copy ${t[0]}, control $((t[1] - t[0])), planted $((t[2] - t[1])), restored $((SECONDS - t[2])))"
@@ -110,13 +132,15 @@ run_probe() {
 }
 queued=()
 suites_of=()
+builds_of=()
 probe() {
     n=$((n + 1))
     printf -v 'queued[n]' '%q ' "$@"
     suites_of[n]="${with_suites:-0}"
+    builds_of[n]="${with_build:-1}"
 }
-first=(secrets coverage vendor-upstream index-replay fast-gate codec-suite index-drift library-conformance
-    index-registry)
+first=(coverage vendor-upstream coverage-extra-reach index-replay coverage-extra-root lean-fmt lean-style
+    sys-suite index-registry fast-gate cli index-drift manifest-suite codec-suite library-conformance)
 launch() {
     local i name order=() seen=" "
     for name in "${first[@]}"; do
@@ -129,7 +153,7 @@ launch() {
     done
     for i in "${order[@]}"; do
         while [[ "$(jobs -rp | wc -l)" -ge $jobs ]]; do wait -n; done
-        with_suites="${suites_of[i]}" eval "run_probe ${queued[i]}" \
+        with_suites="${suites_of[i]}" with_build="${builds_of[i]}" eval "run_probe ${queued[i]}" \
             >"$results/$(printf '%03d' "$i")" 2>&1 &
     done
 }
@@ -142,6 +166,7 @@ run_main() { # STAGES-text FUNCTIONS-text ARGS…
     shift 2
     bash -c 'source tools/gate.sh
 STAGES="$1"
+GATE_FIRST="" GATE_WEIGHTS=""
 eval "$2"
 shift 2
 main "$@"' _ "$stages" "$fns" "$@" 2>&1
@@ -160,7 +185,7 @@ aggregate() {
         "$out" == *"FAILED: mid-stage"* && "$out" == *"gate rc=1"* ]] && return 1
     return 0
 }
-probe gate-aggregate plant_marker "FAILED: mid-stage" aggregate
+with_build=0 probe gate-aggregate plant_marker "FAILED: mid-stage" aggregate
 
 # G1: a stage that exits its process cannot end the run; several failures are all named.
 exits() {
@@ -175,7 +200,7 @@ exits() {
         "$out" == *"FAILED: first leaver last"* ]] && return 1
     return 0
 }
-probe gate-stage-exit plant_marker "FAILED: first leaver last" exits
+with_build=0 probe gate-stage-exit plant_marker "FAILED: first leaver last" exits
 
 # G1/G2: an invalid registry (undefined function, duplicate, shardless) fails before any stage
 # runs, rc 2.
@@ -191,7 +216,36 @@ registry() {
     [[ $rc -eq 2 && "$out" != *"=== "* ]] && return 2
     return 0
 }
-probe gate-registry plant_marker "has no function ghost_stage" registry
+with_build=0 probe gate-registry plant_marker "has no function ghost_stage" registry
+
+# G1: a run-phase knob naming no stage or a weight that is no whole GiB fails before any stage
+# runs, rc 2.
+weights() {
+    local out rc knobs='GATE_FIRST=ok-stage GATE_WEIGHTS=ok-stage=2'
+    [[ -e .planted ]] && knobs='GATE_FIRST=ghost-stage GATE_WEIGHTS="ghost-stage=2 ok-stage=0"'
+    out="$(run_main $'\nok-stage probe\n' "ok_stage() { return 0; }; $knobs" --shard probe)"
+    rc=$?
+    printf '%s\n' "$out"
+    [[ $rc -eq 0 ]] && return 0
+    [[ $rc -eq 2 && "$out" != *"=== "* && "$out" == *"GATE_FIRST names no stage ghost-stage"* &&
+        "$out" == *"entry ok-stage=0 is not"* ]] && return 2
+    return 0
+}
+with_build=0 probe gate-weights plant_marker "GATE_WEIGHTS entry ghost-stage=2 is not <stage>=<GiB>" weights
+
+# G1: a run-phase knob that is not a positive integer (stages at once, memory GiB) fails before any
+# stage runs, rc 2 (control: both set).
+knobs() {
+    local out rc knobs='FVDEP_GATE_JOBS=2 FVDEP_GATE_MEMORY=1'
+    [[ -e .planted ]] && knobs='FVDEP_GATE_JOBS=0 FVDEP_GATE_MEMORY=1'
+    out="$(run_main $'\nok-stage probe\n' "ok_stage() { return 0; }; $knobs" --shard probe)"
+    rc=$?
+    printf '%s\n' "$out"
+    [[ $rc -eq 0 ]] && return 0
+    [[ $rc -eq 2 && "$out" != *"=== "* ]] && return 2
+    return 0
+}
+with_build=0 probe gate-knobs plant_marker "FVDEP_GATE_JOBS + FVDEP_GATE_MEMORY (GiB) must be positive integers" knobs
 
 # G2: an unknown shard → rc 2, no stage runs (control: a real shard).
 usage() {
@@ -204,7 +258,7 @@ usage() {
     [[ $rc -eq 2 && "$out" != *"=== "* ]] && return 2
     return 0
 }
-probe gate-usage plant_marker "usage: tools/gate.sh" usage
+with_build=0 probe gate-usage plant_marker "usage: tools/gate.sh" usage
 
 # G5: each stage's verdict + wall-clock lands in the step ledger as it ends (a red row
 # `unclassified`; tree = the graded file set, an untracked file included); an unwritable ledger
@@ -226,7 +280,7 @@ ledger_rows() {
         awk -F'\t' 'NR > 1 && !(NF == 7 && $1 ~ /^[0-9-]+T[0-9:]+Z$/ && $5 ~ /^[0-9]+\.[0-9]$/) {
             bad = 1 } END { exit bad }' .gate/ledger.tsv
 }
-probe gate-ledger plant_ledger "ledger: cannot append" ledger_rows
+with_build=0 probe gate-ledger plant_ledger "ledger: cannot append" ledger_rows
 
 # tree-clean: a stage that writes into the graded file set fails the run, the file named; a stage
 # writing an ignored path does not.
@@ -235,14 +289,14 @@ tree_written() {
         'writer() { mkdir -p .gate; printf x >.gate/ignored-output; [[ ! -e .planted ]] || printf x >probe-written.txt; }' \
         --shard probe
 }
-probe tree-clean plant_marker "probe-written.txt" tree_written
+with_build=0 probe tree-clean plant_marker "probe-written.txt" tree_written
 
 # G3: a stage whose pinned tool has no lock line fails; a changed cached tool binary is not used:
 # fetch-tools reinstalls it from the verified download (the planted case fails if corrupt bytes
 # survive).
 shell_stage() { bash -c 'source tools/gate.sh; shell'; }
 plant_no_shellcheck() { sed -i '/^shellcheck /d' tools/tools.lock; }
-probe gate-missing-tool plant_no_shellcheck "no pinned tool matches linux-x86_64 shellcheck" shell_stage
+with_build=0 probe gate-missing-tool plant_no_shellcheck "no pinned tool matches linux-x86_64 shellcheck" shell_stage
 cached_tool() {
     local before after recorded
     bash tools/fetch-tools.sh zizmor >/dev/null || return 1
@@ -259,10 +313,10 @@ cached_tool() {
     fi
     return 0
 }
-probe tool-identity plant_marker "corrupt cached binary replaced" cached_tool
+with_build=0 probe tool-identity plant_marker "corrupt cached binary replaced" cached_tool
 # shellcheck disable=SC2016  # the planted script's `$1` is literal on purpose
 plant_shell() { printf '#!/usr/bin/env bash\necho $1\n' >tools/probe-unquoted.sh; }
-probe shellcheck plant_shell "SC2086" shell_stage
+with_build=0 probe shellcheck plant_shell "SC2086" shell_stage
 
 # python: both pinned scanners fire inside unannotated helpers; a missing config stays red.
 python_stage() { bash -c 'source tools/gate.sh; python'; }
@@ -278,12 +332,12 @@ plant_python_warning() {
 plant_python_config() { plant_python_type; rm pyrefly.toml; }
 plant_python_ruff_missing() { sed -i '/^ruff /d' tools/tools.lock; }
 plant_python_pyrefly_missing() { sed -i '/^pyrefly /d' tools/tools.lock; }
-probe python-ruff plant_python_lint "F821" python_stage
-probe python-pyrefly plant_python_type "[missing-attribute]" python_stage
-probe python-warning plant_python_warning "[unreachable-except-clause]" python_stage
-probe python-config plant_python_config "pyrefly.toml" python_stage
-probe python-ruff-missing plant_python_ruff_missing "no pinned tool matches linux-x86_64 ruff" python_stage
-probe python-pyrefly-missing plant_python_pyrefly_missing "no pinned tool matches linux-x86_64 pyrefly" python_stage
+with_build=0 probe python-ruff plant_python_lint "F821" python_stage
+with_build=0 probe python-pyrefly plant_python_type "[missing-attribute]" python_stage
+with_build=0 probe python-warning plant_python_warning "[unreachable-except-clause]" python_stage
+with_build=0 probe python-config plant_python_config "pyrefly.toml" python_stage
+with_build=0 probe python-ruff-missing plant_python_ruff_missing "no pinned tool matches linux-x86_64 ruff" python_stage
+with_build=0 probe python-pyrefly-missing plant_python_pyrefly_missing "no pinned tool matches linux-x86_64 pyrefly" python_stage
 
 # secrets: a planted credential-shaped token in an untracked file.
 secrets_stage() { bash -c 'source tools/gate.sh; secrets'; }
@@ -291,7 +345,7 @@ secrets_stage() { bash -c 'source tools/gate.sh; secrets'; }
 plant_secret() {
     printf 'token = "ghp_%s"\n' "$(printf probe | sha256sum | head -c 36)" >probe-config.toml
 }
-probe secrets plant_secret "probe-config.toml" secrets_stage
+with_build=0 probe secrets plant_secret "probe-config.toml" secrets_stage
 
 # vulns: an unlisted lockfile; a listed lockfile that does not exist; a listed lockfile pinning a
 # package with published advisories (osv.dev).
@@ -318,51 +372,51 @@ plant_vulnerable() {
 JSON
     printf 'probe/package-lock.json\n' >>tools/lockfiles.txt
 }
-probe vulns-unlisted plant_unlisted "probe/Cargo.lock: lockfile not listed" vulns_stage
-probe vulns-missing plant_missing "probe/uv.lock does not exist" vulns_stage
-probe vulns-advisory plant_vulnerable "lodash" vulns_stage
+with_build=0 probe vulns-unlisted plant_unlisted "probe/Cargo.lock: lockfile not listed" vulns_stage
+with_build=0 probe vulns-missing plant_missing "probe/uv.lock does not exist" vulns_stage
+with_build=0 probe vulns-advisory plant_vulnerable "lodash" vulns_stage
 # A vendored commit OSV lists as affected (libxml2 6c128fd5, OSS-Fuzz git ranges).
 plant_vendor_vulnerable() {
     sed -i 's/"commit": "f557259007db9933442dde10aa995c1b00bd3446"/"commit": "6c128fd58a0e4641c23a345d413672494622db1b"/' \
         vendor/hacl-star/lock.json
 }
-probe vulns-vendor plant_vendor_vulnerable "OSV lists" vulns_stage
+with_build=0 probe vulns-vendor plant_vendor_vulnerable "OSV lists" vulns_stage
 
 # workflows: zizmor + actionlint each fire on a planted defect.
 workflows_stage() { bash -c 'source tools/gate.sh; workflows'; }
 plant_zizmor() { sed -i '/^          persist-credentials: false$/d' .github/workflows/gate.yml; }
 plant_actionlint() { sed -i 's/^    runs-on: ubuntu-26.04$/    runs-on: ubuntu-26.04\n    timeout-minutes: soon/' .github/workflows/codeql.yml; }
-probe workflows-zizmor plant_zizmor "artipacked" workflows_stage
-probe workflows-actionlint plant_actionlint "timeout-minutes" workflows_stage
+with_build=0 probe workflows-zizmor plant_zizmor "artipacked" workflows_stage
+with_build=0 probe workflows-actionlint plant_actionlint "timeout-minutes" workflows_stage
 
 # imports: a library module importing `Lean`; a tool module importing a foreign package; preview:
 # a library module importing the preview tree.
 plant_lib_import() { sed -i '1i import Lean' Fvdep/Version.lean; }
 plant_tool_import() { sed -i '1i import Mathlib' tool/FvdepCore/Cli.lean; }
 plant_preview() { sed -i '1i import FvdepPreview' Fvdep.lean; }
-probe imports-library plant_lib_import "Fvdep/Version.lean:1: import Lean" bash tools/check-imports.sh imports
-probe imports-tool plant_tool_import "tool/FvdepCore/Cli.lean:1: import Mathlib" bash tools/check-imports.sh imports
+with_build=0 probe imports-library plant_lib_import "Fvdep/Version.lean:1: import Lean" bash tools/check-imports.sh imports
+with_build=0 probe imports-tool plant_tool_import "tool/FvdepCore/Cli.lean:1: import Mathlib" bash tools/check-imports.sh imports
 # The audit tree reaches the build through the ledger alone: a shipped module + the test driver
 # importing it.
 plant_audit_shipped() { sed -i '1i import FvdepAudit.Json.Spec' tool/FvdepCore/Json.lean; }
 plant_audit_test() { sed -i '1i import FvdepAudit.Json.Spec' tool/Tests.lean; }
-probe imports-audit-shipped plant_audit_shipped "tool/FvdepCore/Json.lean:1: import FvdepAudit.Json.Spec" \
+with_build=0 probe imports-audit-shipped plant_audit_shipped "tool/FvdepCore/Json.lean:1: import FvdepAudit.Json.Spec" \
     bash tools/check-imports.sh imports
-probe imports-audit-test plant_audit_test "tool/Tests.lean:1: import FvdepAudit.Json.Spec" \
+with_build=0 probe imports-audit-test plant_audit_test "tool/Tests.lean:1: import FvdepAudit.Json.Spec" \
     bash tools/check-imports.sh imports
 # The dev driver library (U3 F6) never enters a shipped module.
 plant_dev_shipped() { sed -i '1i import FvdepDev.Sys' tool/FvdepIO/Run.lean; }
-probe imports-dev-shipped plant_dev_shipped "tool/FvdepIO/Run.lean:1: import FvdepDev.Sys" \
+with_build=0 probe imports-dev-shipped plant_dev_shipped "tool/FvdepIO/Run.lean:1: import FvdepDev.Sys" \
     bash tools/check-imports.sh imports
-probe preview plant_preview "Fvdep.lean:1: import FvdepPreview" bash tools/check-imports.sh preview
+with_build=0 probe preview plant_preview "Fvdep.lean:1: import FvdepPreview" bash tools/check-imports.sh preview
 # A module whose name only starts like an allowed root (the `\.`-in-awk-v regression).
 plant_prefix() { sed -i '1i import FvdepPlanted' FvdepPreview.lean; }
-probe imports-prefix plant_prefix "FvdepPreview.lean:1: import FvdepPlanted" bash tools/check-imports.sh imports
+with_build=0 probe imports-prefix plant_prefix "FvdepPreview.lean:1: import FvdepPlanted" bash tools/check-imports.sh imports
 plant_preview_proofs() { sed -i '1i import FvdepProofs' FvdepPreview.lean; }
-probe imports-preview-proofs plant_preview_proofs "FvdepPreview.lean:1: import FvdepProofs" \
+with_build=0 probe imports-preview-proofs plant_preview_proofs "FvdepPreview.lean:1: import FvdepProofs" \
     bash tools/check-imports.sh imports
 plant_proofs_outside() { sed -i '1i import Mathlib' FvdepProofs.lean; }
-probe imports-proofs plant_proofs_outside "FvdepProofs.lean:1: import Mathlib" \
+with_build=0 probe imports-proofs plant_proofs_outside "FvdepProofs.lean:1: import Mathlib" \
     bash tools/check-imports.sh imports
 
 # lean-style: a tab in a Lean source; a misformatted declaration lean-fmt would rewrite.
@@ -375,67 +429,67 @@ probe lean-fmt plant_misformat "Version.lean" lean_style_stage
 # fanout: a missing shard; a disabled gate step; a masked one; SHARD unbound; fail-fast on.
 fanout_stage() { bash -c 'source tools/gate.sh; fanout'; }
 plant_matrix() { sed -i 's/^\( *shard: \)\[lean, checks\]$/\1[lean]/' .github/workflows/gate.yml; }
-probe fanout-shards plant_matrix "matrix shards" fanout_stage
+with_build=0 probe fanout-shards plant_matrix "matrix shards" fanout_stage
 plant_disabled() {
     sed -i 's/^\(      - name: Run the gate shard\)$/\1\n        if: false/' .github/workflows/gate.yml
 }
-probe fanout-disabled plant_disabled "unconditional, unmasked" fanout_stage
+with_build=0 probe fanout-disabled plant_disabled "unconditional, unmasked" fanout_stage
 plant_masked() {
     sed -i 's/^\(      - name: Run the gate shard\)$/\1\n        continue-on-error: true/' .github/workflows/gate.yml
 }
-probe fanout-masked plant_masked "unconditional, unmasked" fanout_stage
+with_build=0 probe fanout-masked plant_masked "unconditional, unmasked" fanout_stage
 plant_unbound() { sed -i '/^      SHARD: \${{ matrix.shard }}$/d' .github/workflows/gate.yml; }
-probe fanout-unbound plant_unbound "SHARD bound" fanout_stage
+with_build=0 probe fanout-unbound plant_unbound "SHARD bound" fanout_stage
 plant_failfast() { sed -i 's/^      fail-fast: false$/      fail-fast: true/' .github/workflows/gate.yml; }
-probe fanout-failfast plant_failfast "fail-fast false" fanout_stage
+with_build=0 probe fanout-failfast plant_failfast "fail-fast false" fanout_stage
 
 # deps: a pinned tool without a dependency-table row.
 plant_tool() {
     printf 'planted 1.0.0 linux-x86_64 %064d https://github.com/planted/planted/releases/download/v1.0.0/planted.tar.gz\n' 0 \
         >>tools/tools.lock
 }
-probe deps plant_tool "planted has no row" python3 -I tools/check-deps.py
+with_build=0 probe deps plant_tool "planted has no row" python3 -I tools/check-deps.py
 plant_vendor_upstream() {
     sed -i 's#"upstream": "https://github.com/hacl-star/hacl-star"#"upstream": "https://github.com/planted/vendored"#' \
         vendor/hacl-star/lock.json
 }
-probe deps-vendor plant_vendor_upstream "planted/vendored has no row" python3 -I tools/check-deps.py
+with_build=0 probe deps-vendor plant_vendor_upstream "planted/vendored has no row" python3 -I tools/check-deps.py
 plant_afl_upstream() { sed -i 's#github.com/AFLplusplus/AFLplusplus/#github.com/planted/fuzzer/#' tools/afl.lock; }
-probe deps-afl plant_afl_upstream "planted/fuzzer has no row" python3 -I tools/check-deps.py
+with_build=0 probe deps-afl plant_afl_upstream "planted/fuzzer has no row" python3 -I tools/check-deps.py
 
 # vendor: one changed byte, a locked file missing, an unlocked file beside the locked ones.
 vendor_stage() { bash -c 'source tools/gate.sh; vendor'; }
 plant_vendor_byte() { printf 'x' >>vendor/hacl-star/dist/gcc-compatible/Hacl_Hash_SHA2.h; }
 plant_vendor_missing() { rm vendor/hacl-star/dist/LICENSE.txt; }
 plant_vendor_extra() { printf 'int planted;\n' >vendor/hacl-star/dist/gcc-compatible/planted.c; }
-probe vendor-byte plant_vendor_byte "Hacl_Hash_SHA2.h sha256 differs" vendor_stage
-probe vendor-missing plant_vendor_missing "dist/LICENSE.txt missing" vendor_stage
-probe vendor-extra plant_vendor_extra "planted.c not in" vendor_stage
+with_build=0 probe vendor-byte plant_vendor_byte "Hacl_Hash_SHA2.h sha256 differs" vendor_stage
+with_build=0 probe vendor-missing plant_vendor_missing "dist/LICENSE.txt missing" vendor_stage
+with_build=0 probe vendor-extra plant_vendor_extra "planted.c not in" vendor_stage
 # vendor-upstream: a commit-only bump to d826c0c9 (its Hacl_Hash_SHA2.c predates the locked one).
 plant_vendor_commit() {
     sed -i 's/"commit": "f557259007db9933442dde10aa995c1b00bd3446"/"commit": "d826c0c9fb494f9476aa3449d7a62412fb5be7d6"/' \
         vendor/hacl-star/lock.json
 }
-probe vendor-upstream plant_vendor_commit "no longer yields the locked bytes" \
+with_build=0 probe vendor-upstream plant_vendor_commit "no longer yields the locked bytes" \
     bash -c 'source tools/gate.sh; vendor_upstream'
 
 # renovate: a manager that stops matching; a half-applied version bump; a greedy Lake manager that
 # fuses two packages into one match (the two-package fixture catches it).
 plant_manager() { sed -i 's/leanprover\/lean4:v(?<currentValue>/leanprover\/lean5:v(?<currentValue>/' renovate.json; }
-probe renovate-extract plant_manager "lean-toolchain: extracted" python3 -I tools/check-renovate.py
+with_build=0 probe renovate-extract plant_manager "lean-toolchain: extracted" python3 -I tools/check-renovate.py
 plant_halfbump() { sed -i 's/^\(zizmor\) \([0-9.]*\) /\1 99.0.0 /' tools/tools.lock; }
-probe renovate-repin plant_halfbump "re-pin with tools/pin-tool.sh zizmor 99.0.0" \
+with_build=0 probe renovate-repin plant_halfbump "re-pin with tools/pin-tool.sh zizmor 99.0.0" \
     python3 -I tools/check-renovate.py
 plant_lake_manager() { sed -i 's/\*?\\"name\\"/*\\"name\\"/' renovate.json; }
-probe renovate-lake plant_lake_manager "tests/renovate/lake-manifest.json: extracted" \
+with_build=0 probe renovate-lake plant_lake_manager "tests/renovate/lake-manifest.json: extracted" \
     python3 -I tools/check-renovate.py
 plant_vendor_manager() { sed -i 's/\\"commit\\"/\\"comit\\"/' renovate.json; }
-probe renovate-vendor plant_vendor_manager "vendor/hacl-star/lock.json: extracted" \
+with_build=0 probe renovate-vendor plant_vendor_manager "vendor/hacl-star/lock.json: extracted" \
     python3 -I tools/check-renovate.py
 plant_afl_manager() { sed -i 's/) source /) sauce /' renovate.json; }
-probe renovate-afl plant_afl_manager "tools/afl.lock: extracted" python3 -I tools/check-renovate.py
+with_build=0 probe renovate-afl plant_afl_manager "tools/afl.lock: extracted" python3 -I tools/check-renovate.py
 plant_afl_halfbump() { sed -i -E 's/^(\S+) \S+ source /\1 9.99c source /' tools/afl.lock; }
-probe renovate-afl-repin plant_afl_halfbump "re-pin with tools/fuzz.sh pin 9.99c" \
+with_build=0 probe renovate-afl-repin plant_afl_halfbump "re-pin with tools/fuzz.sh pin 9.99c" \
     python3 -I tools/check-renovate.py
 
 # meta: version disagreement; an unquoted rule `paths:` entry; a Lake target the gate never builds.
@@ -443,18 +497,18 @@ meta_stage() { bash -c 'source tools/gate.sh; meta'; }
 plant_version() {
     sed -i 's/^def version : String := ".*"$/def version : String := "9.9.9"/' Fvdep/Version.lean
 }
-probe meta-version plant_version 'version "9.9.9" !=' meta_stage
+with_build=0 probe meta-version plant_version 'version "9.9.9" !=' meta_stage
 plant_rule() {
     mkdir -p .claude/rules
     printf -- '---\npaths:\n  - Fvdep/**\n---\n\n# planted\n' >.claude/rules/planted.md
 }
-probe meta-frontmatter plant_rule "paths entry is not a quoted glob" meta_stage
+with_build=0 probe meta-frontmatter plant_rule "paths entry is not a quoted glob" meta_stage
 plant_target() { printf '\nlean_lib FvdepPlanted\n' >>lakefile.lean; }
-probe meta-targets plant_target "FvdepPlanted" meta_stage
+with_build=0 probe meta-targets plant_target "FvdepPlanted" meta_stage
 
 # spec: a spec missing its Phase section.
 plant_spec() { sed -i '/^## Phase/,$d' .agent/spec.md; }
-probe spec plant_spec "spec-lint:" bash -c 'source tools/gate.sh; spec'
+with_build=0 probe spec plant_spec "spec-lint:" bash -c 'source tools/gate.sh; spec'
 
 # coverage: docs/verification.md one byte off the ledger's rendering → the `doc` finding.
 plant_doc_drift() { sed -i '1s/^/x/' docs/verification.md; }
@@ -583,8 +637,8 @@ plant_frozen() { # FILE
 }
 plant_frozen_jh() { plant_frozen tests/codec/FROZEN-JH.tsv; }
 plant_frozen_jhd() { plant_frozen tests/codec/FROZEN-JHD.tsv; }
-probe codec-freeze-jh plant_frozen_jh "B2-2 breach" python3 -I tests/codec/freeze_jh.py
-probe codec-freeze-jhd plant_frozen_jhd "B3-2 breach" python3 -I tests/codec/freeze_jhd.py
+with_build=0 probe codec-freeze-jh plant_frozen_jh "B2-2 breach" python3 -I tests/codec/freeze_jh.py
+with_build=0 probe codec-freeze-jhd plant_frozen_jhd "B3-2 breach" python3 -I tests/codec/freeze_jhd.py
 
 # cli: a binary answering as the contract says passes; one printing a wrong version fails. The fake
 # mirrors docs/interface.md §1–§2 whole, failed writes included (exit 2; the message unless the pipe
@@ -660,16 +714,27 @@ ci_verdict() {
     printf 'not green: %s\n' "$missing"
     return 1
 }
-probe ci-verdict plant_marker "not green: checks" ci_verdict
+with_build=0 probe ci-verdict plant_marker "not green: checks" ci_verdict
 
 # fast gate: a failing background stage (deps: a pin without a row) fails the fast gate, named.
 probe fast-gate plant_tool "FAILED: deps" bash tools/fast-gate.sh
 
+# fast gate: a build-consuming stage ahead of lean-build in FAST_STAGES (it would run before the
+# build) → exit 2 before any stage runs.
+plant_fast_order() { sed -i "/^FAST_STAGES=/s/ lean-build lean-style / lean-style lean-build /" tools/gate.sh; }
+probe fast-gate-order plant_fast_order "lean-build must lead" bash tools/fast-gate.sh
+
 # index (C7): the committed index.json one byte off the library → drift; a theorem forged in
 # FvdepProofs (kernel check skipped at elaboration) → the kernel replay rejects its module; a
 # registry list in a form fvdep cannot read → that refusal. A planted run builds the library afresh
-# (≈ 3 GB peak on the launch library) ⇒ one at a time across these probes (CI runners: 16 GB).
-index_stage() { flock "$scratch/index.lock" bash -c 'source tools/gate.sh; index'; }
+# (≈ 3 GB peak on the launch library) ⇒ a run that executes holds one lock across these probes (CI
+# runners: 16 GB); a control or restored run (closure = the tree's) reuses the verdict without it
+# (waiting there idles a probe slot for another probe's whole planted run).
+index_stage() {
+    bash -c 'source tools/gate.sh
+[[ "$(cat .gate/index.green 2>/dev/null)" == "$(index_key)" ]] || { exec 9>"$1" && flock 9; } || exit 2
+index' _ "$scratch/index.lock"
+}
 plant_index_drift() { printf ' ' >>index.json; }
 probe index-drift plant_index_drift "index.json differs from the library" index_stage
 plant_index_forged() {
