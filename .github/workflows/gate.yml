@@ -46,5 +46,11 @@ jobs:
         timeout-minutes: 10
         run: bash tools/install-lean.sh
 
+      # U5's sandbox: bubblewrap + one step with its flags (tools/install-bwrap.sh).
+      - name: Install bubblewrap and run one sandbox step
+        if: matrix.shard == 'lean'
+        timeout-minutes: 5
+        run: bash tools/install-bwrap.sh
+
       - name: Run the gate shard
         run: bash tools/gate.sh --shard "$SHARD"

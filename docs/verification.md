@@ -2123,6 +2123,274 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `lean-env` (`fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + `lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory `.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + marked irregular, a special file never opened); the build (Lake from fvdep's toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) + its first `error:` line, Lake's progress relayed through the line rule; the load (`importModules` over the built oleans) + the facts read from that environment (declarations, marks, module imports + files, entry files, ABI application types, spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry record fields, the kernel's verdict on each certificate literal (`Kernel.check` + `isDefEq`, synchronous); `leanchecker` over the built modules + its first rejection; `index.json`'s read + replace (`FvdepIO.Sys`))
 
+## `FvdepCore.Sandbox`
+
+- Contract: U5 R1
+- Claim: `bwrapArgs s`: bwrap reads exactly `ops s`, then the helper + the step's argv verbatim; the writable storage = two sized tmpfs (`/fvdep/work`, `/tmp`); the environment = cleared + exactly the spec's variables; `/` + `/dev` remounted read-only after every mount; every destination in the layout. Every host path is bound read-only: `Op` has no writable bind, network or namespace-sharing constructor.
+- Subject: `FvdepCore.Sandbox.bwrapArgs`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SandboxClaims.argsRead` (hash 0x300dd265), proved by `FvdepAudit.Sandbox.Proof.bwrapArgs_read`:
+
+  ```lean
+  ∀ (s : FvdepCore.Sandbox.Spec),
+    FvdepAudit.Sandbox.Spec.bwrapRead (FvdepCore.Sandbox.bwrapArgs s) =
+      some (FvdepCore.Sandbox.ops s, FvdepCore.Sandbox.helper :: s.argv)
+  ```
+- Statement `FvdepLedger.Rows.SandboxClaims.writableExact` (hash 0x17133e96), proved by `FvdepAudit.Sandbox.Proof.ops_writable`:
+
+  ```lean
+  ∀ (s : FvdepCore.Sandbox.Spec),
+    List.filter FvdepAudit.Sandbox.Spec.writableStorage (FvdepCore.Sandbox.ops s) =
+      [FvdepCore.Sandbox.Op.sizedTmpfs s.workBytes "/fvdep/work",
+        FvdepCore.Sandbox.Op.sizedTmpfs s.tmpBytes "/tmp"]
+  ```
+- Statement `FvdepLedger.Rows.SandboxClaims.envExact` (hash 0x57c4521a), proved by `FvdepAudit.Sandbox.Proof.ops_env`:
+
+  ```lean
+  ∀ (s : FvdepCore.Sandbox.Spec),
+    List.filter FvdepAudit.Sandbox.Spec.isEnv (FvdepCore.Sandbox.ops s) =
+      FvdepCore.Sandbox.Op.clearenv ::
+        List.map (fun e => FvdepCore.Sandbox.Op.setenv e.fst e.snd) s.env
+  ```
+- Statement `FvdepLedger.Rows.SandboxClaims.remountLast` (hash 0x52d5b253), proved by `FvdepAudit.Sandbox.Proof.ops_finish`:
+
+  ```lean
+  ∀ (s : FvdepCore.Sandbox.Spec),
+    ∃ pre,
+      FvdepCore.Sandbox.ops s =
+          pre ++
+            [FvdepCore.Sandbox.Op.remountRo "/", FvdepCore.Sandbox.Op.remountRo "/dev",
+              FvdepCore.Sandbox.Op.chdir "/fvdep/src", FvdepCore.Sandbox.Op.jsonStatusFd 3] ∧
+        ∀ (o : FvdepCore.Sandbox.Op), o ∈ pre → ∀ (d : String), o ≠ FvdepCore.Sandbox.Op.remountRo d
+  ```
+- Statement `FvdepLedger.Rows.SandboxClaims.destInLayout` (hash 0xe6a97ce9), proved by `FvdepAudit.Sandbox.Proof.ops_dest`:
+
+  ```lean
+  ∀ (s : FvdepCore.Sandbox.Spec) (o : FvdepCore.Sandbox.Op),
+    o ∈ FvdepCore.Sandbox.ops s →
+      ∀ (d : String), FvdepAudit.Sandbox.Spec.dest? o = some d → d ∈ FvdepAudit.Sandbox.Spec.layout
+  ```
+- Uninterpreted: none
+- Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3))
+- Unproven: none
+
+## `FvdepCore.Sandbox`
+
+- Contract: U5 R5 + R6
+- Claim: `classify`: one exit-code line → `exited` (a later deadline kill changes nothing); two or more → `protocol`; none → `timedOut` when the supervisor killed the step, else `setupFailed` with bwrap's first stderr line.
+- Subject: `FvdepCore.Sandbox.classify`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.SandboxClaims.outcomeExact` (hash 0x483b1b28), proved by `FvdepAudit.Sandbox.Proof.classify_exact`:
+
+  ```lean
+  ∀ (lines : List FvdepCore.Sandbox.StatusLine) (killed : Bool) (e : String),
+    (∀ (n : Nat),
+        FvdepCore.Sandbox.classify lines killed e = FvdepCore.Sandbox.Outcome.exited n ↔
+          List.filterMap FvdepCore.Sandbox.exitCodeOf lines = [n]) ∧
+      (FvdepCore.Sandbox.classify lines killed e = FvdepCore.Sandbox.Outcome.protocol ↔
+          2 ≤ (List.filterMap FvdepCore.Sandbox.exitCodeOf lines).length) ∧
+        (FvdepCore.Sandbox.classify lines killed e = FvdepCore.Sandbox.Outcome.timedOut ↔
+            List.filterMap FvdepCore.Sandbox.exitCodeOf lines = [] ∧ killed = true) ∧
+          ∀ (d : String),
+            FvdepCore.Sandbox.classify lines killed e = FvdepCore.Sandbox.Outcome.setupFailed d ↔
+              List.filterMap FvdepCore.Sandbox.exitCodeOf lines = [] ∧ killed = false ∧ d = e
+  ```
+- Uninterpreted: none
+- Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3))
+- Unproven: none
+
+## `FvdepCore.Build`
+
+- Contract: U5 K2
+- Claim: `plan nodes roots`: an order = a valid build order of the closure (each reached module once, a node, after all its imports); a refusal names a duplicate, a reached module no node provides (+ who imports it) or a nonempty set of reached modules each importing another of them; a missing or stuck refusal ⇒ no valid order exists.
+- Subject: `FvdepCore.Build.plan`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.BuildClaims.planValid` (hash 0x3d536164), proved by `FvdepAudit.Build.Proof.plan_ok`:
+
+  ```lean
+  ∀ (nodes : List FvdepCore.Build.Node) (roots order : List String),
+    FvdepCore.Build.plan nodes roots = Except.ok order →
+      FvdepAudit.Build.Spec.ValidOrder nodes roots order
+  ```
+- Statement `FvdepLedger.Rows.BuildClaims.planDuplicate` (hash 0x7da3733c), proved by `FvdepAudit.Build.Proof.plan_duplicate`:
+
+  ```lean
+  ∀ (nodes : List FvdepCore.Build.Node) (roots : List String) (n : String),
+    FvdepCore.Build.plan nodes roots = Except.error (FvdepCore.Build.Refusal.duplicate n) →
+      2 ≤ List.count n (List.map (fun x => x.name) nodes)
+  ```
+- Statement `FvdepLedger.Rows.BuildClaims.planMissing` (hash 0x4c417378), proved by `FvdepAudit.Build.Proof.plan_missing`:
+
+  ```lean
+  ∀ (nodes : List FvdepCore.Build.Node) (roots : List String) (a : Option String) (t : String),
+    FvdepCore.Build.plan nodes roots = Except.error (FvdepCore.Build.Refusal.missing a t) →
+      FvdepAudit.Build.Spec.Reach nodes roots t ∧
+        ¬t ∈ List.map (fun x => x.name) nodes ∧
+          (∀ (x : String),
+              a = some x →
+                FvdepAudit.Build.Spec.Reach nodes roots x ∧ FvdepAudit.Build.Spec.Imports nodes x t) ∧
+            (a = none → t ∈ roots)
+  ```
+- Statement `FvdepLedger.Rows.BuildClaims.planStuck` (hash 0xe7ac0a47), proved by `FvdepAudit.Build.Proof.plan_stuck`:
+
+  ```lean
+  ∀ (nodes : List FvdepCore.Build.Node) (roots ms : List String),
+    FvdepCore.Build.plan nodes roots = Except.error (FvdepCore.Build.Refusal.stuck ms) →
+      ms ≠ [] ∧
+        ∀ (m : String),
+          m ∈ ms →
+            FvdepAudit.Build.Spec.Reach nodes roots m ∧
+              ∃ i, FvdepAudit.Build.Spec.Imports nodes m i ∧ i ∈ ms
+  ```
+- Statement `FvdepLedger.Rows.BuildClaims.planRefuses` (hash 0xeb457639), proved by `FvdepAudit.Build.Proof.plan_refuses`:
+
+  ```lean
+  ∀ (nodes : List FvdepCore.Build.Node) (roots : List String) (r : FvdepCore.Build.Refusal),
+    FvdepCore.Build.plan nodes roots = Except.error r →
+      (∀ (n : String), r ≠ FvdepCore.Build.Refusal.duplicate n) →
+        ¬∃ order, FvdepAudit.Build.Spec.ValidOrder nodes roots order
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Build`
+
+- Contract: U5 K1 + T2
+- Claim: `preimage k` = the canonical JSON of `keyValue k` (recipe incl. the toolchain fingerprint, module, path, the source's SHA-256, the ordered imports with their keys): within the JSON profile's bounds distinct inputs have distinct preimages, so two inputs share a key (`keyOf h` = SHA-256 of the preimage) only through a SHA-256 collision (a stated premise, never a theorem).
+- Subject: `FvdepCore.Build.preimage`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.BuildClaims.preimageInjective` (hash 0xc069fb12), proved by `FvdepAudit.Build.Proof.preimage_injective`:
+
+  ```lean
+  ∀ (a b : FvdepCore.Build.KeyInput),
+    FvdepAudit.Build.Spec.Bounded a →
+      FvdepAudit.Build.Spec.Bounded b →
+        FvdepCore.Build.preimage a = FvdepCore.Build.preimage b → a = b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Build`
+
+- Contract: U5 K5
+- Claim: `evictPlan entries target`: from the unpinned entries in (used, key) order, the shortest prefix bringing the charged total to the target or under it — all of them when none does; a pinned entry is never named.
+- Subject: `FvdepCore.Build.evictPlan`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.BuildClaims.evictExact` (hash 0x9779a8c6), proved by `FvdepAudit.Build.Proof.evict_exact`:
+
+  ```lean
+  ∀ (entries : List FvdepCore.Build.Entry) (target : Nat),
+    ∃ cands,
+      cands.Perm (List.filter (fun x => !x.pinned) entries) ∧
+        List.Pairwise FvdepAudit.Build.Spec.LruBefore cands ∧
+          ∃ n,
+            FvdepCore.Build.evictPlan entries target = List.map (fun x => x.key) (List.take n cands) ∧
+              (n = cands.length ∨
+                  FvdepAudit.Build.Spec.charged entries -
+                      FvdepAudit.Build.Spec.charged (List.take n cands) ≤
+                    target) ∧
+                ∀ (j : Nat),
+                  j < n →
+                    target <
+                      FvdepAudit.Build.Spec.charged entries -
+                        FvdepAudit.Build.Spec.charged (List.take j cands)
+  ```
+- Uninterpreted: none
+- Residue: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over)
+- Unproven: none
+
+## `FvdepCore.Build`
+
+- Contract: U5 K6
+- Claim: `validate h dir m files` ⇔ the manifest is schema 1, its key inputs hash to the directory's name, no artifact takes a metadata file's name, both metadata files are present, every listed artifact is present with its size + digest, every file present is an artifact or one of the two metadata files.
+- Subject: `FvdepCore.Build.validate`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.BuildClaims.validateExact` (hash 0xc3959c35), proved by `FvdepAudit.Build.Proof.validate_exact`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (dir : String) (m : FvdepCore.Build.Manifest)
+    (files : List FvdepCore.Build.FileRec),
+    FvdepCore.Build.validate h dir m files = true ↔ FvdepAudit.Build.Spec.EntryValid h dir m files
+  ```
+- Uninterpreted: none
+- Residue: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over)
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 P5
+- Claim: `stepVerdict`: a step passes exactly on bwrap exit 0 + a complete frame recording the child's exit 0 + no size cap hit; it fails on its input exactly when bwrap + the frame agree on the child's exit code, no size cap was hit, + that code is nonzero (Lean refusing it; never a library root) or 0 with an incomplete artifact family; every other step gets `infra` (`Verdict`'s third case).
+- Subject: `FvdepCore.Phase.stepVerdict`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.verdictPass` (hash 0xe393d971), proved by `FvdepAudit.Phase.Proof.verdict_pass`:
+
+  ```lean
+  ∀ (s : FvdepCore.Phase.Step) (r : FvdepCore.Phase.StepResult),
+    FvdepCore.Phase.stepVerdict s r = FvdepCore.Phase.Verdict.pass ↔
+      r.outcome = FvdepCore.Sandbox.Outcome.exited 0 ∧
+        r.frame = FvdepCore.Phase.Frame.ok (FvdepCore.Phase.Child.exited 0) true ∧ r.exhausted = false
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.verdictFailed` (hash 0x2f781da4), proved by `FvdepAudit.Phase.Proof.verdict_failed`:
+
+  ```lean
+  ∀ (s : FvdepCore.Phase.Step) (r : FvdepCore.Phase.StepResult),
+    (∃ reason, FvdepCore.Phase.stepVerdict s r = FvdepCore.Phase.Verdict.failed reason) ↔
+      ∃ c complete,
+        r.outcome = FvdepCore.Sandbox.Outcome.exited c ∧
+          r.frame = FvdepCore.Phase.Frame.ok (FvdepCore.Phase.Child.exited c) complete ∧
+            r.exhausted = false ∧
+              (c ≠ 0 ∧ s ≠ FvdepCore.Phase.Step.libraryRoots ∨ c = 0 ∧ complete = false)
+  ```
+- Uninterpreted: none
+- Residue: `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes)
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 P8
+- Claim: `drive exec steps` runs exactly the steps up to + including the first that does not pass, in order, + returns it with its verdict; every step passing ⇒ all run + `none`.
+- Subject: `FvdepCore.Phase.drive`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.driveTrace` (hash 0xd2ae82af), proved by `FvdepAudit.Phase.Proof.drive_trace`:
+
+  ```lean
+  ∀ (answer : FvdepCore.Phase.Step → FvdepCore.Phase.StepResult)
+    (steps acc : List FvdepCore.Phase.Step),
+    ((∀ (s : FvdepCore.Phase.Step),
+          s ∈ steps → FvdepCore.Phase.stepVerdict s (answer s) = FvdepCore.Phase.Verdict.pass) →
+        StateT.run (FvdepCore.Phase.drive (FvdepAudit.Phase.Spec.record answer) steps) acc =
+          (none, acc ++ steps)) ∧
+      ∀ (pre : List FvdepCore.Phase.Step) (s : FvdepCore.Phase.Step)
+        (post : List FvdepCore.Phase.Step),
+        steps = pre ++ s :: post →
+          (∀ (p : FvdepCore.Phase.Step),
+              p ∈ pre → FvdepCore.Phase.stepVerdict p (answer p) = FvdepCore.Phase.Verdict.pass) →
+            FvdepCore.Phase.stepVerdict s (answer s) ≠ FvdepCore.Phase.Verdict.pass →
+              StateT.run (FvdepCore.Phase.drive (FvdepAudit.Phase.Spec.record answer) steps) acc =
+                (some (s, FvdepCore.Phase.stepVerdict s (answer s)), acc ++ pre ++ [s])
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 S2
+- Claim: `stem` (`A.B` → `A/B`): distinct module names without `/` (U3 T3's) have distinct stems, so the frames of `implSources` + `proofSources` name distinct files.
+- Subject: `FvdepCore.Phase.stem`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.stemInjective` (hash 0xa9b4aecf), proved by `FvdepAudit.Phase.Proof.stem_injective`:
+
+  ```lean
+  ∀ (a b : String),
+    ¬'/' ∈ a.toList → ¬'/' ∈ b.toList → FvdepCore.Phase.stem a = FvdepCore.Phase.stem b → a = b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
@@ -2133,3 +2401,6 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - `sys-shim` — the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close): C + the OS have no Lean semantics: each export is one reviewed syscall; the policy over them is proven (rows `FvdepIO.Sys.Policy`); the mapping is tested by `lake test` (replace over absent, present, symlink + directory targets, missing directory, read back, absent + empty reads, the caller's read cap, writer lock contention + exception, Writer lifecycle) + F6's blind suite (stage `sys-suite`, 2,819 credited cases through the dev driver `fvdep-dev`: an LD_PRELOAD fault injector scripting each syscall (every op × errno, `EINTR` budgets, short + zero reads and writes), a crash cut at every syscall of a `replace`, lock contention between processes, ZFS + the gate host's filesystem, the shim + guard under gcc ASan + UBSan) + fuzz target `sys-actions` (action sequences over the shim + guard; corpus replayed under gcc ASan + UBSan by stage `fuzz-replay`) (ruling: "the persistence syscall shim + writer guard (tested)")
 - `lean-env` — `fvdep index`'s observation filler (`FvdepIO.Index`): the presence probe + `lean-toolchain`'s bytes; the snapshot (the three root modules + the `.lean` files of `Fvdep`, `FvdepPreview` + `FvdepProofs` copied into a per-process run directory `.lake/fvdep-index/<pid>/`, removed at the end; a link followed for its content + marked irregular, a special file never opened); the build (Lake from fvdep's toolchain in a clean environment: PATH, HOME, ELAN_HOME, Lake's artifact cache off) + its first `error:` line, Lake's progress relayed through the line rule; the load (`importModules` over the built oleans) + the facts read from that environment (declarations, marks, module imports + files, entry files, ABI application types, spec-type comparisons), `collectAxioms` per `FvdepProofs` theorem, the registry record fields, the kernel's verdict on each certificate literal (`Kernel.check` + `isDefEq`, synchronous); `leanchecker` over the built modules + its first rejection; `index.json`'s read + replace (`FvdepIO.Sys`): the toolchain's environment + Lake and `leanchecker` as processes have no Lean semantics to prove against: the observations are the plan claims' premise (Decisions U4 C-rules: `Facts`); tested by tester-5's blind suite (stage `index-suite`, 701 cases through the built `fvdep`: each C9 refusal class with its message, the schema-1 bytes + the entry count, identity (digest inputs: comments, proofs + unrelated entries), purity (planted artifacts, environment + an absolute path leave the bytes unchanged; `--check` + drift leave `index.json` untouched), two concurrent runs, load + write faults injected by an `LD_PRELOAD` library, Lake's progress through the line rule) + `tests/cli/smoke.sh` (`index --help`, `help index`, usage) (ruling: "`fvdep index`'s observation filler (tested)")
 - `literal` — literal data (the version string `Fvdep.version`): a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both lakefiles (ruling: "Literal data (the version string) is checked by the gate's `meta` stage")
+- `bwrap` — bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3): an OS tool with no Lean semantics; the claims hold the arguments fvdep builds against a model of bwrap's reading, written from its manual (bubblewrap 0.11.1); the CI smoke + U5-B's isolation tests (G1) check the real tool on vflab + the CI runner (ruling: "bwrap")
+- `lean-toolchain` — `lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes: the toolchain is trusted (Decisions `Self-verification scope`: Lean parser, elaborator + exporter); P5's verdicts map its exit codes, tested by tester-6's blind suite through `fvdep-dev` (U5-D) (ruling: "Lean parser, elaborator + exporter")
+- `cache-fs` — the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over: filesystem semantics have no Lean model here; the pure policies decide over observed state (K5, K6), the effects are tested by K7's work counts + tester-6's cache cases (U5-C) (ruling: "the build cache's filesystem effects")

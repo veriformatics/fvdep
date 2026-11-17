@@ -1,3 +1,6 @@
+import FvdepAudit.Build.Proof.Cache
+import FvdepAudit.Build.Proof.Key
+import FvdepAudit.Build.Proof.Plan
 import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Hash.Proof.Frame
@@ -12,9 +15,11 @@ import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
+import FvdepAudit.Phase.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
+import FvdepAudit.Sandbox.Proof
 import FvdepAudit.Sys.Proof.Claims
 import FvdepLedger.Types
 import Main
@@ -1242,6 +1247,161 @@ def historyExact : Prop :=
 
 end FvdepLedger.Rows.HistoryClaims
 
+namespace FvdepLedger.Rows.SandboxClaims
+
+open FvdepCore.Sandbox FvdepAudit.Sandbox.Spec
+
+/-- R1: bwrap (as `bwrapRead` models its argument reading) reads `bwrapArgs s` as exactly `ops s`,
+then the helper + the step's argv verbatim. -/
+def argsRead : Prop := ∀ (s : Spec), bwrapRead (bwrapArgs s) = some (ops s, helper :: s.argv)
+
+/-- R1 (f): the storage the sandbox keeps writable = the two sized tmpfs, at `/fvdep/work` + `/tmp`.
+-/
+def writableExact : Prop :=
+  ∀ (s : Spec),
+    (ops s).filter writableStorage =
+      [.sizedTmpfs s.workBytes "/fvdep/work", .sizedTmpfs s.tmpBytes "/tmp"]
+
+/-- R1 (c): the environment operations = clear, then exactly the spec's variables in order. -/
+def envExact : Prop :=
+  ∀ (s : Spec), (ops s).filter isEnv = .clearenv :: s.env.map fun e => .setenv e.1 e.2
+
+/-- R1 (f): the operations end with `/` + `/dev` remounted read-only, the cwd + the status
+descriptor; no remount before them. -/
+def remountLast : Prop :=
+  ∀ (s : Spec),
+    ∃ pre,
+      ops s = pre ++ [.remountRo "/", .remountRo "/dev", .chdir "/fvdep/src", .jsonStatusFd 3] ∧
+        ∀ o ∈ pre, ∀ d, o ≠ .remountRo d
+
+/-- R1 (e): every destination an operation names lies in the layout. -/
+def destInLayout : Prop := ∀ (s : Spec), ∀ o ∈ ops s, ∀ d, dest? o = some d → d ∈ layout
+
+/-- R6: the outcome precedence: one exit-code line → exited; two or more → protocol; none → timedOut
+when killed, else setupFailed with bwrap's first stderr line. -/
+def outcomeExact : Prop :=
+  ∀ (lines : List StatusLine) (killed : Bool) (e : String),
+    (∀ n, classify lines killed e = .exited n ↔ lines.filterMap exitCodeOf = [n]) ∧
+      (classify lines killed e = .protocol ↔ 2 ≤ (lines.filterMap exitCodeOf).length) ∧
+      (classify lines killed e = .timedOut ↔ lines.filterMap exitCodeOf = [] ∧ killed = true) ∧
+      ∀ d,
+        classify lines killed e = .setupFailed d ↔
+          lines.filterMap exitCodeOf = [] ∧ killed = false ∧ d = e
+
+end FvdepLedger.Rows.SandboxClaims
+
+namespace FvdepLedger.Rows.BuildClaims
+
+open FvdepCore.Build FvdepAudit.Build.Spec
+
+/-- K2: a planned order is a valid build order of the closure (each reached module once, a node,
+after all its imports). -/
+def planValid : Prop :=
+  ∀ (nodes : List Node) (roots order : List String) (_h : plan nodes roots = .ok order),
+    ValidOrder nodes roots order
+
+/-- K2: a duplicate refusal names a module two nodes share. -/
+def planDuplicate : Prop :=
+  ∀ (nodes : List Node) (roots : List String) (n : String)
+    (_h : plan nodes roots = .error (.duplicate n)), 2 ≤ (nodes.map (·.name)).count n
+
+/-- K2: a missing refusal names a reached module no node provides + a reached module importing it
+(none: a root). -/
+def planMissing : Prop :=
+  ∀ (nodes : List Node) (roots : List String) (a : Option String) (t : String)
+    (_h : plan nodes roots = .error (.missing a t)),
+    Reach nodes roots t ∧
+      t ∉ nodes.map (·.name) ∧
+      (∀ x, a = some x → Reach nodes roots x ∧ Imports nodes x t) ∧ (a = none → t ∈ roots)
+
+/-- K2: a stuck refusal names reached modules, nonempty, each importing another of them. -/
+def planStuck : Prop :=
+  ∀ (nodes : List Node) (roots ms : List String) (_h : plan nodes roots = .error (.stuck ms)),
+    ms ≠ [] ∧ ∀ m ∈ ms, Reach nodes roots m ∧ ∃ i, Imports nodes m i ∧ i ∈ ms
+
+/-- K2: a missing or stuck refusal ⇒ no valid build order exists. -/
+def planRefuses : Prop :=
+  ∀ (nodes : List Node) (roots : List String) (r : Refusal) (_h : plan nodes roots = .error r)
+    (_hr : ∀ n, r ≠ .duplicate n), ¬∃ order, ValidOrder nodes roots order
+
+end FvdepLedger.Rows.BuildClaims
+
+namespace FvdepLedger.Rows.BuildClaims
+
+open FvdepCore.Build FvdepAudit.Build.Spec
+
+/-- K1: within the JSON profile's bounds, distinct key inputs have distinct preimages (keys collide
+only through SHA-256). -/
+def preimageInjective : Prop :=
+  ∀ (a b : KeyInput) (_ha : Bounded a) (_hb : Bounded b) (_h : preimage a = preimage b), a = b
+
+end FvdepLedger.Rows.BuildClaims
+
+namespace FvdepLedger.Rows.BuildClaims
+
+open FvdepCore.Build FvdepAudit.Build.Spec
+
+/-- K5: eviction takes, from the unpinned entries in (used, key) order, the shortest prefix bringing
+the charged total to the target or under it — all when none does. -/
+def evictExact : Prop :=
+  ∀ (entries : List Entry) (target : Nat),
+    ∃ cands : List Entry,
+      cands.Perm (entries.filter (!·.pinned)) ∧
+        cands.Pairwise LruBefore ∧
+        ∃ n,
+          evictPlan entries target = (cands.take n).map (·.key) ∧
+            (n = cands.length ∨ charged entries - charged (cands.take n) ≤ target) ∧
+            ∀ j < n, target < charged entries - charged (cands.take j)
+
+/-- K6: `validate` accepts exactly the valid entries. -/
+def validateExact : Prop :=
+  ∀ (h : ByteArray → String) (dir : String) (m : Manifest) (files : List FileRec),
+    validate h dir m files = true ↔ EntryValid h dir m files
+
+end FvdepLedger.Rows.BuildClaims
+
+namespace FvdepLedger.Rows.PhaseClaims
+
+open FvdepCore.Phase FvdepCore.Sandbox FvdepAudit.Phase.Spec
+
+/-- P5: a step passes exactly when bwrap reports exit 0, the frame is complete + records the child
+exiting 0, + no size cap was hit. -/
+def verdictPass : Prop :=
+  ∀ (s : Step) (r : StepResult),
+    stepVerdict s r = .pass ↔
+      r.outcome = Outcome.exited 0 ∧ r.frame = Frame.ok (Child.exited 0) true ∧ r.exhausted = false
+
+/-- P5: a step fails on its input exactly when bwrap + the frame agree that its child exited with
+code `c`, no size cap was hit, + `c` ≠ 0 (Lean refusing the input; never a library root) or `c` = 0
+with an incomplete artifact family. -/
+def verdictFailed : Prop :=
+  ∀ (s : Step) (r : StepResult),
+    (∃ reason, stepVerdict s r = .failed reason) ↔
+      ∃ c complete,
+        r.outcome = Outcome.exited c ∧
+          r.frame = Frame.ok (Child.exited c) complete ∧
+          r.exhausted = false ∧ ((c ≠ 0 ∧ s ≠ .libraryRoots) ∨ (c = 0 ∧ complete = false))
+
+/-- P8: the driver executes exactly the steps up to + including the first that does not pass, in
+order, + returns it with its verdict; every step passing ⇒ all run + none. -/
+def driveTrace : Prop :=
+  ∀ (answer : Step → StepResult),
+    ∀ (steps acc : List Step),
+      ((∀ s ∈ steps, stepVerdict s (answer s) = .pass) →
+          (drive (record answer) steps).run acc = (none, acc ++ steps)) ∧
+        ∀ pre s post,
+          steps = pre ++ s :: post →
+            (∀ p ∈ pre, stepVerdict p (answer p) = .pass) →
+            stepVerdict s (answer s) ≠ .pass →
+            (drive (record answer) steps).run acc =
+              (some (s, stepVerdict s (answer s)), acc ++ pre ++ [s])
+
+/-- S2: distinct module names without `/` have distinct path stems (U3 T3's names have none). -/
+def stemInjective : Prop :=
+  ∀ (a b : String) (_ha : '/' ∉ a.toList) (_hb : '/' ∉ b.toList) (_h : stem a = stem b), a = b
+
+end FvdepLedger.Rows.PhaseClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -1407,6 +1567,38 @@ def residue : List Residue :=
         "a constant has no behaviour to prove; the gate's `meta` stage holds it equal to both " ++
           "lakefiles"
       ruling := "Literal data (the version string) is checked by the gate's `meta` stage"
+      boundary := [] },
+    { id := "bwrap"
+      what :=
+        "bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option " ++
+          "by its name + arity, `--` ends the options) + what each operation does (namespaces, " ++
+          "read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)"
+      reason :=
+        "an OS tool with no Lean semantics; the claims hold the arguments fvdep builds against " ++
+          "a model of bwrap's reading, written from its manual (bubblewrap 0.11.1); the CI " ++
+          "smoke + U5-B's isolation tests (G1) check the real tool on vflab + the CI runner"
+      ruling := "bwrap"
+      boundary := [] },
+    { id := "lean-toolchain"
+      what :=
+        "`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input " ++
+          "exits 1), its outputs + diagnostics, the export's bytes"
+      reason :=
+        "the toolchain is trusted (Decisions `Self-verification scope`: Lean parser, " ++
+          "elaborator + exporter); P5's verdicts map its exit codes, tested by tester-6's blind " ++
+          "suite through `fvdep-dev` (U5-D)"
+      ruling := "Lean parser, elaborator + exporter"
+      boundary := [] },
+    { id := "cache-fs"
+      what :=
+        "the build cache's filesystem effects: publication (temp, fsync, rename, directory " ++
+          "fsync), per-key locks + pins, the observed entry listings + use stamps eviction + " ++
+          "validation decide over"
+      reason :=
+        "filesystem semantics have no Lean model here; the pure policies decide over observed " ++
+          "state (K5, K6), the effects are tested by K7's work counts + tester-6's cache cases " ++
+          "(U5-C)"
+      ruling := "the build cache's filesystem effects"
       boundary := [] }]
 
 def cliRow : Row :=
@@ -2304,6 +2496,159 @@ def indexFillerRow : Row :=
     residue := ["os", "runtime"]
     unproven := ["lean-env"] }
 
+/-- U5 R1: the bwrap arguments of a sandbox step (no caller before U8's `check`). -/
+def sandboxArgsRow : Row :=
+  { component := `FvdepCore.Sandbox
+    contract := "U5 R1"
+    claim :=
+      "`bwrapArgs s`: bwrap reads exactly `ops s`, then the helper + the step's argv verbatim; " ++
+        "the writable storage = two sized tmpfs (`/fvdep/work`, `/tmp`); the environment = " ++
+        "cleared + exactly the spec's variables; `/` + `/dev` remounted read-only after every " ++
+        "mount; every destination in the layout. Every host path is bound read-only: `Op` has " ++
+        "no writable bind, network or namespace-sharing constructor."
+    claims :=
+      [(``SandboxClaims.argsRead, ``FvdepAudit.Sandbox.Proof.bwrapArgs_read),
+        (``SandboxClaims.writableExact, ``FvdepAudit.Sandbox.Proof.ops_writable),
+        (``SandboxClaims.envExact, ``FvdepAudit.Sandbox.Proof.ops_env),
+        (``SandboxClaims.remountLast, ``FvdepAudit.Sandbox.Proof.ops_finish),
+        (``SandboxClaims.destInLayout, ``FvdepAudit.Sandbox.Proof.ops_dest)]
+    subject := ``FvdepCore.Sandbox.bwrapArgs
+    path := []
+    noCaller := "U8"
+    residue := ["bwrap"]
+    unproven := [] }
+
+/-- U5 R6: a step's outcome from bwrap's status lines. -/
+def sandboxOutcomeRow : Row :=
+  { component := `FvdepCore.Sandbox
+    contract := "U5 R5 + R6"
+    claim :=
+      "`classify`: one exit-code line → `exited` (a later deadline kill changes nothing); two " ++
+        "or more → `protocol`; none → `timedOut` when the supervisor killed the step, else " ++
+        "`setupFailed` with bwrap's first stderr line."
+    claims := [(``SandboxClaims.outcomeExact, ``FvdepAudit.Sandbox.Proof.classify_exact)]
+    subject := ``FvdepCore.Sandbox.classify
+    path := []
+    noCaller := "U8"
+    residue := ["bwrap"]
+    unproven := [] }
+
+/-- U5 K2: the build plan over a module graph. -/
+def buildPlanRow : Row :=
+  { component := `FvdepCore.Build
+    contract := "U5 K2"
+    claim :=
+      "`plan nodes roots`: an order = a valid build order of the closure (each reached module " ++
+        "once, a node, after all its imports); a refusal names a duplicate, a reached module " ++
+        "no node provides (+ who imports it) or a nonempty set of reached modules each " ++
+        "importing another of them; a missing or stuck refusal ⇒ no valid order exists."
+    claims :=
+      [(``BuildClaims.planValid, ``FvdepAudit.Build.Proof.plan_ok),
+        (``BuildClaims.planDuplicate, ``FvdepAudit.Build.Proof.plan_duplicate),
+        (``BuildClaims.planMissing, ``FvdepAudit.Build.Proof.plan_missing),
+        (``BuildClaims.planStuck, ``FvdepAudit.Build.Proof.plan_stuck),
+        (``BuildClaims.planRefuses, ``FvdepAudit.Build.Proof.plan_refuses)]
+    subject := ``FvdepCore.Build.plan
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 K1: a cached module's key preimage. -/
+def buildKeyRow : Row :=
+  { component := `FvdepCore.Build
+    contract := "U5 K1 + T2"
+    claim :=
+      "`preimage k` = the canonical JSON of `keyValue k` (recipe incl. the toolchain " ++
+        "fingerprint, module, path, the source's SHA-256, the ordered imports with their " ++
+        "keys): within the JSON profile's bounds distinct inputs have distinct preimages, so " ++
+        "two inputs share a key (`keyOf h` = SHA-256 of the preimage) only through a SHA-256 " ++
+        "collision (a stated premise, never a theorem)."
+    claims := [(``BuildClaims.preimageInjective, ``FvdepAudit.Build.Proof.preimage_injective)]
+    subject := ``FvdepCore.Build.preimage
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 K5: the eviction policy over the observed entries. -/
+def buildEvictRow : Row :=
+  { component := `FvdepCore.Build
+    contract := "U5 K5"
+    claim :=
+      "`evictPlan entries target`: from the unpinned entries in (used, key) order, the " ++
+        "shortest prefix bringing the charged total to the target or under it — all of them " ++
+        "when none does; a pinned entry is never named."
+    claims := [(``BuildClaims.evictExact, ``FvdepAudit.Build.Proof.evict_exact)]
+    subject := ``FvdepCore.Build.evictPlan
+    path := []
+    noCaller := "U8"
+    residue := ["cache-fs"]
+    unproven := [] }
+
+/-- U5 K6: a cache entry's validation over its observed files. -/
+def buildValidateRow : Row :=
+  { component := `FvdepCore.Build
+    contract := "U5 K6"
+    claim :=
+      "`validate h dir m files` ⇔ the manifest is schema 1, its key inputs hash to the " ++
+        "directory's name, no artifact takes a metadata file's name, both metadata files are " ++
+        "present, every listed artifact is present with its size + digest, every file present " ++
+        "is an artifact or one of the two metadata files."
+    claims := [(``BuildClaims.validateExact, ``FvdepAudit.Build.Proof.validate_exact)]
+    subject := ``FvdepCore.Build.validate
+    path := []
+    noCaller := "U8"
+    residue := ["cache-fs"]
+    unproven := [] }
+
+/-- U5 P5: a step's verdict. -/
+def phaseVerdictRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 P5"
+    claim :=
+      "`stepVerdict`: a step passes exactly on bwrap exit 0 + a complete frame recording the " ++
+        "child's exit 0 + no size cap hit; it fails on its input exactly when bwrap + the " ++
+        "frame agree on the child's exit code, no size cap was hit, + that code is nonzero " ++
+        "(Lean refusing it; never a library root) or 0 with an incomplete artifact family; " ++
+        "every other step gets `infra` (`Verdict`'s third case)."
+    claims :=
+      [(``PhaseClaims.verdictPass, ``FvdepAudit.Phase.Proof.verdict_pass),
+        (``PhaseClaims.verdictFailed, ``FvdepAudit.Phase.Proof.verdict_failed)]
+    subject := ``FvdepCore.Phase.stepVerdict
+    path := []
+    noCaller := "U8"
+    residue := ["lean-toolchain"]
+    unproven := [] }
+
+/-- U5 P8: the phase driver. -/
+def phaseDriveRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 P8"
+    claim :=
+      "`drive exec steps` runs exactly the steps up to + including the first that does not " ++
+        "pass, in order, + returns it with its verdict; every step passing ⇒ all run + `none`."
+    claims := [(``PhaseClaims.driveTrace, ``FvdepAudit.Phase.Proof.drive_trace)]
+    subject := ``FvdepCore.Phase.drive
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 S2: a module's source path. -/
+def phaseStemRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 S2"
+    claim :=
+      "`stem` (`A.B` → `A/B`): distinct module names without `/` (U3 T3's) have distinct " ++
+        "stems, so the frames of `implSources` + `proofSources` name distinct files."
+    claims := [(``PhaseClaims.stemInjective, ``FvdepAudit.Phase.Proof.stem_injective)]
+    subject := ``FvdepCore.Phase.stem
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2317,7 +2662,9 @@ def ledger : Ledger :=
         sysReplaceRow, sysReadRow, sysLockRow, sysNativeRow, protocolRow, protocolSigRow,
         indexDecodeRow, indexEncodeRow, registryReadRow, registryProofsRow, registryLiteralRow,
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
-        historyRow, indexCommandRow, indexFillerRow]
+        historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
+        buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
+        phaseStemRow]
     residue := residue }
 
 end FvdepLedger.Rows
