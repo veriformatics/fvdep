@@ -73,8 +73,9 @@ code. -/
 def emit (o : Outcome) : Plan UInt32 :=
   if o.stdout.isEmpty then emitErr o else .step (.out o.stdout) fun _ => emitErr o
 
-/-- C4's digest function: lowercase hex of SHA-256 (HACL*, residue `hacl-sha256`). -/
-def sha (b : ByteArray) : String := FvdepCore.Hash.hex (FvdepIO.Hash.sha256 b)
+/-- C4's digest function = H3's hash step (HACL*, residue `hacl-sha256`): over an entry's frame it
+equals `FvdepIO.Hash.digest .entry` of the entry's closure files (`tool/Tests.lean`, by `rfl`). -/
+def sha (b : ByteArray) : String := FvdepIO.Hash.sha256Hex b
 
 /-- The whole command line as a plan: `main` = `FvdepIO.execute (plan args)`; `fvdep index
 [--check]` = its own plan (contract U4 C1), every other command line = its outcome. -/

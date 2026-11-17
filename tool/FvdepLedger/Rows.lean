@@ -1123,10 +1123,11 @@ def registryDecodeExact : Prop :=
   ∀ (F : Facts) (f : Form) (e : Expr) (env : List Expr) (p : List Name) (v : Val),
     decode F f e env p = .ok v ↔ Denotes F f e env p v
 
-/-- U4 C2: `readRegistry` returns `r` exactly when the four registry list constants denote `r`'s
-records (their layouts, written apart; `profiles` = its length). -/
+/-- U4 C2: the registry lists as read (`readRaw`), mapped to their records (`Lists.ofRaw`), are `r`
+exactly when the four registry list constants denote `r`'s records (their layouts, written apart;
+`profiles` = its length). -/
 def registryReadExact : Prop :=
-  ∀ (F : Facts) (r : Lists), readRegistry F = .ok r ↔ RegistryDenotes F r
+  ∀ (F : Facts) (r : Lists), (readRaw F).map Lists.ofRaw = .ok r ↔ RegistryDenotes F r
 
 /-- U4 C2 + C5: `readProofs` returns `pr` exactly when the proof registry constant denotes `pr`'s
 layout. -/
@@ -1763,11 +1764,13 @@ def sha256DigestRow : Row :=
     claim :=
       "`digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = " ++
         "HACL*'s verified C behind the FFI (tested residue `hacl-sha256`; `digest` itself: S5's " ++
-        "blind suite, stage `codec-suite`, against an independent frame encoder)."
+        "blind suite, stage `codec-suite`, against an independent frame encoder). Its hash step " ++
+        "`sha256Hex` = `fvdep index`'s (`Cli.sha` over `entryFrame` = `digest .entry` of the " ++
+        "closure files, by `rfl` in `tool/Tests.lean`)."
     claims := []
     subject := ``FvdepIO.Hash.digest
     path := []
-    noCaller := "U4"
+    noCaller := "U5"
     residue := ["runtime"]
     unproven := ["hacl-sha256"] }
 
@@ -2068,7 +2071,7 @@ def indexDecodeRow : Row :=
         (``IndexClaims.indexBytesText, ``FvdepAudit.Index.Proof.index_bytes_text)]
     subject := ``FvdepCore.Index.decodeIndex
     path := []
-    noCaller := "U4"
+    noCaller := "U5b"
     residue := []
     unproven := [] }
 
@@ -2102,15 +2105,16 @@ def registryReadRow : Row :=
         "the accepted-forms relation, written apart, relates it (metadata, `let`/`have`, root " ++
         "registry module constants, `<M>.entry` references, `List.nil`/`List.cons`/the standard " ++
         "`++`, constructor applications over string + name literals, `Option`, enumerations); " ++
-        "`readRegistry` returns exactly the records the four list constants denote; the shipped " ++
-        "record forms = the registry types' field order."
+        "`readRaw` then `Lists.ofRaw` (as `fvdep index`'s `judge` calls them) return exactly " ++
+        "the records the four list constants denote; the shipped record forms = the registry " ++
+        "types' field order."
     claims :=
       [(``RegistryClaims.registryDecodeExact, ``FvdepAudit.Registry.Proof.registry_decode),
         (``RegistryClaims.registryReadExact, ``FvdepAudit.Registry.Proof.registry_read),
         (``RegistryClaims.registryFormsExact, ``FvdepAudit.Registry.Proof.registry_forms)]
-    subject := ``FvdepCore.Index.Registry.readRegistry
+    subject := ``FvdepCore.Index.Registry.readRaw
     path := []
-    noCaller := "U4"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2256,7 +2260,7 @@ def historyRow : Row :=
     claims := [(``HistoryClaims.historyExact, ``FvdepAudit.Index.History.Proof.history_exact)]
     subject := ``FvdepCore.Index.History.history
     path := []
-    noCaller := "U4"
+    noCaller := "U7"
     residue := []
     unproven := [] }
 

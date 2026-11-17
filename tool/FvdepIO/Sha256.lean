@@ -70,8 +70,12 @@ end Sha256
 def sha256File (path : System.FilePath) : IO ByteArray :=
   IO.FS.withFile path .read fun h => Sha256.ofReader (h.read (1024 * 1024))
 
-/-- H3: the digest a producer records = lowercase hex of SHA-256 over the framed files. -/
+/-- Lowercase hex of SHA-256 = every H3 digest's hash step: `digest`'s, and `fvdep index`'s over
+its own entry frames (`FvdepCore.Cli.sha`). -/
+def sha256Hex (b : ByteArray) : String := FvdepCore.Hash.hex (sha256 b)
+
+/-- H3: the digest a producer records = `sha256Hex` of the framed files. -/
 def digest (t : FvdepCore.Hash.Tag) (files : List (String × ByteArray)) : String :=
-  FvdepCore.Hash.hex (sha256 (FvdepCore.Hash.frame t.spelling files))
+  sha256Hex (FvdepCore.Hash.frame t.spelling files)
 
 end FvdepIO.Hash

@@ -1,5 +1,5 @@
-import FvdepCore.Index.Doc
 import FvdepCore.Index.History
+import FvdepIO.Index
 
 /-! `fvdep-dev index decode <file>` (contract U4 C9; never shipped): `decodeIndex` over a file —
 stdout the canonical encoding of the decoded index, exit 0; else stdout `refused: <reason>`, exit 1;
@@ -12,6 +12,7 @@ commit → one stderr line, exit 2 (before any violation). Every message line ta
 namespace FvdepDev.Index
 
 open FvdepCore.Doc FvdepCore.Index
+open FvdepIO.Index (chomp)
 
 def usage : String := "usage: fvdep-dev index decode <file> | history [<dir>]\n"
 
@@ -50,10 +51,6 @@ def git (dir : String) (args : List String) : IO (UInt32 × ByteArray × String)
   let bytes ← IO.ofExcept (← IO.wait out)
   let code ← child.wait
   return (code, bytes, err)
-
-/-- The text without its trailing whitespace (git's line ends). -/
-def chomp (s : String) : String :=
-  String.ofList (s.toList.reverse.dropWhile Char.isWhitespace).reverse
 
 def text (b : ByteArray) : String := chomp (String.fromUTF8! b)
 

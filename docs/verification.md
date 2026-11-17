@@ -1129,9 +1129,9 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepIO.Sha256`
 
 - Contract: U3 S1–S4 + H3
-- Claim: `digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = HACL*'s verified C behind the FFI (tested residue `hacl-sha256`; `digest` itself: S5's blind suite, stage `codec-suite`, against an independent frame encoder).
+- Claim: `digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = HACL*'s verified C behind the FFI (tested residue `hacl-sha256`; `digest` itself: S5's blind suite, stage `codec-suite`, against an independent frame encoder). Its hash step `sha256Hex` = `fvdep index`'s (`Cli.sha` over `entryFrame` = `digest .entry` of the closure files, by `rfl` in `tool/Tests.lean`).
 - Subject: `FvdepIO.Hash.digest`
-- Path: none yet (wired by U4)
+- Path: none yet (wired by U5)
 - Uninterpreted: `FvdepIO.Hash.sha256`
 - Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`))
@@ -1688,7 +1688,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C6 + C8; Decisions Data formats
 - Claim: `index.json` schema 1: on a J1-valid value the D5 walk accepts exactly the layouts of indexes whose nodes are well formed; `IndexFile.ofJson` accepts exactly the layouts of well-formed indexes (the relational clauses V8 + V9 included) and refuses with the walk's first violation, else the first relational one; `decodeIndex` = J's decode of the bytes with one final LF removed, then `IndexFile.ofJson`: it accepts exactly the bytes J decodes to a well-formed index's layout, a text refusal is J's, a document refusal is that value's first violation; a well-formed index's canonical bytes decode back to it.
 - Subject: `FvdepCore.Index.decodeIndex`
-- Path: none yet (wired by U4)
+- Path: none yet (wired by U5b)
 - Statement `FvdepLedger.Rows.IndexClaims.indexSchemaExact` (hash 0x3df28654), proved by `FvdepAudit.Index.Proof.index_schema_exact`:
 
   ```lean
@@ -1818,9 +1818,9 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 ## `FvdepCore.Index.Registry`
 
 - Contract: U4 C2 + C8
-- Claim: Registry reading: the walk (`decode` + its list loop `spine`) reads an `Expr` exactly as the accepted-forms relation, written apart, relates it (metadata, `let`/`have`, root registry module constants, `<M>.entry` references, `List.nil`/`List.cons`/the standard `++`, constructor applications over string + name literals, `Option`, enumerations); `readRegistry` returns exactly the records the four list constants denote; the shipped record forms = the registry types' field order.
-- Subject: `FvdepCore.Index.Registry.readRegistry`
-- Path: none yet (wired by U4)
+- Claim: Registry reading: the walk (`decode` + its list loop `spine`) reads an `Expr` exactly as the accepted-forms relation, written apart, relates it (metadata, `let`/`have`, root registry module constants, `<M>.entry` references, `List.nil`/`List.cons`/the standard `++`, constructor applications over string + name literals, `Option`, enumerations); `readRaw` then `Lists.ofRaw` (as `fvdep index`'s `judge` calls them) return exactly the records the four list constants denote; the shipped record forms = the registry types' field order.
+- Subject: `FvdepCore.Index.Registry.readRaw`
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.RegistryClaims.registryDecodeExact` (hash 0x46236c70), proved by `FvdepAudit.Registry.Proof.registry_decode`:
 
   ```lean
@@ -1829,11 +1829,12 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
     FvdepCore.Index.Registry.decode F f e env p = Except.ok v ↔
       FvdepAudit.Registry.Spec.Denotes F f e env p v
   ```
-- Statement `FvdepLedger.Rows.RegistryClaims.registryReadExact` (hash 0xb1e4ae6f), proved by `FvdepAudit.Registry.Proof.registry_read`:
+- Statement `FvdepLedger.Rows.RegistryClaims.registryReadExact` (hash 0x2ebda36e), proved by `FvdepAudit.Registry.Proof.registry_read`:
 
   ```lean
   ∀ (F : FvdepCore.Index.Registry.Facts) (r : FvdepCore.Index.Registry.Lists),
-    FvdepCore.Index.Registry.readRegistry F = Except.ok r ↔
+    Except.map FvdepCore.Index.Registry.Lists.ofRaw (FvdepCore.Index.Registry.readRaw F) =
+        Except.ok r ↔
       FvdepAudit.Registry.Spec.RegistryDenotes F r
   ```
 - Statement `FvdepLedger.Rows.RegistryClaims.registryFormsExact` (hash 0x1edf7149), proved by `FvdepAudit.Registry.Proof.registry_forms`:
@@ -2038,7 +2039,7 @@ Root: `main` = `FvdepIO.execute` (interpreter) applied to `FvdepCore.Cli.plan` (
 - Contract: U4 C7 + C9 + C8
 - Claim: History: `history` returns exactly the violations written apart, in C9's order — the parents' divergence, then HEAD's lines, then each parent's: per baseline its operations in index order (≤ 1 line each: changed digest, vanished, removed without a toolchain change, the first removal's witness — lastCommit + toolchain), then its removed records' + notices' extension; an undecodable index = its one line.
 - Subject: `FvdepCore.Index.History.history`
-- Path: none yet (wired by U4)
+- Path: none yet (wired by U7)
 - Statement `FvdepLedger.Rows.HistoryClaims.historyExact` (hash 0xcf2e7ead), proved by `FvdepAudit.Index.History.Proof.history_exact`:
 
   ```lean

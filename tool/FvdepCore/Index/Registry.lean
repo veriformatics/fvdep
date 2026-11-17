@@ -567,9 +567,6 @@ def readRaw (F : Facts) : Except Name RawLists := do
 def Lists.ofRaw (r : RawLists) : Lists :=
   ⟨r.modules.map entryOf, r.profiles.length, r.notices.map noticeOf, r.removed.map removedOf⟩
 
-/-- C2: the registry lists' records. -/
-def readRegistry (F : Facts) : Except Name Lists := (readRaw F).map Lists.ofRaw
-
 /-- An entry reference's record, its annotation dropped (the certificate writes it inline). -/
 def Val.payload : Val → Val
   | .entry _ v => v

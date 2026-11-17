@@ -1,7 +1,7 @@
 import FvdepAudit.Registry.Proof.Decode
 
-/-! The typed readers (`readRegistry`, `readProofs`) = the spec's denotation through the records'
-layouts; the certificate's literals decode back to the values they write. -/
+/-! The typed readers (`readRaw` → `Lists.ofRaw`, `readProofs`) = the spec's denotation through
+the records' layouts; the certificate's literals decode back to the values they write. -/
 
 namespace FvdepAudit.Registry.Proof
 
@@ -304,9 +304,9 @@ theorem fits_of_listAt {F : Facts} {f : Form} {c : Name} {vs : List Val} (h : Li
   obtain ⟨_, _, _, _, _, hw⟩ := h
   exact fits_listVal (fits_of_denotes hw)
 
-theorem readRegistry_exact (F : Facts) (r : Lists) :
-    readRegistry F = .ok r ↔ RegistryDenotes F r := by
-  unfold readRegistry readRaw RegistryDenotes
+theorem readRecords_exact (F : Facts) (r : Lists) :
+    (readRaw F).map Lists.ofRaw = .ok r ↔ RegistryDenotes F r := by
+  unfold readRaw RegistryDenotes
   constructor
   · intro h
     cases hm : listOf F (.entry moduleForm) modulesName with

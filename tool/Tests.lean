@@ -425,8 +425,8 @@ def okModules : Expr := appendE moduleT (.const `Fvdep.Registry.part []) (nilE m
 
 def okNotices : Expr := nilE (.const `N [])
 
-def refused (F : Facts) : Option Name :=
-  match readRegistry F with
+def refused (F : Facts) :
+    Option Name := match readRaw F with
   | .error n => some n
   | .ok _ => none
 
@@ -442,7 +442,7 @@ def cases : List (String × (Unit → Bool)) :=
       | .ok v => v.elems.map Val.strD == ["a", "b", "d", "e"]
       | .error _ => false),
     ("registry: root-module chunk `++` + an entry reference → the entry + its module", fun _ =>
-      match readRegistry (facts okModules okNotices) with
+      match (readRaw (facts okModules okNotices)).map Lists.ofRaw with
       | .ok r =>
         r.entries.length == 1 && r.profiles == 0 &&
           r.entries.all fun e =>
@@ -857,6 +857,10 @@ open FvdepCore.Index.Assemble
 /-- A digest stand-in (the claim holds for every `h`): the frame's size. -/
 def hSize (b : ByteArray) : String := toString b.size
 
+/-- One hash path: `fvdep index`'s entry digest = H3's `digest` under tag `entry`. -/
+example (F : Facts) (M : Name) :
+    FvdepCore.Cli.sha (entryFrame F M) = FvdepIO.Hash.digest .entry (closureFiles F M) := rfl
+
 def tc : String := "leanprover/lean4:v4.35.0"
 
 def run (F : Facts) (ax : List (Name × List Name)) (l : Lists) (raw : String := tc ++ "\n") :
@@ -1105,7 +1109,8 @@ def text (s : String) : ByteArray := s.toUTF8
 /-- `n < 256` as 8 big-endian bytes. -/
 def be (n : Nat) : List Nat := [0, 0, 0, 0, 0, 0, 0, n]
 
-def hexOf (b : ByteArray) : String := hex (sha256 b)
+/-- The shipped hash step (`FvdepIO.Hash.sha256Hex`), short for the known answers below. -/
+def hexOf (b : ByteArray) : String := sha256Hex b
 
 def million : ByteArray := ⟨(List.replicate 1000000 (97 : UInt8)).toArray⟩
 
