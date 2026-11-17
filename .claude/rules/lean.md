@@ -27,6 +27,9 @@ paths:
 - No Batteries/Mathlib: `List.Forall₂` is absent ⇒ a pointwise relation = `xs.length = ys.length ∧ ∀ x ∈ xs.zip ys, R x.1 x.2`; a constructor named by a keyword (`«open»`) = `.«open»` in terms + patterns.
 - `rw [f]` with a wildcard arm's equation leaves side goals (`… → False`) → `rw [f.eq_def]` + `split`/`dsimp only`, or `simp [f]`; mutual WF soundness = `f.mutual_induct` with `(motive1 := …) (motive2 := …)` + one `?_` per generated case.
 - The kernel from compiled code = `Lean.Kernel.check` / `Kernel.isDefEq` (synchronous, an `Except`): 4.35's `addDecl` checks asynchronously — a kernel rejection is logged, never thrown, so a `try` around it reports success.
-- A nested `try (try … catch …) finally` misparses (`Invalid try`) ⇒ `tryFinally (inner) (finalizer)`.
+- `try … catch` is a do-element, never a term ⇒ a term position takes `tryCatch act handler` / `tryFinally act finalizer`; a nested `try (try … catch …) finally` misparses (`Invalid try`) ⇒ `tryFinally (inner) (finalizer)`.
+- `Except` has no `BEq` instance ⇒ compare results by `match`. 4.35's `String.startsWith` takes a pattern class ⇒ point-free `xs.any m.startsWith` fails to elaborate: `xs.any fun p => m.startsWith p`.
+- Dot notation misses a function declared on an `abbrev` when the value's type is its unfolding (`header.isModule` fails) ⇒ the full name (`Lean.Elab.HeaderSyntax.isModule header`). A fold with `(· / ·)` over `System.FilePath` fails to elaborate ⇒ `fun (d : System.FilePath) (c : String) => d / c`.
+- Gate stage `lean-style` counts every column of a line, string literals included (lean-fmt leaves a long literal whole) ⇒ split a literal past column 100 with `++`.
 - A name an `open` brings in can collide with a root export (`read` vs `MonadReader.read`): `simp [read]` then fails (`Ambiguous term`, `Invalid simp theorem`) ⇒ qualify it (`FvdepCore.Step.read`).
 - `split at h` on a `match` over a pair's component leaves the case equation unreduced (`(a, b).snd = x :: xs`): `rw [he]` finds no occurrence ⇒ `simp only at he`, then `subst he`.
