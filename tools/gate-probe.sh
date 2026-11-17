@@ -460,6 +460,29 @@ probe spec plant_spec "spec-lint:" bash -c 'source tools/gate.sh; spec'
 plant_doc_drift() { sed -i '1s/^/x/' docs/verification.md; }
 probe coverage plant_doc_drift "ledger: root: doc:" bash -c 'source tools/gate.sh; coverage'
 
+# coverage, extra roots: a further executable's entry not shaped `fun a => interpreter (plan a)`
+# (one root per shipped executable, U2 L1 + L4) → the `root` finding naming it.
+# shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
+plant_extra_root() {
+    sed -i 's/^    residue := residue }$/    residue := residue\n    extraRoots := [{ main := ``Cli.plan, interpreter := ``FvdepIO.execute, plan := ``Cli.plan }] }/' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-extra-root plant_extra_root 'FvdepCore.Cli.plan is not `fun a =>' \
+    bash -c 'source tools/gate.sh; coverage'
+
+# coverage, extra roots' reach: a definition an extra root alone reaches, outside every row's
+# subject (U2 L2 over every root) → the `uncovered` finding naming it.
+# shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
+plant_extra_reach() {
+    printf '\n%s\n\n%s\n' 'def probePlan (args : List String) := FvdepCore.Cli.plan ("probe" :: args)' \
+        'def probeMain (args : List String) : IO UInt32 := FvdepIO.execute (probePlan args)' \
+        >>tool/Main.lean
+    sed -i 's/^    residue := residue }$/    residue := residue\n    extraRoots := [{ main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }] }/' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
+    bash -c 'source tools/gate.sh; coverage'
+
 # ledger-suite: a negative case whose expected rc is flipped fails the suite, named (one case).
 plant_case_flip() {
     awk -F'\t' -v OFS='\t' '$1 == "T5" { $4 = 0 } 1' tests/ledger/cases.tsv >cases.tmp &&

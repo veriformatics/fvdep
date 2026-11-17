@@ -18,10 +18,10 @@ structure Residue where
 
 /-- One claim about fvdep's own code. `claims` = (statement, theorem) pairs: the statement is a
 `Prop` definition in the ledger modules (the claim's exact proposition), the theorem's type must be
-it. `path` = `main` → … → `subject` (the executed function), or `[]` while `noCaller` names the open
-unit that wires the subject in, or is `support` (a helper inside the closure of a row with a path).
-`residue` + `unproven` cite `Residue` ids: what the claims still assume, and what of the component
-has no theorem. -/
+it. `path` = a root's `main` → … → `subject` (the executed function), or `[]` while `noCaller`
+names the open unit that wires the subject in, or is `support` (a helper inside the closure of a
+row with a path). `residue` + `unproven` cite `Residue` ids: what the claims still assume, and what
+of the component has no theorem. -/
 structure Row where
   component : Lean.Name
   contract : String
@@ -33,8 +33,16 @@ structure Row where
   residue : List String
   unproven : List String
 
-/-- The whole ledger: the executable's root (`main` = `interpreter` applied to `plan args`, checked
-by shape), the shipped lean_lib roots, the rows, the residue. -/
+/-- A shipped executable's entry: `main` = `interpreter` applied to `plan args` (shape checked). -/
+structure Root where
+  main : Lean.Name
+  interpreter : Lean.Name
+  plan : Lean.Name
+
+/-- The whole ledger: `fvdep`'s root (`main` = `interpreter` applied to `plan args`, checked by
+shape), the shipped lean_lib roots, the rows, the residue + one `Root` per further shipped
+executable (an owned entry its root module's `main` calls whole: a second top-level `main` cannot
+share this environment with `fvdep`'s). -/
 structure Ledger where
   main : Lean.Name
   interpreter : Lean.Name
@@ -42,5 +50,6 @@ structure Ledger where
   libs : List Lean.Name
   rows : List Row
   residue : List Residue
+  extraRoots : List Root := []
 
 end FvdepLedger

@@ -109,15 +109,27 @@ def row (env : Environment) (e : Expr) : Except String Row := do
       residue := ← strs a[7]!
       unproven := ← strs a[8]! }
 
+def rootValue (env : Environment) (e : Expr) : Except String Root := do
+  let a ← fields env ``Root.mk 3 e
+  return {
+      main := ← name env fuel a[0]!
+      interpreter := ← name env fuel a[1]!
+      plan := ← name env fuel a[2]! }
+
 def ledger (env : Environment) (e : Expr) : Except String Ledger := do
-  let a ← fields env ``Ledger.mk 6 e
+  let a ← fields env ``Ledger.mk 7 e
   return {
       main := ← name env fuel a[0]!
       interpreter := ← name env fuel a[1]!
       plan := ← name env fuel a[2]!
       libs := ← list env (name env fuel) fuel a[3]!
       rows := ← list env (row env) fuel a[4]!
-      residue := ← list env (residue env) fuel a[5]! }
+      residue := ← list env (residue env) fuel a[5]!
+      extraRoots := ← list env (rootValue env) fuel a[6]! }
+
+/-- Every shipped executable's root: `fvdep`'s first, then the ledger's extra roots. -/
+def roots (l : Ledger) : List Root :=
+  { main := l.main, interpreter := l.interpreter, plan := l.plan } :: l.extraRoots
 
 /-! ## The environment's code graph -/
 
@@ -169,14 +181,14 @@ def Finding.line (f : Finding) : String := s!"ledger: {f.place}: {f.code}: {f.de
 
 def stdAxioms : List Name := [``propext, ``Classical.choice, ``Quot.sound]
 
-/-- `main`'s value = `fun a => interpreter (plan a)` (metadata ignored). -/
-def rootShaped (l : Ledger) : Expr → Bool
-  | .mdata _ e => rootShaped l e
+/-- A root's `main` value = `fun a => interpreter (plan a)` (metadata ignored). -/
+def rootShaped (r : Root) : Expr → Bool
+  | .mdata _ e => rootShaped r e
   | .lam _ _ body _ =>
     match body.consumeMData with
     | .app (.const i _) arg =>
       match arg.consumeMData with
-      | .app (.const p _) (.bvar 0) => i == l.interpreter && p == l.plan
+      | .app (.const p _) (.bvar 0) => i == r.interpreter && p == r.plan
       | _ => false
     | _ => false
   | _ => false
@@ -197,14 +209,16 @@ def decisionsOf (spec : String) : String :=
 def openUnit (spec unit : String) : Bool :=
   !unit.isEmpty && (spec.splitOn "\n").any fun l => l.startsWith s!"- [ ] {unit} "
 
-/-- L4: a path from the root to the subject whose every edge holds (`main` → interpreter or plan;
-another edge = reachable + a statement of the row mentioning both ends). -/
+/-- L4: a path from a root to the subject whose every edge holds (a root's `main` → its interpreter
+or plan; another edge = reachable + a statement of the row mentioning both ends). -/
 def pathOk (env : Environment) (l : Ledger) (r : Row) : Bool :=
   let stmts := r.claims.filterMap fun c => statementOf env c.1
-  r.path.head? == some l.main && r.path.getLast? == some r.subject &&
+  r.path.head?.any (fun h => (roots l).any (·.main == h)) && r.path.getLast? == some r.subject &&
     (r.path.zip r.path.tail).all fun e =>
-      if e.1 == l.main then e.2 == l.interpreter || e.2 == l.plan
-      else (closure env [e.1]).contains e.2 && stmts.any fun s => mentions s e.1 && mentions s e.2
+      match (roots l).find? (·.main == e.1) with
+      | some rt => e.2 == rt.interpreter || e.2 == rt.plan
+      | none =>
+        (closure env [e.1]).contains e.2 && stmts.any fun s => mentions s e.1 && mentions s e.2
 
 def compiledFlags (env : Environment) (c : Name) : List String :=
   let info := env.find? c
@@ -222,22 +236,26 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
   Id.run do
     let mut out : Array Finding := #[]
     let root := "root"
-    -- L4 root shape
-    match env.find? l.main with
-    | some (.defnInfo d) =>
-      unless rootShaped l d.value do
-        out := out.push ⟨root, "root", s!"{l.main} is not `fun a => {l.interpreter} ({l.plan} a)`"⟩
-    | _ =>
-      out := out.push ⟨root, "root", s!"{l.main} is not a definition"⟩
-    let reach := closure env [l.main]
+    let rs := roots l
+    let mains := rs.map (·.main)
+    -- L4 root shape, per root
+    for rt in rs do
+      match env.find? rt.main with
+      | some (.defnInfo d) =>
+        unless rootShaped rt d.value do
+          out :=
+            out.push ⟨root, "root", s!"{rt.main} is not `fun a => {rt.interpreter} ({rt.plan} a)`"⟩
+      | _ =>
+        out := out.push ⟨root, "root", s!"{rt.main} is not a definition"⟩
+    let reach := closure env mains
     -- Coverage counts definitions (constructors + types are data shapes); auxiliary ones (matchers,
     -- `_proof_`, `_eq_`) sit in their parent's closure.
     let code :=
       reach.toList.filter fun c =>
-        c != l.main && !auxiliary env c && (env.find? c matches some (.defnInfo _))
+        !mains.contains c && !auxiliary env c && (env.find? c matches some (.defnInfo _))
     let residueIds := l.residue.map (·.id)
     -- L2 coverage
-    let covered := closure env ((l.rows.map (·.subject)).filter (· != l.main))
+    let covered := closure env ((l.rows.map (·.subject)).filter (!mains.contains ·))
     for c in code do
       unless covered.contains c do
         out := out.push ⟨root, "uncovered", s!"{c}: reachable, outside every row's subject"⟩
@@ -265,8 +283,8 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
       | some _ =>
         unless moduleOf env r.subject == some r.component do
           out := out.push ⟨place, "subject", s!"{r.subject} is not defined in {r.component}"⟩
-      if r.subject == l.main then
-        out := out.push ⟨place, "subject", s!"the root {l.main} is no row subject"⟩
+      if mains.contains r.subject then
+        out := out.push ⟨place, "subject", s!"the root {r.subject} is no row subject"⟩
       -- L3 claims
       let mut stmts : Array Expr := #[]
       for (st, th) in r.claims do
@@ -312,12 +330,16 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
       else
         unless r.noCaller.isEmpty do
           out := out.push ⟨place, "nocaller", "a row with a path has no noCaller"⟩
-        unless r.path.head? == some l.main && r.path.getLast? == some r.subject do
-          out := out.push ⟨place, "path", s!"the path must run from {l.main} to {r.subject}"⟩
+        unless r.path.head?.any mains.contains && r.path.getLast? == some r.subject do
+          out :=
+            out.push
+              ⟨place, "path",
+                s!"the path must run from {" or ".intercalate (mains.map toString)} to {r.subject}"⟩
         for (a, b) in r.path.zip r.path.tail do
-          if a == l.main then
-            unless b == l.interpreter || b == l.plan do
-              out := out.push ⟨place, "path", s!"{l.main} calls {l.interpreter} + {l.plan} alone"⟩
+          if let some rt := rs.find? (·.main == a) then
+            unless b == rt.interpreter || b == rt.plan do
+              out :=
+                out.push ⟨place, "path", s!"{rt.main} calls {rt.interpreter} + {rt.plan} alone"⟩
           else
             unless (closure env [a]).contains b do
               out := out.push ⟨place, "edge", s!"{b} is unreachable from {a}"⟩
@@ -327,8 +349,9 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
       unless r.claims.isEmpty do
         let cited := r.residue ++ r.unproven
         let allowed := (l.residue.filter (cited.contains ·.id)).flatMap (·.boundary)
-        let roots := r.subject :: r.path.filter fun p => p != l.main && p != l.interpreter
-        for c in (closure env roots).toList do
+        let starts :=
+          r.subject :: r.path.filter fun p => !rs.any fun rt => p == rt.main || p == rt.interpreter
+        for c in (closure env starts).toList do
           unless allowed.contains c do
             let flags := compiledFlags env c
             unless flags.isEmpty do
@@ -395,8 +418,10 @@ def render (env : Environment) (l : Ledger) (decl : Name) : IO String := do
       s!"Generated by `fvdep-ledger --write` from `{decl}` (contract " ++
       "`docs/contracts/U2-core.md` L1–L8); gate stage `coverage` regenerates it + compares the " ++
       "bytes. Edit the rows, then run `bash tools/ledger-doc.sh`.\n\n" ++
-      s!"Root: {code l.main} = {code l.interpreter} (interpreter) applied to {code l.plan} " ++
-      "(shape checked).\n"
+      "".intercalate
+        ((roots l).map fun rt =>
+          s!"Root: {code rt.main} = {code rt.interpreter} (interpreter) applied to " ++
+            s!"{code rt.plan} (shape checked).\n")
   for r in l.rows do
     out :=
       out ++ s!"\n## {code r.component}\n\n- Contract: {r.contract}\n- Claim: {r.claim}\n" ++

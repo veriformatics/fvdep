@@ -189,9 +189,11 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 # axioms ⊆ std, root shape + call paths, compiled = checked, kernel replay (leanchecker), and
 # docs/verification.md = the rendering. Verdict reused like a suite's in the fast gate (input
 # closure = the tool package, the library, the doc + `.agent/spec.md`: `noCaller` names its rows).
+# The checker loads `FvdepLedger.Rows` at run time (`lake exe` builds its own imports alone) ⇒ the
+# rows' build first: a row edit or plant is checked as written, never a stale `.olean`.
 coverage() {
     suite coverage "$(shipped_closure tool docs/verification.md .agent/spec.md)" "" \
-        bash -c 'cd tool && lake exe fvdep-ledger --check ../docs/verification.md'
+        bash -c 'cd tool && lake build -q FvdepLedger && lake exe fvdep-ledger --check ../docs/verification.md'
 }
 
 # SHA-256 over the tracked + untracked-unignored files under PATH…, both Lake configs + toolchain
