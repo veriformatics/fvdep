@@ -202,12 +202,13 @@ def put(p: Path, rel: str, contents: str | bytes) -> None:
 def manifest_modules(p: Path, impls: list[str], proofs: list[str],
                      impl: str = "SandboxTrial.encode", proof: str = "SandboxTrial.encode_eq") -> None:
     f = p / "fvdep.toml"
-    s = f.read_text()
+    # The entry's keys alone: `[policy]` holds a `proof = ` line too (rewriting it = a manifest refusal).
+    head, sep, s = f.read_text().partition("[modules.")
     s = re.sub(r"impl_modules = .*", "impl_modules = " + json.dumps(impls), s)
     s = re.sub(r"proof_modules = .*", "proof_modules = " + json.dumps(proofs), s)
     s = re.sub(r'^impl = .*', "impl = " + json.dumps(impl), s, flags=re.M)
     s = re.sub(r'^proof = .*', "proof = " + json.dumps(proof), s, flags=re.M)
-    f.write_text(s)
+    f.write_text(head + sep + s)
 
 
 def sandbox_ok(r: Result, outcome: str = "exited 0", frame: str = "complete") -> None:
@@ -693,7 +694,9 @@ def diagnostic_line_rule(c: Context) -> None:
     p = c.project()
     put(p, "SandboxTrial/Proof.lean", "import Lean\nimport SandboxTrial.Impl\n\n"
         "open Lean Elab Command\n\n"
-        'run_cmd throwError ("u5 first " ++ String.singleton (Char.ofNat 27) ++ "\\tend\\nsecond line")\n')
+        # Lean 4.35 leaves `throwError`'s result type open here without the ascription.
+        'run_cmd (throwError ("u5 first " ++ String.singleton (Char.ofNat 27) ++ "\\tend\\nsecond line") : '
+        'CommandElabM Unit)\n')
     r = c.phase(p)
     phase_failed(r, 2, "SandboxTrial/Proof.lean", message=r"u5 first \u001B\tend")
     need("second line" not in r.line(r"phase2 failed: (.+)")[1], "reason kept a later message line")
@@ -757,8 +760,9 @@ for variant in ("base", "ordered", "reversed", "utf8", "unrelated"):
     def _digests(c: Context, kind: str = variant) -> None:
         p = c.project()
         if kind in {"ordered", "reversed"}:
-            put(p, "SandboxTrial/Aux.lean", "def SandboxTrial.aux : Nat := 9\n")
-            mods = ["SandboxTrial.Aux", "SandboxTrial.Impl"]
+            # Lean 4.35 refuses `Aux` as a module component (a reserved file name on some systems).
+            put(p, "SandboxTrial/Helper.lean", "def SandboxTrial.helper : Nat := 9\n")
+            mods = ["SandboxTrial.Helper", "SandboxTrial.Impl"]
             if kind == "reversed":
                 mods.reverse()
             manifest_modules(p, mods, ["SandboxTrial.Proof"])
