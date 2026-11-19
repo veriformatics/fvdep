@@ -31,9 +31,11 @@ def compileFlags (r : Recipe) : List String :=
   ["--json", "-j", String.ofList (FvdepCore.Ids.decimal r.threads), "-R", "/fvdep/src"] ++
     r.options.flatMap fun o => ["-D", o]
 
-/-- T2: the search path inside a step (library view, then phase 1's frozen artifacts, then this
-phase's earlier modules). -/
-def leanPath : List String := ["/fvdep/lib", "/fvdep/phase1", "/fvdep/prior"]
+/-- T2: the search path inside a step — the library view, then the check's consumer modules built so
+far (phase 1's frozen artifacts + this phase's earlier ones, one directory: Lean resolves a module's
+root component to the first entry holding it, so a namespace split across two entries loses its
+later modules — measured: `SandboxTrial.Proof` in a second entry is "does not exist"). -/
+def leanPath : List String := ["/fvdep/lib", "/fvdep/prior"]
 
 /-- T2: the environment of every compile (+ `LEAN_PATH`). -/
 def compileEnv : List (String × String) :=

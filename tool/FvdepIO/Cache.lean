@@ -215,19 +215,12 @@ def view (e : Env) (dir : System.FilePath) (deps : List (String × Manifest)) :
             (io s!"the view could not link {a.path} of entry {key}: {FvdepIO.Spawn.errnoText n}")
   return .ok ()
 
-/-- A failing compile's first error: the first `lean --json` message of severity `error` (its first
-line), else stderr's first nonempty line (presentation; U5-D's B1 owns the phase reasons). -/
+/-- A failing compile's first error (B1's capture while pumping: stdout's first `lean --json`
+message of severity `error`, else stderr's first text-form error; its first line), else stderr's
+first nonempty line (presentation; the phase reasons = B1's `FvdepCore.Bundle.reason`). -/
 def diagnostic (obs : FvdepIO.Sandbox.Observation) : String :=
-  let json :=
-    (FvdepCore.Index.Command.textOfBytes obs.stdout.kept).splitOn "\n" |>.findSome? fun l =>
-      match Lean.Json.parse l with
-      | .ok j =>
-        match j.getObjValAs? String "severity", j.getObjValAs? String "data" with
-        | .ok "error", .ok d => some ((d.splitOn "\n").headD d)
-        | _, _ => none
-      | .error _ => none
-  match json with
-  | some d => d
+  match obs.firstOut <|> obs.firstErr with
+  | some d => FvdepCore.Bundle.firstLine d.message
   | none =>
     ((FvdepCore.Index.Command.textOfBytes obs.stderr.kept).splitOn "\n").find? (!·.isEmpty) |>.getD
       "lean exited without a diagnostic"
@@ -471,10 +464,17 @@ def refusalText : Refusal → String
   | .missing none t => s!"{t} has no source in the library"
   | .stuck ms => s!"library modules import each other: {", ".intercalate ms}"
 
+/-- One closure module's entry as `build` resolved it. -/
+structure Resolved where
+  module : String
+  key : String
+  use : Use
+  manifest : Manifest
+
 /-- K: the closure of `roots` in the library at `lib`, each module's entry valid + pinned (in plan
-order: module, key, how it was had). -/
+order: module, key, how it was had, its manifest). -/
 def build (e : Env) (lib : System.FilePath) (roots : List String) :
-    IO (Except Failure (List (String × String × Use))) := do
+    IO (Except Failure (List Resolved)) := do
   let sources ←
     match ← discover lib roots with
     | .ok s =>
@@ -519,7 +519,9 @@ def build (e : Env) (lib : System.FilePath) (roots : List String) :
       done := done.push (m, key, use, man)
     | .error f =>
       return .error f
-  return .ok (done.toList.map fun x => (x.1, x.2.1, x.2.2.1))
+  return .ok
+      (done.toList.map fun x =>
+        { module := x.1, key := x.2.1, use := x.2.2.1, manifest := x.2.2.2 })
 
 /-- `cache list`: every valid entry (key, charge = its artifacts + manifest, module), by key. -/
 def list (e : Env) : IO (List (String × Nat × String)) := do

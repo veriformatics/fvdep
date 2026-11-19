@@ -241,4 +241,41 @@ where go : List String → List String
     | [c] => [c ++ ".lean"]
     | c :: cs => c :: go cs
 
+/-! ## P1 the step plan, K2's import classes, P4's roots check (U5-D) -/
+
+/-- P1: a phase's deadline window — every planned compile in K2's order, the consumer roots check,
+the export. Phase 1's library roots check runs before it, outside the window: it imports library
+modules alone, so no consumer code reaches its exit. -/
+def steps (order : List String) : List Step := order.map .compile ++ [.consumerRoots, .exportStep]
+
+/-- K2 + P5: how a phase reads one import of a consumer module. -/
+inductive ImportClass where
+  | listed
+  | built
+  | toolchain
+  | library
+  | absent
+  deriving DecidableEq, Repr
+
+/-- K2 + P5: an import `m` in a phase listing `listed` (phase 2: `built` = phase 1's modules), the
+library holding a source for each module `present` names; the first match wins. `absent` = no source
+anywhere: the consumer's own refusal (the phase's `failed`), never infrastructure. -/
+def importClass (listed built : List String) (present : String → Bool) (m : String) : ImportClass :=
+  if listed.contains m then .listed
+  else
+    if built.contains m then .built
+    else
+      if FvdepCore.Build.toolchainModule m then .toolchain
+      else if present m then .library else .absent
+
+/-- P4: the roots check's module — the export's imports, a blank line, one `#check @<root>` per
+root ⇒ root k (from 1) sits on line `imports.length + 1 + k`. -/
+def rootsSource (imports roots : List String) : String :=
+  String.join (imports.map fun m => s!"import {m}\n") ++ "\n" ++
+    String.join (roots.map fun r => s!"#check @{r}\n")
+
+/-- P4: the root a roots-check diagnostic at `line` names (`rootsSource`'s layout). -/
+def rootAt (imports roots : List String) (line : Nat) : Option String :=
+  if imports.length + 1 < line then roots[line - imports.length - 2]? else none
+
 end FvdepCore.Phase

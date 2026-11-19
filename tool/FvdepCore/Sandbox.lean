@@ -165,7 +165,8 @@ where
 /-- T3: a step's limits (U5's defaults; U7 qualifies the production values under stated load):
 the deadline in seconds, the two tmpfs sizes, the bytes a diagnostic stream keeps, the frame cap,
 each ≥ 1 (`bwrap --size 0` = a setup failure), the tmpfs sizes ≤ `tmpfsMax`; `fileBytes` = every
-step process's `RLIMIT_FSIZE` (default `workBytes / 8`, `fileCap`). -/
+step process's `RLIMIT_FSIZE` (default `workBytes / 8`, `fileCap`); `exportBytes` = the export's
+cap (P4; default the per-file cap, `exportCap`: the export file is written through it). -/
 structure Limits where
   deadline : Nat := 600
   workBytes : Nat := 1073741824
@@ -173,10 +174,14 @@ structure Limits where
   diagnosticBytes : Nat := 65536
   frameBytes : Nat := 268435456
   fileBytes : Option Nat := none
+  exportBytes : Option Nat := none
   deriving DecidableEq, Repr
 
 /-- The per-file cap a step runs under (`RLIMIT_FSIZE`). -/
 def Limits.fileCap (l : Limits) : Nat := l.fileBytes.getD (l.workBytes / 8)
+
+/-- P4's export cap (default: the per-file cap). -/
+def Limits.exportCap (l : Limits) : Nat := l.exportBytes.getD l.fileCap
 
 /-- bwrap's tmpfs size cap: bubblewrap 0.11.1 refuses a larger `--size` at setup (`--size (for
 tmpfs) is limited to 9223372036854775807`), like `--size 0`. -/
@@ -185,8 +190,8 @@ def tmpfsMax : Nat := 9223372036854775807
 
 /-- T3's bounds + relation (A1): each tmpfs size ≤ `tmpfsMax`; the per-file cap ≥ 1 and 8 × it ≤
 `workBytes` ⇒ a compile's artifact family (≤ 7 files) never fills `/fvdep/work`: a file past the cap
-ends its writer by `SIGXFSZ` first (a signal death, P5's resource case) — `none` = holds, else the
-reason. -/
+ends its writer by `SIGXFSZ` first (a signal death, P5's resource case); the export cap ≥ 1 and ≤
+the per-file cap (the export is one file written under it) — `none` = holds, else the reason. -/
 def Limits.check (l : Limits) : Option String :=
   if tmpfsMax < l.workBytes then
     some s!"--work-bytes {l.workBytes} is above bwrap's tmpfs cap {tmpfsMax}"
@@ -198,6 +203,11 @@ def Limits.check (l : Limits) : Option String :=
       else
         if l.workBytes < 8 * l.fileCap then
           some s!"--file-bytes {l.fileCap} is above --work-bytes / 8"
-        else none
+        else
+          if l.exportCap == 0 then some "the export cap is 0"
+          else
+            if l.fileCap < l.exportCap then
+              some s!"--export-bytes {l.exportCap} is above the per-file cap {l.fileCap}"
+            else none
 
 end FvdepCore.Sandbox

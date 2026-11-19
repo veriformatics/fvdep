@@ -1395,6 +1395,42 @@ def driveTrace : Prop :=
             (drive (record answer) steps).run acc =
               (some (s, stepVerdict s (answer s)), acc ++ pre ++ [s])
 
+/-- K2 + P5: an import is the consumer's own refusal (`absent`) exactly when it names no listed
+module, no phase-1 module, no toolchain module + no module the library holds a source for (claim
+at U5-D3). -/
+def importAbsent : Prop :=
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    importClass listed built present m = .absent ↔
+      m ∉ listed ∧ m ∉ built ∧ FvdepCore.Build.toolchainModule m = false ∧ present m = false
+
+/-- K2 + P5: an import reads the library exactly when it names no listed, phase-1 or toolchain
+module + the library holds its source (claim at U5-D3). -/
+def importLibrary : Prop :=
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    importClass listed built present m = .library ↔
+      m ∉ listed ∧ m ∉ built ∧ FvdepCore.Build.toolchainModule m = false ∧ present m = true
+
+/-- S1: the snapshot reads a component exactly when it is the module's file, a regular file within
+the per-file cap + the remaining total, under the smaller of the two caps (claim at U5-D3). -/
+def snapReads : Prop :=
+  ∀ (l : SourceLimits) (used : Nat) (leaf : Bool) (o : Opened) (cap : Nat),
+    snapDecide l used leaf o = .read cap ↔
+      leaf = true ∧
+        ∃ size,
+          o = .file .regular size ∧
+            size ≤ l.fileBytes ∧
+            used + size ≤ l.totalBytes ∧ cap = min l.fileBytes (l.totalBytes - used)
+
+/-- S1: the snapshot descends exactly into a directory on the way (claim at U5-D3). -/
+def snapDescends : Prop :=
+  ∀ (l : SourceLimits) (used : Nat) (leaf : Bool) (o : Opened),
+    snapDecide l used leaf o = .descend ↔ leaf = false ∧ ∃ size, o = .file .directory size
+
+/-- S1: a leaf read is accepted exactly when it stayed within its cap (claim at U5-D3). -/
+def snapReadAccepts : Prop :=
+  ∀ (l : SourceLimits) (used cap n total : Nat),
+    snapRead l used cap n = .ok total ↔ n ≤ cap ∧ total = used + n
+
 /-- S2: distinct module names without `/` have distinct path stems (U3 T3's names have none). -/
 def stemInjective : Prop :=
   ∀ (a b : String) (_ha : '/' ∉ a.toList) (_hb : '/' ∉ b.toList) (_h : stem a = stem b), a = b
@@ -1671,7 +1707,19 @@ def residue : List Residue :=
           "paths, names outside T3's grammar, both caps at n and n + 1, the shim's name " ++
           "guard, descriptors on every path)"
       ruling := "the project snapshot's reads"
-      boundary := [``FvdepIO.Snapshot.openAt] }]
+      boundary := [``FvdepIO.Snapshot.openAt] },
+    { id := "failure-bundle"
+      what :=
+        "B2's failure bundles (`FvdepIO.Bundle.write`: the inputs listed + copied, the record, " ++
+          "staging + rename under `bundles/lock`, retention's removals) + B1's reason text + " ++
+          "B2's picks (`omitOrder`, `retainPick`)"
+      reason :=
+        "presentation + a debugging aid: no verdict reads a bundle or a reason's text (P5 " ++
+          "classifies; a `failed` reason's text = B1's presentation, like U3's render ruling); " ++
+          "tested by `lake test` (reason, picks) + tester-6's bundle cases (B.retention; " ++
+          "B.complete + B.incomplete with D4)"
+      ruling := "the failure bundle's writes"
+      boundary := [] }]
 
 def cliRow : Row :=
   { component := `FvdepCore.Cli
@@ -2881,6 +2929,55 @@ def snapshotRow : Row :=
     residue := ["sys-shim", "os", "runtime"]
     unproven := ["project-snapshot"] }
 
+/-- U5 B1 + B2's pure parts (tested presentation, outside the claims). -/
+def bundleCoreRow : Row :=
+  { component := `FvdepCore.Bundle
+    contract := "U5 B1, B2"
+    claim :=
+      "B1: a failing step's reason = its first error diagnostic (the project path + line, the " ++
+        "message's first line, the line rule last), else the tool's exit code; B2: inputs " ++
+        "omitted largest first until the bound holds, the newest 16 bundles kept."
+    claims := []
+    subject := ``FvdepCore.Bundle.reason
+    path := []
+    noCaller := "U8"
+    residue := ["runtime"]
+    unproven := ["failure-bundle"] }
+
+/-- U5 P1–P8: a check's two phases (runner residue). -/
+def phaseRunRow : Row :=
+  { component := `FvdepIO.Phase
+    contract := "U5 P1–P8, K2, B1"
+    claim :=
+      "Each phase's sources graphed (headers, `importClass`, `plan`: a refusal = the phase's " ++
+        "`failed`), the library closure filled + viewed (a failure = infrastructure), then " ++
+        "`drive` over phase 1's library roots check + `steps` (each compile in K2's order, the " ++
+        "roots check, the export) within the phase deadline, each step judged by `stepVerdict`, " ++
+        "each phase observed by `observe1`/`observe2`; phase 2 only after `phase1 (ok e1)`, " ++
+        "bound " ++
+        "to that e1; built files read as bytes alone."
+    claims := []
+    subject := ``FvdepIO.Phase.check
+    path := []
+    noCaller := "U8"
+    residue := ["bwrap", "lean-toolchain", "hacl-sha256", "sys-shim", "os", "runtime"]
+    unproven := ["sandbox-spawn", "step-helper", "cache-fs"] }
+
+/-- U5 B2: the failure bundle's writes. -/
+def bundleWriteRow : Row :=
+  { component := `FvdepIO.Bundle
+    contract := "U5 B2"
+    claim :=
+      "A failing step's record + copies of its required inputs + its streams under " ++
+        "`bundles/v1/<recipe digest>-<phase>-<module|step>-<attempt>/`, within 32 MiB (the " ++
+        "largest inputs omitted first, the record marking each), the newest 16 kept."
+    claims := []
+    subject := ``FvdepIO.Bundle.write
+    path := []
+    noCaller := "U8"
+    residue := ["hacl-sha256", "os", "runtime"]
+    unproven := ["failure-bundle"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2897,7 +2994,8 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow]
+        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
+        bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

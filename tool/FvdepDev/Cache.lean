@@ -123,7 +123,7 @@ def build (lib : String) (mods : List String) : IO UInt32 := do
       say [s!"infra {f.code}: {f.detail}"]
       return 2
     | .ok rows =>
-      say (rows.map fun x => s!"{if x.2.2 == .built then "built" else "reused"} {x.2.1} {x.1}")
+      say (rows.map fun x => s!"{if x.use == .built then "built" else "reused"} {x.key} {x.module}")
     -- K5 at the final unpin.
     if let .error f← evict e t then
       say [s!"infra {f.code}: {f.detail}"]

@@ -127,7 +127,7 @@ tree-clean  lean checks
 # Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
 # registry order; a stage's weight = its peak memory alone (GiB, anon + tmpfs, rounded up; unlisted
 # = 1). Both from `tools/vflab-run bash tools/gate-measure.sh [STAGE…]` (vflab, no other fvdep job).
-GATE_FIRST='index-suite acceptance sys-suite coverage'
+GATE_FIRST='index-suite sandbox-suite acceptance sys-suite coverage'
 GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 ledger-suite=3 sys-suite=3'
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
@@ -324,7 +324,7 @@ sandbox_closure() {
 # + D4 cases merge with U5-D. Its steps run fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID
 # namespace of the job's own.
 sandbox_suite() {
-    local cases=(--case R. --case K.)
+    local cases=(--case R. --case K. --case P. --case S. --case B.retention)
     [[ -z "${FVDEP_SANDBOX_CASE:-}" ]] || cases=(--case "$FVDEP_SANDBOX_CASE")
     suite sandbox-suite "$(sandbox_closure tests/sandbox)" "${FVDEP_SANDBOX_CASE:-}" \
         bash tests/sandbox/run.sh "${cases[@]}"

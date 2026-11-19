@@ -1,5 +1,5 @@
 import FvdepCore
-import FvdepIO.Cache
+import FvdepIO.Phase
 import FvdepIO.Sha256
 import FvdepIO.Snapshot
 import FvdepIO.Step
@@ -1973,6 +1973,169 @@ def ioCases : List (String × IO Bool) :=
 
 end Snapshot
 
+namespace PhaseIO
+
+def ioCases : List (String × IO Bool) :=
+  [("phase: a host I/O failure (the run directory or phase 1's sources a file) = infra io, " ++
+        "never an " ++
+        "exception",
+      do
+      let dir ← IO.FS.createTempDir
+      try
+        let run := dir / "run"
+        IO.FS.writeFile run "a file where the run directory belongs"
+        let e : FvdepIO.Cache.Env :=
+          { root := dir / "cache"
+            bwrap := "bwrap"
+            sysroot := dir
+            helper := dir
+            recipe := FvdepCore.Build.library "r" "f"
+            limits := {}
+            step := {}
+            trace := none
+            run
+            handles := ← IO.mkRef #[]
+            counter := ← IO.mkRef 0 }
+        let s : FvdepIO.Phase.Setup :=
+          { cache := e
+            recipe := FvdepCore.Build.consumer "r" "f"
+            limits := {}
+            library := dir }
+        let r : FvdepIO.Phase.Request :=
+          { impl := [("A", "def a := 1".toUTF8)]
+            proof := []
+            specModule := "S"
+            spec := "S.s"
+            abi := none
+            roots1 := []
+            roots2 := [] }
+        let rep ← FvdepIO.Phase.check s r
+        -- A run directory whose phase-1 sources directory is a file: the failure is phase 1's own.
+        let run2 := dir / "run2"
+        IO.FS.createDirAll run2
+        IO.FS.writeFile (run2 / "sources1") "a file where phase 1's sources belong"
+        let rep2 ← FvdepIO.Phase.check { s with cache := { e with run := run2 } } r
+        return rep.runs.map (·.obs) matches [FvdepCore.Evidence.Obs.infra .io _] &&
+            rep2.runs.map (·.obs) matches [FvdepCore.Evidence.Obs.infra .io _]
+      finally
+        IO.FS.removeDirAll dir)]
+
+end PhaseIO
+
+namespace PhaseD
+
+open FvdepCore.Phase FvdepCore.Bundle FvdepCore.Sandbox
+
+def jsonLine : String :=
+  "{\"caption\":\"\",\"data\":\"Unknown identifier `u5`\\nsecond\"," ++
+    "\"endPos\":{\"column\":35,\"line\":3}," ++
+    "\"fileName\":\"./A/B.lean\",\"isSilent\":false,\"keepFullRange\":false," ++
+    "\"kind\":\"lean.unknownIdentifier._namedError\",\"pos\":{\"column\":14,\"line\":3}," ++
+    "\"severity\":\"error\"}"
+
+def scanAll (chunks : List String) (cap : Nat := 4096) : Option Diag :=
+  let s :=
+    chunks.foldl
+      (fun s c => s.push cap ofJson FvdepIO.Sandbox.jsonMarker FvdepIO.Sandbox.jsonSkip c.toUTF8)
+      ({} : FvdepIO.Sandbox.Scan)
+  s.finish ofJson FvdepIO.Sandbox.jsonMarker FvdepIO.Sandbox.jsonSkip
+
+def info : String := "{\"data\":\"x\",\"severity\":\"information\"}"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("phase: P1's window = the compiles in order, the roots check, the export", fun _ =>
+      steps ["A", "B.C"] == [.compile "A", .compile "B.C", .consumerRoots, .exportStep] &&
+        steps [] == [.consumerRoots, .exportStep]),
+    ("phase: an import's class — listed, built, toolchain, library, else absent (first match)",
+      fun _ =>
+      let c := importClass ["P.A", "P.B"] ["Q.A"] (fun m => m == "Fvdep.X" || m == "P.A")
+      c "P.A" == .listed && c "Q.A" == .built && c "Init.Data" == .toolchain &&
+        c "Lean" == .toolchain &&
+        c "Fvdep.X" == .library &&
+        c "Fvdep.Y" == .absent &&
+        c "External" == .absent),
+    ("phase: the roots file puts root k on line imports + 1 + k; other lines name none", fun _ =>
+      rootsSource ["A", "B"] ["x", "y"] == "import A\nimport B\n\n#check @x\n#check @y\n" &&
+        rootAt ["A", "B"] ["x", "y"] 4 == some "x" &&
+        rootAt ["A", "B"] ["x", "y"] 5 == some "y" &&
+        (rootAt ["A", "B"] ["x", "y"] 3).isNone &&
+        (rootAt ["A", "B"] ["x", "y"] 1).isNone &&
+        (rootAt ["A", "B"] ["x", "y"] 6).isNone &&
+        rootAt [] ["r"] 2 == some "r"),
+    ("bundle: B1 reads Lean's JSON error line (file, line, message) + skips other severities",
+      fun _ =>
+      ofJson jsonLine ==
+          some
+            { file := some "./A/B.lean", line := some 3,
+              message := "Unknown identifier `u5`\nsecond" } &&
+        (ofJson info).isNone &&
+        (ofJson "not json").isNone),
+    ("bundle: B1 reads Lean's text-form error line (named error or not)", fun _ =>
+      ofText "./A/B.lean:1:14: error(lean.unknownIdentifier): Unknown identifier `u5`" ==
+          some
+            { file := some "./A/B.lean", line := some 1, message := "Unknown identifier `u5`" } &&
+        ofText "X.lean:7:0: error: a: b" ==
+          some { file := some "X.lean", line := some 7, message := "a: b" } &&
+        (ofText "plain text").isNone),
+    ("bundle: B1's reason maps the path, keeps the first line, escapes controls last", fun _ =>
+      reason "implementation" (ofJson jsonLine) "lean" 1 ==
+          "implementation build failed (A/B.lean:3: Unknown identifier `u5`)" &&
+        reason "proof" (some { file := some "/fvdep/src/P/Q.lean", line := some 2, message := "m" })
+            "lean" 1 ==
+          "proof build failed (P/Q.lean:2: m)" &&
+        reason "proof"
+            (some { file := some "/fvdep/lib/Fvdep/A/B.olean", line := some 1, message := "m" })
+            "lean" 1 ==
+          "proof build failed (Fvdep.A.B:1: m)" &&
+        reason "proof" (some { file := none, line := none, message := "bare\nmore" }) "lean" 1 ==
+          "proof build failed (bare)" &&
+        reason "implementation" none "leanexport" 134 ==
+          "implementation build failed (leanexport exited with code 134)" &&
+        reason "proof" (some { file := none, line := none, message := "a\x1B\tb" }) "lean" 1 ==
+          "proof build failed (a\\u001B\\tb)"),
+    ("bundle: B2 omits the largest inputs first (ties by path) until the rest fits", fun _ =>
+      omitOrder [("a", 5), ("b", 9), ("c", 9), ("d", 1)] 24 == [] &&
+        omitOrder [("a", 5), ("b", 9), ("c", 9), ("d", 1)] 23 == ["b"] &&
+        omitOrder [("a", 5), ("b", 9), ("c", 9), ("d", 1)] 6 == ["b", "c"] &&
+        omitOrder [("a", 5), ("b", 9), ("c", 9), ("d", 1)] 0 == ["b", "c", "a", "d"]),
+    ("bundle: B2 keeps the newest 16 by time, then name", fun _ =>
+      let bs := (List.range 18).map fun i => (s!"n{i + 10}", if i < 2 then 0 else i)
+      retainPick bs 16 == ["n10", "n11"] &&
+        retainPick [("b", 1), ("a", 1), ("c", 2)] 1 == ["a", "b"] &&
+        retainPick [("a", 1)] 16 == []),
+    ("sandbox: T3's export cap ≥ 1 + ≤ the per-file cap (default = it)", fun _ =>
+      ({} : Limits).exportCap == ({} : Limits).fileCap &&
+        ({ exportBytes := some 0 } : Limits).check.isSome &&
+        ({ fileBytes := some 100, exportBytes := some 101 } : Limits).check.isSome &&
+        ({ fileBytes := some 100, exportBytes := some 100 } : Limits).check.isNone),
+    ("sandbox: B1's scan finds the first error line across chunk boundaries, skipping the rest",
+      fun _ =>
+      let line := jsonLine ++ "\n"
+      let n := line.length / 2
+      let a := String.ofList (line.toList.take n)
+      let b := String.ofList (line.toList.drop n)
+      (scanAll [info ++ "\n" ++ a, b ++ info ++ "\n"]).map (·.line) == some (some 3) &&
+        (scanAll [info ++ "\n", info]).isNone &&
+        (scanAll [jsonLine]).map (·.line) == some (some 3) &&
+        (scanAll
+                (List.replicate 50 "x\nyy\n" ++
+                  [jsonLine ++ "\n", jsonLine.replace "line\":3" "line\":9"])).map
+            (·.line) ==
+          some (some 3)),
+    ("sandbox: an error line past the cap is never read; Horspool's search finds a marker exactly",
+      fun _ =>
+      (scanAll [jsonLine ++ "\n"] (cap := 20)).isNone &&
+        (FvdepIO.Sandbox.find "abcab".toUTF8 "cab".toUTF8 (FvdepIO.Sandbox.skipOf "cab".toUTF8)
+            0) ==
+          some 2 &&
+        (FvdepIO.Sandbox.find "ab".toUTF8 "abc".toUTF8 (FvdepIO.Sandbox.skipOf "abc".toUTF8)
+            0).isNone &&
+        (FvdepIO.Sandbox.find "zzbabb".toUTF8 "abb".toUTF8 (FvdepIO.Sandbox.skipOf "abb".toUTF8)
+            0) ==
+          some 3)]
+
+end PhaseD
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -2015,11 +2178,13 @@ def main : IO UInt32 := do
                   Sandbox.cases ++
                   Step.cases ++
                   Cache.cases ++
-                  Snapshot.cases).map
+                  Snapshot.cases ++
+                  PhaseD.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
-    (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases).mapM
+    (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases ++
+            PhaseIO.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
