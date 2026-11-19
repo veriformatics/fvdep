@@ -2103,6 +2103,25 @@ def cases : List (String × (Unit → Bool)) :=
       retainPick bs 16 == ["n10", "n11"] &&
         retainPick [("b", 1), ("a", 1), ("c", 2)] 1 == ["a", "b"] &&
         retainPick [("a", 1)] 16 == []),
+    ("bundle: B2's record reads back from its canonical text alone (D4's intake)", fun _ =>
+      let rc : Record :=
+        { recipe := FvdepCore.Build.consumer "4.35.0+x" "fp"
+          limits := { fileBytes := some 7, exportBytes := some 5 }
+          phase := 2
+          step := "compile"
+          module := "A.B"
+          imports := ["X"]
+          roots := ["r"]
+          presence := [("Y", "library")]
+          inputs :=
+            [{ role := "src", path := "A/B.lean", size := 3, sha256 := "ab", kept := true }] }
+      let b := FvdepCore.Json.print rc.value
+      let t := FvdepCore.Index.Command.textOfBytes b
+      Record.ofBytes b == some rc &&
+        (Record.ofBytes (t.replace "\"schema\":1" "\"schema\":2").toUTF8).isNone &&
+        (Record.ofBytes (b ++ " ".toUTF8)).isNone &&
+        (Record.ofBytes (t.replace "\"complete\":true" "\"complete\":false").toUTF8).isNone &&
+        (Record.ofBytes (t.replace "\"phase\":2" "\"phase\": 2").toUTF8).isNone),
     ("sandbox: T3's export cap ≥ 1 + ≤ the per-file cap (default = it)", fun _ =>
       ({} : Limits).exportCap == ({} : Limits).fileCap &&
         ({ exportBytes := some 0 } : Limits).check.isSome &&

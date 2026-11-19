@@ -461,6 +461,55 @@ def channel(tmp: Path) -> None:
     need(got[3:] == ["1"], f"no frame on an inherited pipe: {r.stdout!r} {r.stderr[:200]!r}")
 
 
+@case("G2.link-plant", "noframe-links")
+def link_plant(tmp: Path) -> None:
+    """A step plants a link (to a file the step reads), a FIFO + a mode-000 directory under
+    /fvdep/work/out beside a regular file: the regular file alone is framed (no link followed, no
+    FIFO opened, the locked directory skipped), the step ends, the link's target is untouched."""
+    src = tmp / "src"
+    src.mkdir()
+    secret = src / "secret"
+    secret.write_bytes(b"u5-g2-secret")
+    script = ("import os\n"
+              "o = '/fvdep/work/out'\n"
+              "os.makedirs(o + '/locked')\n"
+              "open(o + '/locked/inner', 'w').write('x')\n"
+              "os.chmod(o + '/locked', 0)\n"
+              "os.symlink('/fvdep/src/secret', o + '/link')\n"
+              "os.mkfifo(o + '/fifo')\n"
+              "open(o + '/ok', 'w').write('ok')\n")
+    r = sandbox(script, "--src", str(src))
+    need(r.returncode == 0, f"fvdep-dev exit {r.returncode}: {r.stderr[:300]!r}")
+    lines = r.stdout.splitlines()
+    need("outcome exited 0" in lines and "frame complete" in lines, f"step: {r.stdout[:300]!r}")
+    framed = [x.split()[1] for x in lines if x.startswith("file ")]
+    need(framed == ["ok"], f"framed {framed!r}, expected only ok")
+    need(secret.read_bytes() == b"u5-g2-secret", "the link's target changed")
+
+
+@case("P1.library-first", "order")
+def library_first(tmp: Path) -> None:
+    """Phase 1's library roots check runs before any consumer compile (contract P1): an absent spec
+    root = exit 2 even when the implementation itself does not compile (exit 1 otherwise)."""
+    proj = tmp / "project"
+    shutil.copytree(ROOT / "tests/sandbox/fixtures/honest", proj)
+    pin = subprocess.check_output(["git", "rev-parse", "HEAD"], cwd=ROOT, text=True).strip()
+    manifest = proj / "fvdep.toml"
+    manifest.write_text(manifest.read_text().replace("0" * 40, pin))
+    (proj / "SandboxTrial/Impl.lean").write_text("def broken := u5_first_missing\n")
+    env = dict(os.environ, FVDEP_CACHE=str(tmp / "cache"))
+    argv = [str(DEV), "phase", "check", str(proj), "base64.encode", "--library", str(ROOT),
+            "--spec-module", "Fvdep.Base64.Encode.V1_0_0",
+            "--spec", "Fvdep.Base64.Encode.V1_0_0.u5_absent"]
+    r = subprocess.run(argv, capture_output=True, text=True, env=env, timeout=600, check=False)
+    lines = r.stdout.splitlines()
+    need(r.returncode == 2, f"exit {r.returncode}: {r.stdout[:400]!r}")
+    need(any(x.startswith("infra io: ") and "u5_absent" in x for x in lines),
+         f"no infra line naming the root: {r.stdout[:400]!r}")
+    need(not any(x.startswith("phase1 failed") for x in lines),
+         "the consumer's own failure outranked the absent library root")
+
+
 @case("G4.print-flood", "retention")
 def print_flood(tmp: Path) -> None:
     # 10^9 lines (2 GB) through a 1 KiB diagnostic cap (contract G4).

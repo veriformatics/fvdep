@@ -142,4 +142,51 @@ def Record.value (r : Record) : Value :=
       ("recipe", recipeValue r.recipe), ("roots", strs r.roots), ("schema", .int 1),
       ("step", .str r.step)]
 
+/-- B2: a record's limits back (each cap as the record resolved it). -/
+def limitsOf (v : Value) : Option FvdepCore.Sandbox.Limits := do
+  let [deadline, diagnosticBytes, exportBytes, fileBytes, frameBytes, tmpBytes, workBytes] ←
+    members
+        ["deadline", "diagnosticBytes", "exportBytes", "fileBytes", "frameBytes", "tmpBytes",
+          "workBytes"]
+        v | none
+  pure {
+        deadline := ← natOf deadline
+        workBytes := ← natOf workBytes
+        tmpBytes := ← natOf tmpBytes
+        diagnosticBytes := ← natOf diagnosticBytes
+        frameBytes := ← natOf frameBytes
+        fileBytes := some (← natOf fileBytes)
+        exportBytes := some (← natOf exportBytes) }
+
+def inputOf (v : Value) : Option Input := do
+  let [kept, path, role, sha256, size] ← members ["kept", "path", "role", "sha256", "size"] v | none
+  pure {
+        role := ← strOf role
+        path := ← strOf path
+        size := ← natOf size
+        sha256 := ← strOf sha256
+        kept := ← boolOf kept }
+
+/-- B2 + D4: `bundle.json` back — its canonical text alone (another spelling of the same value, an
+unknown or missing member, another schema or a `complete` its inputs contradict = no record). -/
+def Record.ofBytes (b : ByteArray) : Option Record := do
+  let v ← (FvdepCore.Json.decode b).toOption
+  let [complete, imports, inputs, limits, module, phase, presence, recipe, roots, schema, step] ←
+    members
+        ["complete", "imports", "inputs", "limits", "module", "phase", "presence", "recipe",
+          "roots", "schema", "step"]
+        v | none
+  let r : Record :=
+    { recipe := ← recipeOf recipe
+      limits := ← limitsOf limits
+      phase := ← natOf phase
+      step := ← strOf step
+      module := ← strOf module
+      imports := ← strsOf imports
+      roots := ← strsOf roots
+      presence := ← (← arrOf presence).mapM pairOf
+      inputs := ← (← arrOf inputs).mapM inputOf }
+  guard ((← natOf schema) == 1 && (← boolOf complete) == r.complete && print r.value == b)
+  pure r
+
 end FvdepCore.Bundle

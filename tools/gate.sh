@@ -324,7 +324,7 @@ sandbox_closure() {
 # + D4 cases merge with U5-D. Its steps run fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID
 # namespace of the job's own.
 sandbox_suite() {
-    local cases=(--case R. --case K. --case P. --case S. --case B.retention)
+    local cases=(--case R. --case K. --case P. --case S. --case B.)
     [[ -z "${FVDEP_SANDBOX_CASE:-}" ]] || cases=(--case "$FVDEP_SANDBOX_CASE")
     suite sandbox-suite "$(sandbox_closure tests/sandbox)" "${FVDEP_SANDBOX_CASE:-}" \
         bash tests/sandbox/run.sh "${cases[@]}"

@@ -114,14 +114,13 @@ def freeze (dir : System.FilePath) (files : List (String × ByteArray)) : IO (Li
 modules built so far at `/fvdep/prior` (`run/consumer`: phase 1's frozen artifacts + this phase's
 earlier ones, T2); `pre` = the helper's options before its `--file-bytes`, `cmd` = the command,
 `env` = extra variables. -/
-def stepRun (s : Setup) (src view : System.FilePath) (pre cmd : List String)
+def stepRun (s : Setup) (src view prior : System.FilePath) (pre cmd : List String)
     (env : List (String × String)) (lim : Limits) (untilMs : Option Nat) :
     IO (Except String FvdepIO.Sandbox.Observation) := do
-  let run := s.cache.run
   let spec : Spec :=
     { ro :=
         [(s.cache.sysroot.toString, .sysroot), (s.cache.helper.toString, .step),
-          (src.toString, .src), (view.toString, .lib), ((run / "consumer").toString, .prior)]
+          (src.toString, .src), (view.toString, .lib), (prior.toString, .prior)]
       env := s.recipe.env ++ [("LEAN_PATH", ":".intercalate s.recipe.leanPath)] ++ env
       workBytes := lim.workBytes
       tmpBytes := lim.tmpBytes
@@ -151,6 +150,56 @@ def detailOf (n : Nat) (step : Step) (lim : Limits) (exportOver : Bool)
     | _ => if exportOver then s!" (the export passed --export-bytes {lim.exportCap})" else ""
   s!"phase {n}, {stepName step}: {d}{cap}"
 
+/-- A step's command (P1, P4; T2's recipe): the helper's options before `--file-bytes`, the argv,
+extra environment, the artifact family its frame must hold, the tool B1 names. `imports` + `roots`
+= the roots check's or the export's request; `isModule` = a compiled module's header flag (P2). -/
+def stepCommand (recipe : Recipe) (step : Step) (imports roots : List String) (isModule : Bool) :
+    List String × List String × List (String × String) × List String × String :=
+  match step with
+  | .compile m =>
+    (["--mkdir", FvdepIO.Cache.outDir m], compileArgv recipe m, [], family isModule m, "lean")
+  | .libraryRoots | .consumerRoots =>
+    (["--mkdir", "out"], recipe.argv ++ compileFlags recipe ++ ["./FvdepRoots.lean"], [], [],
+      "lean")
+  | .exportStep =>
+    (["--mkdir", "out", "--stdout", "out/export.ndjson"],
+      ["leanexport"] ++ imports ++ ["--"] ++ roots, [("LEAN_ABORT_ON_PANIC", "1")],
+      ["export.ndjson"], "leanexport")
+
+/-- One step run + judged (P5) over its materialized inputs: its `StepResult` (B1's reason or the
+absent root as `diagnostic`, the export cap as a size cap), the observation, whether the export
+passed its cap, the root a roots check names — or bwrap's setup failure. -/
+def judge (s : Setup) (n : Nat) (step : Step) (src view prior : System.FilePath)
+    (imports roots : List String) (isModule : Bool) (lim : Limits) (untilMs : Option Nat) :
+    IO (Except String (StepResult × FvdepIO.Sandbox.Observation × Bool × String)) := do
+  let (pre, cmd, env, fam, tool) := stepCommand s.recipe step imports roots isModule
+  match ← stepRun s src view prior pre cmd env lim untilMs with
+  | .error why =>
+    return .error why
+  | .ok obs =>
+    let over :=
+      match obs.frame with
+      | .ok o => step == .exportStep && o.files.any fun f => lim.exportCap < f.2.size
+      | _ => false
+    let first := obs.firstOut <|> obs.firstErr
+    let missing :=
+      match step with
+      | .libraryRoots | .consumerRoots =>
+        match (first.bind (·.line)).bind (rootAt imports roots) with
+        | some root => root
+        | none => s!"one of {", ".intercalate roots}"
+      | _ => ""
+    let reason :=
+      match step with
+      | .libraryRoots | .consumerRoots =>
+        FvdepCore.Doc.escapeControls s!"{label n} build failed ({missing} is not defined)"
+      | _ => FvdepCore.Bundle.reason (label n) first tool (exitCode obs)
+    let res := FvdepIO.Cache.result fam obs
+    return .ok
+        ({ res with
+            exhausted := res.exhausted || over, diagnostic := reason },
+          obs, over, missing)
+
 /-- K2 + P5's graph of a phase: each module's import order, the library modules it reads, each
 module's `module` flag. -/
 structure Graph where
@@ -162,8 +211,8 @@ structure Graph where
 refusal), each import classed (`importClass`; the library's presence read per import), K2's plan
 → the graph, or the failed reason + the presence facts read so far (B2: a rerun repeats the decision
 from them). -/
-def graph (s : Setup) (n : Nat) (mods : List (String × ByteArray)) (built : List String) :
-    IO (Except (String × List (String × String)) Graph) := do
+def graph (n : Nat) (mods : List (String × ByteArray)) (built : List String)
+    (present : String → IO Bool) : IO (Except (String × List (String × String)) Graph) := do
   let listed := mods.map (·.1)
   let mut heads : Array (String × FvdepIO.Header.Observed) := #[]
   for (m, bytes) in mods do
@@ -178,7 +227,7 @@ def graph (s : Setup) (n : Nat) (mods : List (String × ByteArray)) (built : Lis
   for (m, h) in heads do
     let mut edges : Array String := #[]
     for i in h.imports do
-      let here ← (s.library / (stem i.module ++ ".lean")).pathExists
+      let here ← present i.module
       let c := importClass listed built (fun _ => here) i.module
       presence := presence.push (i.module, className c)
       match c with
@@ -230,7 +279,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
   let failedObs (reason : String) : Obs :=
     if n == 1 then .phase1 (.failed reason) else .phase2 "" (.failed reason)
   let g ←
-    match ← graph s n mods built with
+    match ← graph n mods built fun m => (s.library / (stem m ++ ".lean")).pathExists with
     | .ok g =>
       pure g
     | .error (reason, presence) =>
@@ -274,7 +323,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
         return { outcome := .timedOut, frame := .missing, exhausted := false, diagnostic := "" }
     let stepLim :=
       if step == .libraryRoots then { lim with deadline := s.cache.limits.fillBudget } else lim
-    let (src, pre, cmd, env, fam, tool) ←
+    let (src, imports, rs, isMod) ←
       match step with
       | .compile m =>
         let src := run / s!"src{n}" / m
@@ -282,10 +331,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
         if let some p := f.parent then
           IO.FS.createDirAll p
         IO.FS.writeBinFile f (((mods.find? (·.1 == m)).map (·.2)).getD .empty)
-        let isMod := (g.isModule.lookup m).getD false
-        pure
-            (src, ["--mkdir", FvdepIO.Cache.outDir m], compileArgv s.recipe m, [], family isMod m,
-              "lean")
+        pure (src, [], [], (g.isModule.lookup m).getD false)
       | .libraryRoots | .consumerRoots =>
         let (imports, rs) :=
           if step == .libraryRoots then ([r.specModule] ++ abiModule, libConsts)
@@ -293,44 +339,15 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
         let src := run / s!"roots{n}-{if step == .libraryRoots then "library" else "consumer"}"
         IO.FS.createDirAll src
         IO.FS.writeFile (src / "FvdepRoots.lean") (rootsSource imports rs)
-        pure
-            (src, ["--mkdir", "out"],
-              s.recipe.argv ++ compileFlags s.recipe ++ ["./FvdepRoots.lean"], [], [], "lean")
+        pure (src, imports, rs, false)
       | .exportStep =>
-        pure
-            (empty, ["--mkdir", "out", "--stdout", "out/export.ndjson"],
-              ["leanexport"] ++ exportImports ++ ["--"] ++ roots, [("LEAN_ABORT_ON_PANIC", "1")],
-              ["export.ndjson"], "leanexport")
-    match ← stepRun s src view pre cmd env stepLim untilMs with
+        pure (empty, exportImports, roots, false)
+    match ← judge s n step src view (run / "consumer") imports rs isMod stepLim untilMs with
     | .error why =>
       return { outcome := .setupFailed why, frame := .missing, exhausted := false,
                diagnostic := "" }
-    | .ok obs =>
-      let over :=
-        match obs.frame with
-        | .ok o => step == .exportStep && o.files.any fun f => lim.exportCap < f.2.size
-        | _ => false
-      let first := obs.firstOut <|> obs.firstErr
-      let missing :=
-        match step with
-        | .libraryRoots | .consumerRoots =>
-          let (imports, rs) :=
-            if step == .libraryRoots then ([r.specModule] ++ abiModule, libConsts)
-            else (exportImports, roots)
-          match (first.bind (·.line)).bind (rootAt imports rs) with
-          | some root => root
-          | none => s!"one of {", ".intercalate rs}"
-        | _ => ""
+    | .ok (res, obs, over, missing) =>
       st.modify fun x => { x with last := some (step, obs, over, src, missing) }
-      let reason :=
-        match step with
-        | .libraryRoots | .consumerRoots =>
-          FvdepCore.Doc.escapeControls s!"{label n} build failed ({missing} is not defined)"
-        | _ => FvdepCore.Bundle.reason (label n) first tool (exitCode obs)
-      let res := FvdepIO.Cache.result fam obs
-      let res :=
-        { res with
-          exhausted := res.exhausted || over, diagnostic := reason }
       if stepVerdict step res == .pass then
         if let .ok o := obs.frame then
           match step with
@@ -405,6 +422,13 @@ def phase (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteArray)
     (built libPrev : List String) : IO PhaseRun :=
   tryCatch (phaseBody s r n mods built libPrev) fun ex =>
     pure { obs := .infra .io s!"phase {n}: a host I/O operation failed: {ex}", libRoots := libPrev }
+
+/-- A command's fresh run directory on the cache's filesystem (`<cache>/runs/<pid>.<ns>`): K4's
+views = hard links into the cache, which `link(2)` refuses across filesystems (`EXDEV`). -/
+def runDir (cache : System.FilePath) : IO System.FilePath := do
+  let dir := cache / "runs" / s!"{← IO.Process.getPID}.{← IO.monoNanosNow}"
+  IO.FS.createDirAll dir
+  return dir
 
 /-- The phase-2 observation bound to the e1 it was built on (U2 E: `phase2 e1 …`). -/
 def bindE1 (e1 : Digest) : Obs → Obs

@@ -33,6 +33,8 @@ STUB_ARGS = (
 
 # (key + label, edits (path, old, new), the cases run (a run.sh --case substring; "" = all), the
 # cases it must fail, the build that must fail ("" = none)).
+PHASE = "tool/FvdepIO/Phase.lean"
+
 MUTANTS = [
     ("STUB every isolation mechanism off, steps still run",
      [(SPAWN, "        (e = closefrom(&fa, 5)) != 0) {", "        (e = 0) != 0) {"),
@@ -83,6 +85,15 @@ MUTANTS = [
       (RUNNER, "  | 0 => { p with out := p.out.push keep chunk }\n",
        "  | 0 => { p with out := p.out.push keep chunk, hoard := p.hoard.push chunk }\n")],
      "G4.print-flood", ["G4.print-flood"], ""),
+    ("G2 the helper follows links (lstat → stat, the no-follow open dropped)",
+     [(STEP, "      match ← e.path.symlinkMetadata.toBaseIO with", "      match ← e.path.metadata.toBaseIO with"),
+      (SPAWN, "    int fd = open(cpath, O_RDONLY | O_NOFOLLOW | O_NONBLOCK | O_CLOEXEC);",
+       "    int fd = open(cpath, O_RDONLY | O_NONBLOCK | O_CLOEXEC);")],
+     "G2.", ["G2.link-plant"], ""),
+    ("P1 the library roots check after the window (consumer code first)",
+     [(PHASE, "  let plan := (if n == 1 then [Step.libraryRoots] else []) ++ steps g.order",
+       "  let plan := steps g.order ++ (if n == 1 then [Step.libraryRoots] else [])")],
+     "P1.", ["P1.library-first"], ""),
 ]
 
 
