@@ -42,6 +42,11 @@ def compileEnv : List (String × String) :=
   [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
     ("LC_ALL", "C")]
 
+/-- T2: a step's environment under recipe `r` — `r`'s variables, then `LEAN_PATH` = its search path
+joined by `:` (R1 clears every other variable). -/
+def stepEnv (r : Recipe) : List (String × String) :=
+  r.env ++ [("LEAN_PATH", ":".intercalate r.leanPath)]
+
 /-- T2 `consumer/1`: Lean's default options for consumer modules (U6 governs their syntax). -/
 def consumer (release fingerprint : String) : Recipe :=
   { id := "consumer/1"
@@ -53,21 +58,20 @@ def consumer (release fingerprint : String) : Recipe :=
     options := []
     threads := 4 }
 
-/-- T2 `library/1`: fvdep's qualified elaboration options for library modules (= `fvdep index`'s
-build, `FvdepIO.Index.lakefile`). -/
+/-- The library's elaboration options (name, value): every build of its sources takes them —
+`library/1` here, `fvdep index`'s (`FvdepIO.Index.lakefile`) + the root `lakefile.lean`'s
+`leanOptions` (gate stage `meta` compares that copy). -/
+def libraryOptions : List (String × String) :=
+  [("autoImplicit", "false"), ("relaxedAutoImplicit", "false"), ("warningAsError", "true"),
+    ("linter.extra.dupNamespace", "true"), ("linter.extra.unnecessarySeqFocus", "true"),
+    ("linter.extra.unreachableTactic", "true"), ("linter.extra.unusedDecidableInType", "true"),
+    ("linter.redundantVisibility", "true")]
+
+/-- T2 `library/1`: `consumer/1` with the library's options (`libraryOptions`). -/
 def library (release fingerprint : String) : Recipe :=
-  { id := "library/1"
-    release
-    fingerprint
-    argv := ["lean"]
-    leanPath
-    env := compileEnv
-    options :=
-      ["autoImplicit=false", "relaxedAutoImplicit=false", "warningAsError=true",
-        "linter.extra.dupNamespace=true", "linter.extra.unnecessarySeqFocus=true",
-        "linter.extra.unreachableTactic=true", "linter.extra.unusedDecidableInType=true",
-        "linter.redundantVisibility=true"]
-    threads := 4 }
+  { consumer release fingerprint with
+    id := "library/1"
+    options := libraryOptions.map fun o => o.1 ++ "=" ++ o.2 }
 
 /-! ## K1 keys -/
 

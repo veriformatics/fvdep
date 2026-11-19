@@ -319,10 +319,10 @@ sandbox_closure() {
         tool/StepMain.lean
 }
 
-# The blind sandbox suite's D2 + D3 cases (tester-6; U5 R + D2: `fvdep-dev sandbox run`, one step
-# each: outcomes, pumps, frames, preflight; K + D3: `fvdep-dev cache`, fills, pins, eviction); its D1
-# + D4 cases merge with U5-D. Its steps run fvdep-step ⇒ tests/sandbox/run.sh refuses outside a PID
-# namespace of the job's own.
+# The blind sandbox suite (tester-6): R + D2 (`fvdep-dev sandbox run`, one step each: outcomes,
+# pumps, frames, preflight), K + D3 (`fvdep-dev cache`: fills, pins, eviction), P + S + B + D1/D4
+# (`fvdep-dev phase check|rerun`). Its steps run fvdep-step ⇒ tests/sandbox/run.sh refuses outside
+# a PID namespace of the job's own.
 sandbox_suite() {
     local cases=(--case R. --case K. --case P. --case S. --case B.)
     [[ -z "${FVDEP_SANDBOX_CASE:-}" ]] || cases=(--case "$FVDEP_SANDBOX_CASE")
@@ -485,7 +485,7 @@ renovate() { python3 -I tools/check-renovate.py; }
 # One version in Fvdep/Version.lean + both lakefiles; the target lists above = every lean_lib +
 # lean_exe the lakefiles declare; every rule file's frontmatter keeps the quoted `paths:` list.
 meta() {
-    local rc=0 lean root_v tool_v f declared listed
+    local rc=0 lean root_v tool_v f declared listed lake_opts core_opts
     lean="$(sed -n 's/^def version : String := "\(.*\)"$/\1/p' Fvdep/Version.lean)"
     root_v="$(sed -n 's/^  version := v!"\(.*\)"$/\1/p' lakefile.lean)"
     tool_v="$(sed -n 's/^  version := v!"\(.*\)"$/\1/p' tool/lakefile.lean)"
@@ -500,6 +500,16 @@ meta() {
     if [[ "$declared" != "$listed" ]]; then
         printf 'meta: lakefile targets [%s] != tools/gate.sh target lists [%s]\n' \
             "$(paste -sd' ' - <<<"$declared")" "$(paste -sd' ' - <<<"$listed")" >&2
+        rc=1
+    fi
+    # The library's sources compile under one option list: the root lakefile's copy = the shipped
+    # one (`library/1` + `fvdep index`'s lakefile read `libraryOptions`).
+    lake_opts="$(grep -o '⟨`[A-Za-z.]*, [a-z0-9]*⟩' lakefile.lean | sed 's/^⟨`\(.*\), \(.*\)⟩$/\1=\2/')"
+    core_opts="$(sed -n '/^def libraryOptions/,/^$/p' tool/FvdepCore/Build.lean |
+        grep -o '("[^"]*", "[^"]*")' | sed 's/^("\(.*\)", "\(.*\)")$/\1=\2/')"
+    if [[ -z "$lake_opts" || "$lake_opts" != "$core_opts" ]]; then
+        printf 'meta: lakefile.lean leanOptions [%s] != FvdepCore.Build.libraryOptions [%s]\n' \
+            "$(paste -sd' ' - <<<"$lake_opts")" "$(paste -sd' ' - <<<"$core_opts")" >&2
         rc=1
     fi
     for f in .claude/rules/*.md; do

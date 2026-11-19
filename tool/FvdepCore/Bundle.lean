@@ -1,6 +1,7 @@
 import FvdepCore.Build
 import FvdepCore.Doc
 import FvdepCore.Sandbox
+import FvdepCore.Step
 import Lean.Data.Json
 
 /-! The failure bundle's pure parts (contract `docs/contracts/U5-sandbox.md` B1, B2): B1's reason —
@@ -92,8 +93,9 @@ def retainPick (bundles : List (String × Nat)) (keep : Nat) : List String :=
   let sorted := bundles.mergeSort fun a b => a.2 < b.2 || (a.2 == b.2 && decide (a.1 ≤ b.1))
   (sorted.take (sorted.length - keep)).map (·.1)
 
-/-- B2: one required input of the failing step: its role (`src`, `lib`, `phase1`, `prior`), path
-under that role's directory, size + digest, whether its copy is in the bundle. -/
+/-- B2: one required input of the failing step: its role (`src`, `lib`, `prior`:
+`FvdepIO.Phase.inputsOf`), path under that role's directory, size + digest, whether its copy is in
+the bundle. -/
 structure Input where
   role : String
   path : String
@@ -168,7 +170,9 @@ def inputOf (v : Value) : Option Input := do
         kept := ← boolOf kept }
 
 /-- B2 + D4: `bundle.json` back — its canonical text alone (another spelling of the same value, an
-unknown or missing member, another schema or a `complete` its inputs contradict = no record). -/
+unknown or missing member, another schema, a `complete` its inputs contradict or an input outside
+B2's roles `src`, `lib`, `prior` or at an unsafe path (D4 reads `inputs/<role>/<path>`) = no
+record). -/
 def Record.ofBytes (b : ByteArray) : Option Record := do
   let v ← (FvdepCore.Json.decode b).toOption
   let [complete, imports, inputs, limits, module, phase, presence, recipe, roots, schema, step] ←
@@ -187,6 +191,9 @@ def Record.ofBytes (b : ByteArray) : Option Record := do
       presence := ← (← arrOf presence).mapM pairOf
       inputs := ← (← arrOf inputs).mapM inputOf }
   guard ((← natOf schema) == 1 && (← boolOf complete) == r.complete && print r.value == b)
+  guard
+      (r.inputs.all fun i =>
+        ["src", "lib", "prior"].contains i.role && FvdepCore.Step.safePath i.path)
   pure r
 
 end FvdepCore.Bundle

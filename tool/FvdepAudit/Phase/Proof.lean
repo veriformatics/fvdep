@@ -156,6 +156,37 @@ theorem stem_char_inj (c d : Char) (hc : c ≠ '/') (hd : d ≠ '/')
     · simp [hc', hd'] at h; exact absurd h hc
     · simpa [hc', hd'] using h
 
+theorem stem_append (a b : String) : stem (a ++ b) = stem a ++ stem b := by
+  apply String.ext
+  simp [stem, String.toList_map, String.toList_append]
+
+theorem stem_plain (c : String) (h : '.' ∉ c.toList) : stem c = c := by
+  apply String.ext
+  have hm : c.toList.map (fun x => if x == '.' then '/' else x) = c.toList.map id :=
+    List.map_congr_left fun x hx => by
+      have hx' : x ≠ '.' := fun e => h (e ▸ hx)
+      simp [hx']
+  simpa [stem, String.toList_map] using hm
+
+/-- T2 + P1 + S2: a module's path stem = its dot-separated components joined by `/`. -/
+theorem stem_components (cs : List String) (h : ∀ c ∈ cs, '.' ∉ c.toList) :
+    stem (".".intercalate cs) = "/".intercalate cs := by
+  have hdot : stem "." = "/" := by
+    apply String.ext
+    simp [stem, String.toList_map]
+  induction cs with
+  | nil =>
+    apply String.ext
+    simp [stem, String.toList_map]
+  | cons c cs ih =>
+    have hc : stem c = c := stem_plain c (h c (by simp))
+    have hcs : ∀ x ∈ cs, '.' ∉ x.toList := fun x hx => h x (by simp [hx])
+    cases cs with
+    | nil => simpa [String.intercalate_singleton] using hc
+    | cons d ds =>
+      rw [String.intercalate_cons_cons, String.intercalate_cons_cons, stem_append, stem_append,
+        hdot, hc, ih hcs]
+
 /-- S2: distinct module names without `/` have distinct path stems (U3 T3's names have none). -/
 theorem stem_injective (a b : String) (ha : '/' ∉ a.toList) (hb : '/' ∉ b.toList)
     (h : stem a = stem b) : a = b := by
@@ -555,5 +586,54 @@ theorem source_files_exact (ms : List (String × ByteArray)) (p : String) (b : B
 theorem phase_plan_first (order : List String) :
     phasePlan 1 order = .libraryRoots :: steps order ∧ phasePlan 2 order = steps order := by
   simp [phasePlan]
+
+/-- T2 + P1: a module's compile argv under each recipe = the contract's template. -/
+theorem compile_argv_exact (rel fp m : String) :
+    compileArgv (FvdepCore.Build.consumer rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src", "-o",
+          "/fvdep/work/out/" ++ stem m ++ ".olean", "-i", "/fvdep/work/out/" ++ stem m ++ ".ilean",
+          "-c", "/fvdep/work/out/" ++ stem m ++ ".c", "./" ++ stem m ++ ".lean"] ∧
+      compileArgv (FvdepCore.Build.library rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src"] ++
+          FvdepCore.Build.libraryOptions.flatMap (fun o => ["-D", o.1 ++ "=" ++ o.2]) ++
+          ["-o", "/fvdep/work/out/" ++ stem m ++ ".olean", "-i",
+            "/fvdep/work/out/" ++ stem m ++ ".ilean", "-c", "/fvdep/work/out/" ++ stem m ++ ".c",
+            "./" ++ stem m ++ ".lean"] := by
+  have h4 : String.ofList (FvdepCore.Ids.decimal 4) = "4" := by
+    rw [FvdepCore.Ids.decimal]
+    decide
+  constructor <;>
+    simp [compileArgv, FvdepCore.Build.compileFlags, FvdepCore.Build.consumer,
+      FvdepCore.Build.library, FvdepCore.Build.libraryOptions, h4]
+
+/-- T2: the recipes' search path, release, fingerprint + ids; `library/1` = `consumer/1` with the
+library's options. -/
+theorem recipes_exact (rel fp : String) :
+    FvdepCore.Build.consumer rel fp =
+        { id := "consumer/1"
+          release := rel
+          fingerprint := fp
+          argv := ["lean"]
+          leanPath := ["/fvdep/lib", "/fvdep/prior"]
+          env :=
+            [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+              ("LC_ALL", "C")]
+          options := []
+          threads := 4 } ∧
+      FvdepCore.Build.library rel fp =
+        { FvdepCore.Build.consumer rel fp with
+          id := "library/1"
+          options := FvdepCore.Build.libraryOptions.map fun o => o.1 ++ "=" ++ o.2 } ∧
+      FvdepCore.Build.stepEnv (FvdepCore.Build.consumer rel fp) =
+        [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+          ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")] ∧
+      FvdepCore.Build.stepEnv (FvdepCore.Build.library rel fp) =
+        [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+          ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")] := by
+  refine ⟨rfl, rfl, ?_, ?_⟩ <;>
+    show
+      FvdepCore.Build.compileEnv ++ [("LEAN_PATH", ":".intercalate FvdepCore.Build.leanPath)] =
+        _ <;>
+    decide
 
 end FvdepAudit.Phase.Proof

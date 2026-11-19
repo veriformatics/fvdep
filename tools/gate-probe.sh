@@ -492,7 +492,8 @@ plant_afl_halfbump() { sed -i -E 's/^(\S+) \S+ source /\1 9.99c source /' tools/
 with_build=0 probe renovate-afl-repin plant_afl_halfbump "re-pin with tools/fuzz.sh pin 9.99c" \
     python3 -I tools/check-renovate.py
 
-# meta: version disagreement; an unquoted rule `paths:` entry; a Lake target the gate never builds.
+# meta: version disagreement; an unquoted rule `paths:` entry; a Lake target the gate never builds;
+# the library's option list differing between the root lakefile + `FvdepCore.Build`.
 meta_stage() { bash -c 'source tools/gate.sh; meta'; }
 plant_version() {
     sed -i 's/^def version : String := ".*"$/def version : String := "9.9.9"/' Fvdep/Version.lean
@@ -505,6 +506,8 @@ plant_rule() {
 with_build=0 probe meta-frontmatter plant_rule "paths entry is not a quoted glob" meta_stage
 plant_target() { printf '\nlean_lib FvdepPlanted\n' >>lakefile.lean; }
 with_build=0 probe meta-targets plant_target "FvdepPlanted" meta_stage
+plant_options() { sed -i 's/, ("warningAsError", "true")//' tool/FvdepCore/Build.lean; }
+with_build=0 probe meta-options plant_options "!= FvdepCore.Build.libraryOptions" meta_stage
 
 # spec: a spec missing its Phase section.
 plant_spec() { sed -i '/^## Phase/,$d' .agent/spec.md; }

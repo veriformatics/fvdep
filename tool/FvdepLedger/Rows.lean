@@ -1542,9 +1542,59 @@ def phasePlanFirst : Prop :=
   ∀ (order : List String),
     phasePlan 1 order = .libraryRoots :: steps order ∧ phasePlan 2 order = steps order
 
+/-- T2 + P1 + S2: a module's path stem = its dot-separated components joined by `/` (`A.B` →
+`A/B`), for components without a dot. -/
+def stemComponents : Prop :=
+  ∀ (cs : List String), (∀ c ∈ cs, '.' ∉ c.toList) → stem (".".intercalate cs) = "/".intercalate cs
+
 /-- S2: distinct module names without `/` have distinct path stems (U3 T3's names have none). -/
 def stemInjective : Prop :=
   ∀ (a b : String) (_ha : '/' ∉ a.toList) (_hb : '/' ∉ b.toList) (_h : stem a = stem b), a = b
+
+/-- T2 + P1: a module's compile argv = the contract's template — `lean --json -j 4 -R /fvdep/src`,
+`-D <name>=<value>` per recipe option (`consumer/1`: none, Lean's defaults; `library/1`: the
+library's `libraryOptions`), the three outputs under `/fvdep/work/out`, the source as `./A/B.lean`
+last (never read as an option). -/
+def compileArgvExact : Prop :=
+  ∀ (rel fp m : String),
+    compileArgv (FvdepCore.Build.consumer rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src", "-o",
+          "/fvdep/work/out/" ++ stem m ++ ".olean", "-i", "/fvdep/work/out/" ++ stem m ++ ".ilean",
+          "-c", "/fvdep/work/out/" ++ stem m ++ ".c", "./" ++ stem m ++ ".lean"] ∧
+      compileArgv (FvdepCore.Build.library rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src"] ++
+          FvdepCore.Build.libraryOptions.flatMap (fun o => ["-D", o.1 ++ "=" ++ o.2]) ++
+          ["-o", "/fvdep/work/out/" ++ stem m ++ ".olean", "-i",
+            "/fvdep/work/out/" ++ stem m ++ ".ilean", "-c", "/fvdep/work/out/" ++ stem m ++ ".c",
+            "./" ++ stem m ++ ".lean"]
+
+/-- T2: `consumer/1`'s every field (the record each key + P record carries: Lean's default options,
+4 threads, the search path `/fvdep/lib:/fvdep/prior` = the library view, then the check's consumer
+modules built so far), `library/1` = it with the library's options, + each recipe's step environment
+(`stepEnv`: the compile environment + that `LEAN_PATH`). -/
+def recipesExact : Prop :=
+  ∀ (rel fp : String),
+    FvdepCore.Build.consumer rel fp =
+        { id := "consumer/1"
+          release := rel
+          fingerprint := fp
+          argv := ["lean"]
+          leanPath := ["/fvdep/lib", "/fvdep/prior"]
+          env :=
+            [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+              ("LC_ALL", "C")]
+          options := []
+          threads := 4 } ∧
+      FvdepCore.Build.library rel fp =
+        { FvdepCore.Build.consumer rel fp with
+          id := "library/1"
+          options := FvdepCore.Build.libraryOptions.map fun o => o.1 ++ "=" ++ o.2 } ∧
+      FvdepCore.Build.stepEnv (FvdepCore.Build.consumer rel fp) =
+        [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+          ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")] ∧
+      FvdepCore.Build.stepEnv (FvdepCore.Build.library rel fp) =
+        [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+          ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")]
 
 end FvdepLedger.Rows.PhaseClaims
 
@@ -2950,15 +3000,37 @@ def phaseStepsRow : Row :=
 /-- U5 S2: a module's source path. -/
 def phaseStemRow : Row :=
   { component := `FvdepCore.Phase
-    contract := "U5 S2"
+    contract := "U5 S2, T2"
     claim :=
-      "`stem` (`A.B` → `A/B`): distinct module names without `/` (U3 T3's) have distinct " ++
-        "stems, so the frames of `implSources` + `proofSources` name distinct files."
+      "`stem` (`A.B` → `A/B`): a module's dot-separated components joined by `/` (the paths " ++
+        "`compileArgv`, `family` + `sourceFiles` build); distinct module names without `/` " ++
+        "(U3 T3's) have distinct stems, so the frames of `implSources` + `proofSources` name " ++
+        "distinct files."
     claims :=
-      [(``PhaseClaims.stemInjective, ``FvdepAudit.Phase.Proof.stem_injective),
+      [(``PhaseClaims.stemComponents, ``FvdepAudit.Phase.Proof.stem_components),
+        (``PhaseClaims.stemInjective, ``FvdepAudit.Phase.Proof.stem_injective),
         (``PhaseClaims.sourceFilesDistinct, ``FvdepAudit.Phase.Proof.source_files_distinct),
         (``PhaseClaims.sourceFilesExact, ``FvdepAudit.Phase.Proof.source_files_exact)]
     subject := ``FvdepCore.Phase.stem
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 T2 + P1: the two recipes + a module's compile argv. -/
+def phaseArgvRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 T2, P1"
+    claim :=
+      "`compileArgv`: under `consumer/1` = `lean --json -j 4 -R /fvdep/src`, the three " ++
+        "outputs under `/fvdep/work/out`, the source as `./A/B.lean` last; under `library/1` " ++
+        "the same with `-D <name>=<value>` per `libraryOptions` entry before the outputs; both " ++
+        "recipes search `/fvdep/lib` then `/fvdep/prior` (`stepEnv`: the compile environment + " ++
+        "that `LEAN_PATH`), keep their release + fingerprint + differ in id + options alone."
+    claims :=
+      [(``PhaseClaims.compileArgvExact, ``FvdepAudit.Phase.Proof.compile_argv_exact),
+        (``PhaseClaims.recipesExact, ``FvdepAudit.Phase.Proof.recipes_exact)]
+    subject := ``FvdepCore.Phase.compileArgv
     path := []
     noCaller := "U8"
     residue := []
@@ -3188,9 +3260,9 @@ def ledger : Ledger :=
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
-        phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, stepFrameRow,
-        stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow,
-        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
+        phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
+        stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow,
+        headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

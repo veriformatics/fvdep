@@ -31,5 +31,6 @@ paths:
 - `Except` has no `BEq` instance ⇒ compare results by `match`. 4.35's `String.startsWith` takes a pattern class ⇒ point-free `xs.any m.startsWith` fails to elaborate: `xs.any fun p => m.startsWith p`.
 - Dot notation misses a function declared on an `abbrev` when the value's type is its unfolding (`header.isModule` fails) ⇒ the full name (`Lean.Elab.HeaderSyntax.isModule header`). A fold with `(· / ·)` over `System.FilePath` fails to elaborate ⇒ `fun (d : System.FilePath) (c : String) => d / c`.
 - Gate stage `lean-style` counts every column of a line, string literals included (lean-fmt leaves a long literal whole) ⇒ split a literal past column 100 with `++`; an edit after the last fast gate → recheck the changed `.lean` files' columns before the commit (no check runs between it and the full gate + CI).
+- A mutant leaving a binder unused fails the build (`linter.unusedVariables` under `warningAsError`) before its test runs = no verdict ⇒ write the binder `_` in the mutant.
 - A name an `open` brings in can collide with a root export (`read` vs `MonadReader.read`): `simp [read]` then fails (`Ambiguous term`, `Invalid simp theorem`) ⇒ qualify it (`FvdepCore.Step.read`).
 - `split at h` on a `match` over a pair's component leaves the case equation unreduced (`(a, b).snd = x :: xs`): `rw [he]` finds no occurrence ⇒ `simp only at he`, then `subst he`.

@@ -67,11 +67,6 @@ structure Report where
 
 def label (n : Nat) : String := if n == 1 then "implementation" else "proof"
 
-def infraOf : String → Infra
-  | "sandbox_setup" => .sandboxSetup
-  | "tool_missing" => .toolMissing
-  | _ => .io
-
 def stepName : Step → String
   | .compile m => s!"compile {m}"
   | .consumerRoots => "roots"
@@ -121,7 +116,7 @@ def stepRun (s : Setup) (src view prior : System.FilePath) (pre cmd : List Strin
     { ro :=
         [(s.cache.sysroot.toString, .sysroot), (s.cache.helper.toString, .step),
           (src.toString, .src), (view.toString, .lib), (prior.toString, .prior)]
-      env := s.recipe.env ++ [("LEAN_PATH", ":".intercalate s.recipe.leanPath)] ++ env
+      env := stepEnv s.recipe ++ env
       workBytes := lim.workBytes
       tmpBytes := lim.tmpBytes
       argv := pre ++ ["--file-bytes", toString lim.fileCap, "--"] ++ cmd }
@@ -294,10 +289,10 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
     | .ok es =>
       pure es
     | .error f =>
-      return { obs := .infra (infraOf f.code) s!"phase {n}, the library: {f.detail}", libRoots }
+      return { obs := .infra f.code s!"phase {n}, the library: {f.detail}", libRoots }
   let view := run / s!"view{n}"
   if let .error f← FvdepIO.Cache.view s.cache view (entries.map fun x => (x.key, x.manifest)) then
-    return { obs := .infra (infraOf f.code) s!"phase {n}, the library view: {f.detail}", libRoots }
+    return { obs := .infra f.code s!"phase {n}, the library view: {f.detail}", libRoots }
   let exportImports := (g.order ++ [r.specModule] ++ abiModule).eraseDups
   let roots := if n == 1 then r.roots1 else r.roots2
   let libConsts := [r.spec] ++ (r.abi.map (·.2)).toList

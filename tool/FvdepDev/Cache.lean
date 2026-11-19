@@ -120,13 +120,13 @@ def build (lib : String) (mods : List String) : IO UInt32 := do
     let built ← tryFinally (FvdepIO.Cache.build e lib mods) (unpinAll e)
     match built with
     | .error f =>
-      say [s!"infra {f.code}: {f.detail}"]
+      say [s!"infra {FvdepIO.Cache.infraText f.code}: {f.detail}"]
       return 2
     | .ok rows =>
       say (rows.map fun x => s!"{if x.use == .built then "built" else "reused"} {x.key} {x.module}")
     -- K5 at the final unpin.
     if let .error f← evict e t then
-      say [s!"infra {f.code}: {f.detail}"]
+      say [s!"infra {FvdepIO.Cache.infraText f.code}: {f.detail}"]
       return 2
     return 0
   finally
@@ -167,7 +167,7 @@ def run (args : List String) : IO UInt32 := do
         return 2
     match ← evict (← envOf r "" { cacheBytes := t }) t with
     | .error f =>
-      say [s!"infra {f.code}: {f.detail}"]
+      say [s!"infra {FvdepIO.Cache.infraText f.code}: {f.detail}"]
       return 2
     | .ok (n, left) =>
       say [if n == 0 && t < left then "nothing evictable" else s!"evicted {n}"]

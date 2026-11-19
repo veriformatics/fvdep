@@ -50,12 +50,13 @@ def Env.locks (e : Env) : System.FilePath := e.dir / "locks"
 
 def Env.tmp (e : Env) : System.FilePath := e.dir / "tmp"
 
-/-- An infrastructure failure: its interface code (`io`, `sandbox_setup`, …) + detail. -/
+/-- An infrastructure failure: its interface code (`infraText`: `io`, `sandbox_setup`, …) +
+detail. -/
 structure Failure where
-  code : String
+  code : FvdepCore.Evidence.Infra
   detail : String
 
-def io (detail : String) : Failure := { code := "io", detail }
+def io (detail : String) : Failure := { code := .io, detail }
 
 def infraText : FvdepCore.Evidence.Infra → String
   | .sandboxSetup => "sandbox_setup"
@@ -276,7 +277,7 @@ def fill (e : Env) (key : String) (input : KeyInput) (src : ByteArray) (isModule
       { ro :=
           [(e.sysroot.toString, .sysroot), (e.helper.toString, .step), (srcDir.toString, .src),
             (lib.toString, .lib)]
-        env := e.recipe.env ++ [("LEAN_PATH", ":".intercalate e.recipe.leanPath)]
+        env := stepEnv e.recipe
         workBytes := e.step.workBytes
         tmpBytes := e.step.tmpBytes
         argv :=
@@ -287,12 +288,11 @@ def fill (e : Env) (key : String) (input : KeyInput) (src : ByteArray) (isModule
       | .ok obs =>
         pure obs
       | .error why =>
-        return .error { code := "sandbox_setup", detail := why }
+        return .error { code := .sandboxSetup, detail := why }
     let fam := FvdepCore.Phase.family isModule input.module
     match FvdepCore.Phase.stepVerdict (.compile input.module) (result fam obs) with
     | .infra code detail =>
-      return .error
-          { code := infraText code, detail := s!"library module {input.module}: {detail}" }
+      return .error { code, detail := s!"library module {input.module}: {detail}" }
     | .failed reason =>
       return .error (io s!"library module {input.module} did not build: {reason}")
     | .pass =>

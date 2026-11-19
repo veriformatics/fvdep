@@ -1,3 +1,4 @@
+import FvdepCore.Build
 import FvdepCore.Index.Command
 import FvdepIO.Sys
 import Lean.Compiler.ExternAttr
@@ -115,10 +116,8 @@ def prepare : IO FilePath := do
 library) + the three libraries; Lake's artifact cache off. -/
 def lakefile : String :=
   "name = \"fvdepindex\"\nenableArtifactCache = false\n\n[leanOptions]\n" ++
-    "autoImplicit = false\nrelaxedAutoImplicit = false\nwarningAsError = true\n" ++
-    "linter.extra.dupNamespace = true\nlinter.extra.unnecessarySeqFocus = true\n" ++
-    "linter.extra.unreachableTactic = true\nlinter.extra.unusedDecidableInType = true\n" ++
-    "linter.redundantVisibility = true\n\n[[lean_lib]]\nname = \"Fvdep\"\n\n" ++
+    String.join (FvdepCore.Build.libraryOptions.map fun o => o.1 ++ " = " ++ o.2 ++ "\n") ++
+    "\n[[lean_lib]]\nname = \"Fvdep\"\n\n" ++
     "[[lean_lib]]\nname = \"FvdepPreview\"\n\n[[lean_lib]]\nname = \"FvdepProofs\"\n"
 
 /-- C1's clean environment: `PATH`, `HOME` (+ `ELAN_HOME`) alone (elan finds the toolchain), the

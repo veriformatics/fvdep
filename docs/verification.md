@@ -2378,10 +2378,17 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 
 ## `FvdepCore.Phase`
 
-- Contract: U5 S2
-- Claim: `stem` (`A.B` → `A/B`): distinct module names without `/` (U3 T3's) have distinct stems, so the frames of `implSources` + `proofSources` name distinct files.
+- Contract: U5 S2, T2
+- Claim: `stem` (`A.B` → `A/B`): a module's dot-separated components joined by `/` (the paths `compileArgv`, `family` + `sourceFiles` build); distinct module names without `/` (U3 T3's) have distinct stems, so the frames of `implSources` + `proofSources` name distinct files.
 - Subject: `FvdepCore.Phase.stem`
 - Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.stemComponents` (hash 0x91059c37), proved by `FvdepAudit.Phase.Proof.stem_components`:
+
+  ```lean
+  ∀ (cs : List String),
+    (∀ (c : String), c ∈ cs → ¬'.' ∈ c.toList) →
+      FvdepCore.Phase.stem (".".intercalate cs) = "/".intercalate cs
+  ```
 - Statement `FvdepLedger.Rows.PhaseClaims.stemInjective` (hash 0xa9b4aecf), proved by `FvdepAudit.Phase.Proof.stem_injective`:
 
   ```lean
@@ -2616,6 +2623,58 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
     FvdepCore.Phase.phasePlan 1 order =
         FvdepCore.Phase.Step.libraryRoots :: FvdepCore.Phase.steps order ∧
       FvdepCore.Phase.phasePlan 2 order = FvdepCore.Phase.steps order
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 T2, P1
+- Claim: `compileArgv`: under `consumer/1` = `lean --json -j 4 -R /fvdep/src`, the three outputs under `/fvdep/work/out`, the source as `./A/B.lean` last; under `library/1` the same with `-D <name>=<value>` per `libraryOptions` entry before the outputs; both recipes search `/fvdep/lib` then `/fvdep/prior` (`stepEnv`: the compile environment + that `LEAN_PATH`), keep their release + fingerprint + differ in id + options alone.
+- Subject: `FvdepCore.Phase.compileArgv`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.compileArgvExact` (hash 0x6d16faef), proved by `FvdepAudit.Phase.Proof.compile_argv_exact`:
+
+  ```lean
+  ∀ (rel fp m : String),
+    FvdepCore.Phase.compileArgv (FvdepCore.Build.consumer rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src", "-o",
+          "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".olean", "-i",
+          "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".ilean", "-c",
+          "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".c",
+          "./" ++ FvdepCore.Phase.stem m ++ ".lean"] ∧
+      FvdepCore.Phase.compileArgv (FvdepCore.Build.library rel fp) m =
+        ["lean", "--json", "-j", "4", "-R", "/fvdep/src"] ++
+            List.flatMap (fun o => ["-D", o.fst ++ "=" ++ o.snd]) FvdepCore.Build.libraryOptions ++
+          ["-o", "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".olean", "-i",
+            "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".ilean", "-c",
+            "/fvdep/work/out/" ++ FvdepCore.Phase.stem m ++ ".c",
+            "./" ++ FvdepCore.Phase.stem m ++ ".lean"]
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.recipesExact` (hash 0xafc5fd17), proved by `FvdepAudit.Phase.Proof.recipes_exact`:
+
+  ```lean
+  ∀ (rel fp : String),
+    FvdepCore.Build.consumer rel fp =
+        { id := "consumer/1", release := rel, fingerprint := fp, argv := ["lean"],
+          leanPath := ["/fvdep/lib", "/fvdep/prior"],
+          env :=
+            [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+              ("LC_ALL", "C")],
+          options := [], threads := 4 } ∧
+      (FvdepCore.Build.library rel fp =
+          have __src := FvdepCore.Build.consumer rel fp;
+          { id := "library/1", release := __src.release, fingerprint := __src.fingerprint,
+            argv := __src.argv, leanPath := __src.leanPath, env := __src.env,
+            options := List.map (fun o => o.fst ++ "=" ++ o.snd) FvdepCore.Build.libraryOptions,
+            threads := __src.threads }) ∧
+        FvdepCore.Build.stepEnv (FvdepCore.Build.consumer rel fp) =
+            [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+              ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")] ∧
+          FvdepCore.Build.stepEnv (FvdepCore.Build.library rel fp) =
+            [("PATH", "/fvdep/sysroot/bin:/usr/bin"), ("HOME", "/fvdep/work"), ("TMPDIR", "/tmp"),
+              ("LC_ALL", "C"), ("LEAN_PATH", "/fvdep/lib:/fvdep/prior")]
   ```
 - Uninterpreted: none
 - Residue: none

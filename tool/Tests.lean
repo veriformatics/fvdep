@@ -2070,6 +2070,13 @@ def cases : List (String × (Unit → Bool)) :=
               message := "Unknown identifier `u5`\nsecond" } &&
         (ofJson info).isNone &&
         (ofJson "not json").isNone),
+    ("bundle: B1 reads a marked stdout line nested to the capture cap (a step's bytes are " ++
+        "untrusted) + returns, no diagnostic",
+      fun _ =>
+      let opens := String.ofList (List.replicate 65000 '[')
+      let closes := String.ofList (List.replicate 65000 ']')
+      (ofJson ("{\"severity\":\"error\",\"data\":" ++ opens)).isNone &&
+        (ofJson ("{\"data\":" ++ opens ++ closes ++ ",\"severity\":\"error\"}")).isNone),
     ("bundle: B1 reads Lean's text-form error line (named error or not)", fun _ =>
       ofText "./A/B.lean:1:14: error(lean.unknownIdentifier): Unknown identifier `u5`" ==
           some
@@ -2103,7 +2110,9 @@ def cases : List (String × (Unit → Bool)) :=
       retainPick bs 16 == ["n10", "n11"] &&
         retainPick [("b", 1), ("a", 1), ("c", 2)] 1 == ["a", "b"] &&
         retainPick [("a", 1)] 16 == []),
-    ("bundle: B2's record reads back from its canonical text alone (D4's intake)", fun _ =>
+    ("bundle: B2's record reads back from its canonical text alone (D4's intake; an input " ++
+        "outside the roles src, lib, prior or at an unsafe path = no record)",
+      fun _ =>
       let rc : Record :=
         { recipe := FvdepCore.Build.consumer "4.35.0+x" "fp"
           limits := { fileBytes := some 7, exportBytes := some 5 }
@@ -2121,7 +2130,19 @@ def cases : List (String × (Unit → Bool)) :=
         (Record.ofBytes (t.replace "\"schema\":1" "\"schema\":2").toUTF8).isNone &&
         (Record.ofBytes (b ++ " ".toUTF8)).isNone &&
         (Record.ofBytes (t.replace "\"complete\":true" "\"complete\":false").toUTF8).isNone &&
-        (Record.ofBytes (t.replace "\"phase\":2" "\"phase\": 2").toUTF8).isNone),
+        (Record.ofBytes (t.replace "\"phase\":2" "\"phase\": 2").toUTF8).isNone &&
+        (Record.ofBytes
+            (FvdepCore.Json.print
+              { rc with
+                  inputs :=
+                    [{ role := "src", path := "../x", size := 3, sha256 := "ab",
+                       kept := true }] }.value)).isNone &&
+        (Record.ofBytes
+            (FvdepCore.Json.print
+              { rc with
+                  inputs :=
+                    [{ role := "etc", path := "x", size := 3, sha256 := "ab",
+                       kept := true }] }.value)).isNone),
     ("sandbox: T3's export cap ≥ 1 + ≤ the per-file cap (default = it)", fun _ =>
       ({} : Limits).exportCap == ({} : Limits).fileCap &&
         ({ exportBytes := some 0 } : Limits).check.isSome &&
