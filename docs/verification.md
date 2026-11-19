@@ -2388,6 +2388,235 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
   ∀ (a b : String),
     ¬'/' ∈ a.toList → ¬'/' ∈ b.toList → FvdepCore.Phase.stem a = FvdepCore.Phase.stem b → a = b
   ```
+- Statement `FvdepLedger.Rows.PhaseClaims.sourceFilesDistinct` (hash 0xe4896722), proved by `FvdepAudit.Phase.Proof.source_files_distinct`:
+
+  ```lean
+  ∀ (ms : List (String × ByteArray)),
+    (List.map (fun x => x.fst) ms).Nodup →
+      (∀ (m : String × ByteArray), m ∈ ms → ¬'/' ∈ m.fst.toList) →
+        (List.map (fun x => x.fst) (FvdepCore.Phase.sourceFiles ms)).Nodup
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.sourceFilesExact` (hash 0xcbc6dc5c), proved by `FvdepAudit.Phase.Proof.source_files_exact`:
+
+  ```lean
+  ∀ (ms : List (String × ByteArray)) (p : String) (b : ByteArray),
+    (p, b) ∈ FvdepCore.Phase.sourceFiles ms ↔ ∃ m, (m, b) ∈ ms ∧ p = FvdepCore.Phase.stem m ++ ".lean"
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 S1
+- Claim: `snapNames`, `snapDecide`, `snapRead`: names pass exactly when plain + unrepeated; a component is descended into exactly when a directory on the way, read exactly when the module's regular file within both caps (under the smaller); a read is accepted exactly when within its cap.
+- Subject: `FvdepCore.Phase.snapDecide`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.snapReads` (hash 0xf4634e8e), proved by `FvdepAudit.Phase.Proof.snap_reads`:
+
+  ```lean
+  ∀ (l : FvdepCore.Phase.SourceLimits) (used : Nat) (leaf : Bool) (o : FvdepCore.Phase.Opened)
+    (cap : Nat),
+    FvdepCore.Phase.snapDecide l used leaf o = FvdepCore.Phase.Snap.read cap ↔
+      leaf = true ∧
+        ∃ size,
+          o = FvdepCore.Phase.Opened.file FvdepCore.Phase.Kind.regular size ∧
+            size ≤ l.fileBytes ∧
+              used + size ≤ l.totalBytes ∧ cap = min l.fileBytes (l.totalBytes - used)
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.snapDescends` (hash 0x7676b17e), proved by `FvdepAudit.Phase.Proof.snap_descends`:
+
+  ```lean
+  ∀ (l : FvdepCore.Phase.SourceLimits) (used : Nat) (leaf : Bool) (o : FvdepCore.Phase.Opened),
+    FvdepCore.Phase.snapDecide l used leaf o = FvdepCore.Phase.Snap.descend ↔
+      leaf = false ∧ ∃ size, o = FvdepCore.Phase.Opened.file FvdepCore.Phase.Kind.directory size
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.snapReadAccepts` (hash 0x83b1d415), proved by `FvdepAudit.Phase.Proof.snap_read_accepts`:
+
+  ```lean
+  ∀ (l : FvdepCore.Phase.SourceLimits) (used cap n total : Nat),
+    FvdepCore.Phase.snapRead l used cap n = Except.ok total ↔ n ≤ cap ∧ total = used + n
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.snapNamesNone` (hash 0x56e46787), proved by `FvdepAudit.Phase.Proof.snap_names_none`:
+
+  ```lean
+  ∀ (ms : List String),
+    FvdepCore.Phase.snapNames ms = none ↔
+      (∀ (m : String),
+          m ∈ ms → ((m.splitOn ".").all fun c => FvdepCore.Manifest.isComponent c.toList) = true) ∧
+        ms.Nodup
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.snapReadRefuses` (hash 0xda9a8d9d), proved by `FvdepAudit.Phase.Proof.snap_read_refuses`:
+
+  ```lean
+  ∀ (l : FvdepCore.Phase.SourceLimits) (used n : Nat),
+    min l.fileBytes (l.totalBytes - used) < n →
+      (l.totalBytes - used < l.fileBytes →
+          FvdepCore.Phase.snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+            Except.error (FvdepCore.Phase.Refusal.grewTotal l.totalBytes)) ∧
+        (l.fileBytes < l.totalBytes - used →
+            FvdepCore.Phase.snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+              Except.error (FvdepCore.Phase.Refusal.grewFile l.fileBytes)) ∧
+          (l.fileBytes = l.totalBytes - used →
+            FvdepCore.Phase.snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+                Except.error (FvdepCore.Phase.Refusal.grewFile l.fileBytes) ∨
+              FvdepCore.Phase.snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+                Except.error (FvdepCore.Phase.Refusal.grewTotal l.totalBytes))
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.snapNamesSome` (hash 0x58c36e7f), proved by `FvdepAudit.Phase.Proof.snap_names_some`:
+
+  ```lean
+  ∀ (ms : List String) (m : String) (r : FvdepCore.Phase.Refusal),
+    FvdepCore.Phase.snapNames ms = some (m, r) →
+      m ∈ ms ∧
+        (r = FvdepCore.Phase.Refusal.notModuleName ∧
+            ((m.splitOn ".").all fun c => FvdepCore.Manifest.isComponent c.toList) = false ∨
+          r = FvdepCore.Phase.Refusal.listedTwice ∧ 2 ≤ List.count m ms)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 K2, P5
+- Claim: `importClass`: an import is the consumer's own refusal exactly when no listed, phase-1, toolchain or library-held module bears its name; it reads the library exactly when the library holds it + nothing earlier matches.
+- Subject: `FvdepCore.Phase.importClass`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.importAbsent` (hash 0xb20c4c8d), proved by `FvdepAudit.Phase.Proof.import_absent`:
+
+  ```lean
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    FvdepCore.Phase.importClass listed built present m = FvdepCore.Phase.ImportClass.absent ↔
+      ¬m ∈ listed ∧ ¬m ∈ built ∧ FvdepCore.Build.toolchainModule m = false ∧ present m = false
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.importLibrary` (hash 0xe50ccdb2), proved by `FvdepAudit.Phase.Proof.import_library`:
+
+  ```lean
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    FvdepCore.Phase.importClass listed built present m = FvdepCore.Phase.ImportClass.library ↔
+      ¬m ∈ listed ∧ ¬m ∈ built ∧ FvdepCore.Build.toolchainModule m = false ∧ present m = true
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.importListed` (hash 0xddb1b917), proved by `FvdepAudit.Phase.Proof.import_listed`:
+
+  ```lean
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    FvdepCore.Phase.importClass listed built present m = FvdepCore.Phase.ImportClass.listed ↔
+      m ∈ listed
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.importBuilt` (hash 0x571460bb), proved by `FvdepAudit.Phase.Proof.import_built`:
+
+  ```lean
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    FvdepCore.Phase.importClass listed built present m = FvdepCore.Phase.ImportClass.built ↔
+      ¬m ∈ listed ∧ m ∈ built
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.importToolchain` (hash 0xeaac671d), proved by `FvdepAudit.Phase.Proof.import_toolchain`:
+
+  ```lean
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    FvdepCore.Phase.importClass listed built present m = FvdepCore.Phase.ImportClass.toolchain ↔
+      ¬m ∈ listed ∧ ¬m ∈ built ∧ FvdepCore.Build.toolchainModule m = true
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 P5, P6, P8
+- Claim: `observe1`/`observe2`: `ok` exactly when every step passed, `failed r` exactly when the stopping step failed with `r` (phase 2 bound to its e1), its infrastructure otherwise; `handoff`: phase 2 runs on `e1` exactly when phase 1 observed `ok e1`; the driver never stops on a passing step.
+- Subject: `FvdepCore.Phase.observe1`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.observe1Exact` (hash 0x7351a5e5), proved by `FvdepAudit.Phase.Proof.observe1_exact`:
+
+  ```lean
+  ∀ (o : Option (FvdepCore.Phase.Step × FvdepCore.Phase.Verdict)) (e1 : String),
+    (FvdepCore.Phase.observe1 o e1 = FvdepCore.Evidence.Obs.phase1 (FvdepCore.Evidence.Built.ok e1) ↔
+        o = none) ∧
+      (∀ (r : String),
+          FvdepCore.Phase.observe1 o e1 =
+              FvdepCore.Evidence.Obs.phase1 (FvdepCore.Evidence.Built.failed r) ↔
+            ∃ s, o = some (s, FvdepCore.Phase.Verdict.failed r)) ∧
+        ∀ (c : FvdepCore.Evidence.Infra) (d : String) (s : FvdepCore.Phase.Step),
+          o = some (s, FvdepCore.Phase.Verdict.infra c d) →
+            FvdepCore.Phase.observe1 o e1 = FvdepCore.Evidence.Obs.infra c d
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.observe2Exact` (hash 0xbf390608), proved by `FvdepAudit.Phase.Proof.observe2_exact`:
+
+  ```lean
+  ∀ (o : Option (FvdepCore.Phase.Step × FvdepCore.Phase.Verdict)) (e1 e2 : String),
+    (FvdepCore.Phase.observe2 e1 o e2 =
+          FvdepCore.Evidence.Obs.phase2 e1 (FvdepCore.Evidence.Built.ok e2) ↔
+        o = none) ∧
+      (∀ (r : String),
+          FvdepCore.Phase.observe2 e1 o e2 =
+              FvdepCore.Evidence.Obs.phase2 e1 (FvdepCore.Evidence.Built.failed r) ↔
+            ∃ s, o = some (s, FvdepCore.Phase.Verdict.failed r)) ∧
+        ∀ (c : FvdepCore.Evidence.Infra) (d : String) (s : FvdepCore.Phase.Step),
+          o = some (s, FvdepCore.Phase.Verdict.infra c d) →
+            FvdepCore.Phase.observe2 e1 o e2 = FvdepCore.Evidence.Obs.infra c d
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.handoffExact` (hash 0xdc081642), proved by `FvdepAudit.Phase.Proof.handoff_exact`:
+
+  ```lean
+  ∀ (o : FvdepCore.Evidence.Obs) (e1 : String),
+    FvdepCore.Phase.handoff o = some e1 ↔
+      o = FvdepCore.Evidence.Obs.phase1 (FvdepCore.Evidence.Built.ok e1)
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.driveStopsNotPass` (hash 0x687717f0), proved by `FvdepAudit.Phase.Proof.drive_stops_not_pass`:
+
+  ```lean
+  ∀ (answer : FvdepCore.Phase.Step → FvdepCore.Phase.StepResult)
+    (steps acc : List FvdepCore.Phase.Step) (s : FvdepCore.Phase.Step) (v : FvdepCore.Phase.Verdict)
+    (t : List FvdepCore.Phase.Step),
+    StateT.run (FvdepCore.Phase.drive (FvdepAudit.Phase.Spec.record answer) steps) acc =
+        (some (s, v), t) →
+      v ≠ FvdepCore.Phase.Verdict.pass
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Phase`
+
+- Contract: U5 P1, P2
+- Claim: `steps`: each compile in K2's order, then the roots check, then the export; `family`: `.olean`, `.ilean`, `.c` + under a `module` header `.olean.server`, `.olean.private`, `.ir`, `.ir.sig`.
+- Subject: `FvdepCore.Phase.steps`
+- Path: none yet (wired by U8)
+- Statement `FvdepLedger.Rows.PhaseClaims.stepsPlan` (hash 0x43270957), proved by `FvdepAudit.Phase.Proof.steps_plan`:
+
+  ```lean
+  ∀ (order : List String),
+    FvdepCore.Phase.steps order =
+      List.map FvdepCore.Phase.Step.compile order ++
+        [FvdepCore.Phase.Step.consumerRoots, FvdepCore.Phase.Step.exportStep]
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.familyExact` (hash 0x9cc88ade), proved by `FvdepAudit.Phase.Proof.family_exact`:
+
+  ```lean
+  ∀ (isModule : Bool) (m f : String),
+    f ∈ FvdepCore.Phase.family isModule m ↔
+      f = FvdepCore.Phase.stem m ++ ".olean" ∨
+        isModule = true ∧
+            (f = FvdepCore.Phase.stem m ++ ".olean.server" ∨
+              f = FvdepCore.Phase.stem m ++ ".olean.private" ∨
+                f = FvdepCore.Phase.stem m ++ ".ir" ∨ f = FvdepCore.Phase.stem m ++ ".ir.sig") ∨
+          f = FvdepCore.Phase.stem m ++ ".ilean" ∨ f = FvdepCore.Phase.stem m ++ ".c"
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.familyNodup` (hash 0xcea88ec), proved by `FvdepAudit.Phase.Proof.family_nodup`:
+
+  ```lean
+  ∀ (isModule : Bool) (m : String), (FvdepCore.Phase.family isModule m).Nodup
+  ```
+- Statement `FvdepLedger.Rows.PhaseClaims.phasePlanFirst` (hash 0x90051d5f), proved by `FvdepAudit.Phase.Proof.phase_plan_first`:
+
+  ```lean
+  ∀ (order : List String),
+    FvdepCore.Phase.phasePlan 1 order =
+        FvdepCore.Phase.Step.libraryRoots :: FvdepCore.Phase.steps order ∧
+      FvdepCore.Phase.phasePlan 2 order = FvdepCore.Phase.steps order
+  ```
 - Uninterpreted: none
 - Residue: none
 - Unproven: none

@@ -33,7 +33,7 @@ STUB_ARGS = (
 
 # (key + label, edits (path, old, new), the cases run (a run.sh --case substring; "" = all), the
 # cases it must fail, the build that must fail ("" = none)).
-PHASE = "tool/FvdepIO/Phase.lean"
+CORE_PHASE = "tool/FvdepCore/Phase.lean"
 
 MUTANTS = [
     ("STUB every isolation mechanism off, steps still run",
@@ -91,8 +91,8 @@ MUTANTS = [
        "    int fd = open(cpath, O_RDONLY | O_NONBLOCK | O_CLOEXEC);")],
      "G2.", ["G2.link-plant"], ""),
     ("P1 the library roots check after the window (consumer code first)",
-     [(PHASE, "  let plan := (if n == 1 then [Step.libraryRoots] else []) ++ steps g.order",
-       "  let plan := steps g.order ++ (if n == 1 then [Step.libraryRoots] else [])")],
+     [(CORE_PHASE, "  (if n == 1 then [Step.libraryRoots] else []) ++ steps order",
+       "  steps order ++ (if n == 1 then [Step.libraryRoots] else [])")],
      "P1.", ["P1.library-first"], ""),
 ]
 

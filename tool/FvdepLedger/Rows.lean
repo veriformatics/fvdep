@@ -1431,6 +1431,117 @@ def snapReadAccepts : Prop :=
   ∀ (l : SourceLimits) (used cap n total : Nat),
     snapRead l used cap n = .ok total ↔ n ≤ cap ∧ total = used + n
 
+/-- S1: the names pass exactly when every listed name is dot-separated U3 T3 components + none is
+listed twice (claim at U5-D3). -/
+def snapNamesNone : Prop :=
+  ∀ (ms : List String),
+    snapNames ms = none ↔
+      (∀ m ∈ ms, ((m.splitOn ".").all fun c => FvdepCore.Manifest.isComponent c.toList) = true) ∧
+        ms.Nodup
+
+/-- P5 + P8: phase 1's observation = `ok e1` exactly when its driver passed every step, `failed r`
+exactly when the stopping step failed with `r`, the stopping step's infrastructure otherwise. -/
+def observe1Exact : Prop :=
+  ∀ (o : Option (Step × Verdict)) (e1 : String),
+    (observe1 o e1 = .phase1 (.ok e1) ↔ o = none) ∧
+      (∀ r, observe1 o e1 = .phase1 (.failed r) ↔ ∃ s, o = some (s, .failed r)) ∧
+      ∀ (c : FvdepCore.Evidence.Infra) (d : String) (s : Step),
+        o = some (s, .infra c d) → observe1 o e1 = .infra c d
+
+/-- P5 + P8 for phase 2, bound to the e1 it was built on. -/
+def observe2Exact : Prop :=
+  ∀ (o : Option (Step × Verdict)) (e1 e2 : String),
+    (observe2 e1 o e2 = .phase2 e1 (.ok e2) ↔ o = none) ∧
+      (∀ r, observe2 e1 o e2 = .phase2 e1 (.failed r) ↔ ∃ s, o = some (s, .failed r)) ∧
+      ∀ (c : FvdepCore.Evidence.Infra) (d : String) (s : Step),
+        o = some (s, .infra c d) → observe2 e1 o e2 = .infra c d
+
+/-- P6: phase 2 runs on `e1` exactly when phase 1 observed `ok e1` (`check` hands `handoff`'s
+result to phase 2, whose observations name it: `observe2Exact`). -/
+def handoffExact : Prop :=
+  ∀ (o : FvdepCore.Evidence.Obs) (e1 : String), handoff o = some e1 ↔ o = .phase1 (.ok e1)
+
+/-- P8: the driver never stops on a passing step (the outcome `observe1` + `observe2` read). -/
+def driveStopsNotPass : Prop :=
+  ∀ (answer : Step → StepResult) (steps acc : List Step) (s : Step) (v : Verdict) (t : List Step),
+    (drive (record answer) steps).run acc = (some (s, v), t) → v ≠ .pass
+
+/-- P1: the deadline window = each compile in K2's order, then the roots check, then the export. -/
+def stepsPlan : Prop :=
+  ∀ (order : List String), steps order = order.map Step.compile ++ [.consumerRoots, .exportStep]
+
+/-- P2: a module's artifact family — `.olean`, `.ilean`, `.c`, + under a `module` header
+`.olean.server`, `.olean.private`, `.ir`, `.ir.sig`. -/
+def familyExact : Prop :=
+  ∀ (isModule : Bool) (m f : String),
+    f ∈ family isModule m ↔
+      f = stem m ++ ".olean" ∨
+        isModule = true ∧
+          (f = stem m ++ ".olean.server" ∨
+            f = stem m ++ ".olean.private" ∨ f = stem m ++ ".ir" ∨ f = stem m ++ ".ir.sig") ∨
+        f = stem m ++ ".ilean" ∨ f = stem m ++ ".c"
+
+/-- S2 → H3: distinct module names without `/` frame distinct paths. -/
+def sourceFilesDistinct : Prop :=
+  ∀ (ms : List (String × ByteArray)),
+    (ms.map (·.1)).Nodup → (∀ m ∈ ms, '/' ∉ m.1.toList) → ((sourceFiles ms).map (·.1)).Nodup
+
+/-- K2: an import is this phase's own module exactly when listed (first match). -/
+def importListed : Prop :=
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    importClass listed built present m = .listed ↔ m ∈ listed
+
+/-- K2: an import is phase 1's module exactly when not listed + built. -/
+def importBuilt : Prop :=
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    importClass listed built present m = .built ↔ m ∉ listed ∧ m ∈ built
+
+/-- K2: an import is the toolchain's exactly when neither listed nor built + a toolchain module. -/
+def importToolchain : Prop :=
+  ∀ (listed built : List String) (present : String → Bool) (m : String),
+    importClass listed built present m = .toolchain ↔
+      m ∉ listed ∧ m ∉ built ∧ FvdepCore.Build.toolchainModule m = true
+
+/-- S1: a leaf read past its cap (the cap `snapReads` supplies) is refused by the cap that bound it:
+the remaining total when smaller, the per-file cap when smaller. -/
+def snapReadRefuses : Prop :=
+  ∀ (l : SourceLimits) (used n : Nat),
+    min l.fileBytes (l.totalBytes - used) < n →
+      (l.totalBytes - used < l.fileBytes →
+          snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+            .error (.grewTotal l.totalBytes)) ∧
+        (l.fileBytes < l.totalBytes - used →
+          snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+            .error (.grewFile l.fileBytes)) ∧
+        (l.fileBytes = l.totalBytes - used →
+          snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+              .error (.grewFile l.fileBytes) ∨
+            snapRead l used (min l.fileBytes (l.totalBytes - used)) n =
+              .error (.grewTotal l.totalBytes))
+
+/-- S1: a refused name list names an actual offender: a listed name, `notModuleName` only for a name
+outside the grammar, `listedTwice` only for a name listed at least twice. -/
+def snapNamesSome : Prop :=
+  ∀ (ms : List String) (m : String) (r : Refusal),
+    snapNames ms = some (m, r) →
+      m ∈ ms ∧
+        (r = .notModuleName ∧
+            ((m.splitOn ".").all fun c => FvdepCore.Manifest.isComponent c.toList) = false ∨
+          r = .listedTwice ∧ 2 ≤ ms.count m)
+
+/-- P2: a family lists each artifact once (the frame check compares its length). -/
+def familyNodup : Prop := ∀ (isModule : Bool) (m : String), (family isModule m).Nodup
+
+/-- S2 → H3: the framed source files = each module's `A/B.lean` path with exactly its bytes. -/
+def sourceFilesExact : Prop :=
+  ∀ (ms : List (String × ByteArray)) (p : String) (b : ByteArray),
+    (p, b) ∈ sourceFiles ms ↔ ∃ m, (m, b) ∈ ms ∧ p = stem m ++ ".lean"
+
+/-- P1: phase 1's plan = its library roots check, then the window; phase 2's = the window alone. -/
+def phasePlanFirst : Prop :=
+  ∀ (order : List String),
+    phasePlan 1 order = .libraryRoots :: steps order ∧ phasePlan 2 order = steps order
+
 /-- S2: distinct module names without `/` have distinct path stems (U3 T3's names have none). -/
 def stemInjective : Prop :=
   ∀ (a b : String) (_ha : '/' ∉ a.toList) (_hb : '/' ∉ b.toList) (_h : stem a = stem b), a = b
@@ -2755,6 +2866,87 @@ def phaseDriveRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5 S1: the snapshot's decision per name + path component. -/
+def phaseSnapRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 S1"
+    claim :=
+      "`snapNames`, `snapDecide`, `snapRead`: names pass exactly when plain + unrepeated; a " ++
+        "component is descended into exactly when a directory on the way, read exactly when " ++
+        "the module's regular file within both caps (under the smaller); a read is accepted " ++
+        "exactly when within its cap."
+    claims :=
+      [(``PhaseClaims.snapReads, ``FvdepAudit.Phase.Proof.snap_reads),
+        (``PhaseClaims.snapDescends, ``FvdepAudit.Phase.Proof.snap_descends),
+        (``PhaseClaims.snapReadAccepts, ``FvdepAudit.Phase.Proof.snap_read_accepts),
+        (``PhaseClaims.snapNamesNone, ``FvdepAudit.Phase.Proof.snap_names_none),
+        (``PhaseClaims.snapReadRefuses, ``FvdepAudit.Phase.Proof.snap_read_refuses),
+        (``PhaseClaims.snapNamesSome, ``FvdepAudit.Phase.Proof.snap_names_some)]
+    subject := ``FvdepCore.Phase.snapDecide
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 K2 + P5: an import's class in a phase. -/
+def phaseImportRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 K2, P5"
+    claim :=
+      "`importClass`: an import is the consumer's own refusal exactly when no listed, phase-1, " ++
+        "toolchain or library-held module bears its name; it reads the library exactly when the " ++
+        "library holds it + nothing earlier matches."
+    claims :=
+      [(``PhaseClaims.importAbsent, ``FvdepAudit.Phase.Proof.import_absent),
+        (``PhaseClaims.importLibrary, ``FvdepAudit.Phase.Proof.import_library),
+        (``PhaseClaims.importListed, ``FvdepAudit.Phase.Proof.import_listed),
+        (``PhaseClaims.importBuilt, ``FvdepAudit.Phase.Proof.import_built),
+        (``PhaseClaims.importToolchain, ``FvdepAudit.Phase.Proof.import_toolchain)]
+    subject := ``FvdepCore.Phase.importClass
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 P5 + P8: a phase's observation from its driver's outcome. -/
+def phaseObserveRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 P5, P6, P8"
+    claim :=
+      "`observe1`/`observe2`: `ok` exactly when every step passed, `failed r` exactly when the " ++
+        "stopping step failed with `r` (phase 2 bound to its e1), its infrastructure otherwise; " ++
+        "`handoff`: phase 2 runs on `e1` exactly when phase 1 observed `ok e1`; the driver " ++
+        "never stops on a passing step."
+    claims :=
+      [(``PhaseClaims.observe1Exact, ``FvdepAudit.Phase.Proof.observe1_exact),
+        (``PhaseClaims.observe2Exact, ``FvdepAudit.Phase.Proof.observe2_exact),
+        (``PhaseClaims.handoffExact, ``FvdepAudit.Phase.Proof.handoff_exact),
+        (``PhaseClaims.driveStopsNotPass, ``FvdepAudit.Phase.Proof.drive_stops_not_pass)]
+    subject := ``FvdepCore.Phase.observe1
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U5 P1 + P2: the deadline window's plan + a module's artifact family. -/
+def phaseStepsRow : Row :=
+  { component := `FvdepCore.Phase
+    contract := "U5 P1, P2"
+    claim :=
+      "`steps`: each compile in K2's order, then the roots check, then the export; `family`: " ++
+        "`.olean`, `.ilean`, `.c` + under a `module` header `.olean.server`, " ++
+        "`.olean.private`, `.ir`, `.ir.sig`."
+    claims :=
+      [(``PhaseClaims.stepsPlan, ``FvdepAudit.Phase.Proof.steps_plan),
+        (``PhaseClaims.familyExact, ``FvdepAudit.Phase.Proof.family_exact),
+        (``PhaseClaims.familyNodup, ``FvdepAudit.Phase.Proof.family_nodup),
+        (``PhaseClaims.phasePlanFirst, ``FvdepAudit.Phase.Proof.phase_plan_first)]
+    subject := ``FvdepCore.Phase.steps
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
 /-- U5 S2: a module's source path. -/
 def phaseStemRow : Row :=
   { component := `FvdepCore.Phase
@@ -2762,7 +2954,10 @@ def phaseStemRow : Row :=
     claim :=
       "`stem` (`A.B` → `A/B`): distinct module names without `/` (U3 T3's) have distinct " ++
         "stems, so the frames of `implSources` + `proofSources` name distinct files."
-    claims := [(``PhaseClaims.stemInjective, ``FvdepAudit.Phase.Proof.stem_injective)]
+    claims :=
+      [(``PhaseClaims.stemInjective, ``FvdepAudit.Phase.Proof.stem_injective),
+        (``PhaseClaims.sourceFilesDistinct, ``FvdepAudit.Phase.Proof.source_files_distinct),
+        (``PhaseClaims.sourceFilesExact, ``FvdepAudit.Phase.Proof.source_files_exact)]
     subject := ``FvdepCore.Phase.stem
     path := []
     noCaller := "U8"
@@ -2993,9 +3188,9 @@ def ledger : Ledger :=
         registryCertificateRow, validateRow, closureRow, statusesRow, closureFilesRow, assembleRow,
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
-        phaseStemRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
-        bundleWriteRow]
+        phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, stepFrameRow,
+        stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow,
+        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

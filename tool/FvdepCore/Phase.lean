@@ -113,6 +113,12 @@ def observe2 (e1 : Digest) (outcome : Option (Step × Verdict)) (e2 : Digest) : 
   | some (_, .infra code detail) => .infra code detail
   | some (_, .pass) => .infra .io "internal: a passing step stopped the phase"
 
+/-- P6: the export phase 2 builds on — phase 1's `e1` exactly when phase 1 observed `ok e1`; no
+phase 2 otherwise. -/
+def handoff : Obs → Option Digest
+  | .phase1 (.ok e1) => some e1
+  | _ => none
+
 /-! ## P1 compile argv -/
 
 /-- Module `A.B`'s relative path stem `A/B` (U3 T3 names: plain components, no `/`). -/
@@ -247,6 +253,11 @@ where go : List String → List String
 the export. Phase 1's library roots check runs before it, outside the window: it imports library
 modules alone, so no consumer code reaches its exit. -/
 def steps (order : List String) : List Step := order.map .compile ++ [.consumerRoots, .exportStep]
+
+/-- P1: phase `n`'s whole plan — phase 1's library roots check before its window (no consumer code
+reaches that exit), phase 2's window alone. -/
+def phasePlan (n : Nat) (order : List String) : List Step :=
+  (if n == 1 then [Step.libraryRoots] else []) ++ steps order
 
 /-- K2 + P5: how a phase reads one import of a consumer module. -/
 inductive ImportClass where

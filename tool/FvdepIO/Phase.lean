@@ -267,7 +267,7 @@ structure Shared where
 spec + ABI modules + the library modules imported (phase 2: ∪ phase 1's) + its view (a failure =
 infrastructure), then P8's `drive` over phase 1's library roots check + the window (`steps`). -/
 def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteArray))
-    (built libPrev : List String) : IO PhaseRun := do
+    (built libPrev : List String) (e1 : Digest) : IO PhaseRun := do
   let run := s.cache.run
   let lim := s.limits
   let sources := run / s!"sources{n}"
@@ -277,7 +277,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
       IO.FS.createDirAll p
     IO.FS.writeBinFile f bytes
   let failedObs (reason : String) : Obs :=
-    if n == 1 then .phase1 (.failed reason) else .phase2 "" (.failed reason)
+    if n == 1 then .phase1 (.failed reason) else .phase2 e1 (.failed reason)
   let g ←
     match ← graph n mods built fun m => (s.library / (stem m ++ ".lean")).pathExists with
     | .ok g =>
@@ -361,11 +361,11 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
           | _ =>
             pure ()
       return res
-  let plan := (if n == 1 then [Step.libraryRoots] else []) ++ steps g.order
+  let plan := phasePlan n g.order
   let outcome ← drive exec plan
   let sh ← st.get
   let e := (sh.exported.map (·.sha256)).getD ""
-  let obs := if n == 1 then observe1 outcome e else observe2 "" outcome e
+  let obs := if n == 1 then observe1 outcome e else observe2 e1 outcome e
   let frozen :=
     if outcome.isNone then
       sh.exported.map fun x => { artifacts := sh.artifacts.toList, exported := x }
@@ -417,10 +417,11 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
     return { obs, frozen, libRoots }
 
 /-- `phaseBody`, a host I/O failure of the supervisor's own (its run directory, a library file read)
-= `infra io` (P5), never an exception the caller reads as a verdict. -/
+= `infra io` (P5), never an exception the caller reads as a verdict; `e1` = phase 1's export digest
+(phase 2's observations name it, P6), ignored in phase 1. -/
 def phase (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteArray))
-    (built libPrev : List String) : IO PhaseRun :=
-  tryCatch (phaseBody s r n mods built libPrev) fun ex =>
+    (built libPrev : List String) (e1 : Digest) : IO PhaseRun :=
+  tryCatch (phaseBody s r n mods built libPrev e1) fun ex =>
     pure { obs := .infra .io s!"phase {n}: a host I/O operation failed: {ex}", libRoots := libPrev }
 
 /-- A command's fresh run directory on the cache's filesystem (`<cache>/runs/<pid>.<ns>`): K4's
@@ -430,12 +431,7 @@ def runDir (cache : System.FilePath) : IO System.FilePath := do
   IO.FS.createDirAll dir
   return dir
 
-/-- The phase-2 observation bound to the e1 it was built on (U2 E: `phase2 e1 …`). -/
-def bindE1 (e1 : Digest) : Obs → Obs
-  | .phase2 _ b => .phase2 e1 b
-  | o => o
-
-/-- P3 → P6: S2's digests, phase 1, then phase 2 only after `phase1 (ok e1)` (bound to that e1). -/
+/-- P3 → P6: S2's digests, phase 1, then phase 2 on `handoff`'s export alone (phase 1's `ok e1`). -/
 def check (s : Setup) (r : Request) : IO Report := do
   let run := s.cache.run
   let implSources := FvdepIO.Hash.digest .implSources (sourceFiles r.impl)
@@ -448,12 +444,13 @@ def check (s : Setup) (r : Request) : IO Report := do
         implSources
         proofSources
         runs := [{ obs := .infra .io s!"the run directory could not be prepared: {ex}" }] }
-  let one ← phase s r 1 r.impl [] []
-  match one.obs with
-  | .phase1 (.ok e1) =>
-    let two ← phase s r 2 r.proof (r.impl.map (·.1)) one.libRoots
-    return { implSources, proofSources, runs := [one, { two with obs := bindE1 e1 two.obs }] }
-  | _ =>
+  -- Phase 1 binds no earlier export (its `e1` argument is unused).
+  let one ← phase s r 1 r.impl [] [] ""
+  match handoff one.obs with
+  | some e1 =>
+    let two ← phase s r 2 r.proof (r.impl.map (·.1)) one.libRoots e1
+    return { implSources, proofSources, runs := [one, two] }
+  | none =>
     return { implSources, proofSources, runs := [one] }
 
 end FvdepIO.Phase
