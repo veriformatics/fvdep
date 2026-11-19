@@ -1656,7 +1656,22 @@ def residue : List Residue :=
       boundary :=
         [``FvdepIO.Spawn.nodump, ``FvdepIO.Spawn.channel, ``FvdepIO.Spawn.coreLimit,
           ``FvdepIO.Spawn.fileLimit, ``FvdepIO.Spawn.spawn, ``FvdepIO.Spawn.killAll,
-          ``FvdepIO.Spawn.available, ``FvdepIO.Spawn.openRegular] }]
+          ``FvdepIO.Spawn.available, ``FvdepIO.Spawn.openRegular] },
+    { id := "project-snapshot"
+      what :=
+        "the project snapshot's reads: `c/fvdep_snapshot.c`'s `openat` of one plain path " ++
+          "component (`O_NOFOLLOW`, `O_NONBLOCK`, `O_NOCTTY`, `O_CLOEXEC`; any other name → " ++
+          "`EINVAL`) + `fstat` on its descriptor, the project directory's open, the reads " ++
+          "under their caps, every descriptor closed on every path (`FvdepIO.Snapshot.walk`)"
+      reason :=
+        "C + the OS have no Lean semantics: the export is one reviewed `openat` + `fstat` " ++
+          "pair; each step's decision is pure (`snapNames`, `snapDecide`, `snapRead`); the IO " ++
+          "is tested by `lake test`'s snapshot cases (a link at the file or on the way, a FIFO " ++
+          "without a writer, a socket, a directory as the file, a file on the way, missing " ++
+          "paths, names outside T3's grammar, both caps at n and n + 1, the shim's name " ++
+          "guard, descriptors on every path)"
+      ruling := "the project snapshot's reads"
+      boundary := [``FvdepIO.Snapshot.openAt] }]
 
 def cliRow : Row :=
   { component := `FvdepCore.Cli
@@ -2849,6 +2864,23 @@ def toolchainRow : Row :=
     residue := ["hacl-sha256", "sys-shim", "os", "runtime"]
     unproven := ["cache-fs"] }
 
+/-- U5 S1: the project snapshot. -/
+def snapshotRow : Row :=
+  { component := `FvdepIO.Snapshot
+    contract := "U5 S1, T3"
+    claim :=
+      "Each listed module's `A/B.lean` under the project directory, read once: every path " ++
+        "component opened without following a link + `fstat`ed on its descriptor; a link, a " ++
+        "missing name, a FIFO, socket or device, a directory as the file, a file on the way, a " ++
+        "name outside T3's grammar or listed twice, a file over 1 MiB or a snapshot over 16 MiB " ++
+        "→ refused, naming the file, the component + the cause, before any compile."
+    claims := []
+    subject := ``FvdepIO.Snapshot.read
+    path := []
+    noCaller := "U8"
+    residue := ["sys-shim", "os", "runtime"]
+    unproven := ["project-snapshot"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -2865,7 +2897,7 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow, cacheRow, headerRow, toolchainRow]
+        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

@@ -1,5 +1,6 @@
 import FvdepCore.Build
 import FvdepCore.Evidence
+import FvdepCore.Manifest
 import FvdepCore.Sandbox
 
 /-! A phase's pure parts (contract `docs/contracts/U5-sandbox.md` P1, P5, P8): the compile argv,
@@ -137,5 +138,107 @@ def family (isModule : Bool) (module : String) : List String :=
       [p ++ ".olean", p ++ ".olean.server", p ++ ".olean.private", p ++ ".ir", p ++ ".ir.sig"]
     else [p ++ ".olean"]) ++
     [p ++ ".ilean", p ++ ".c"]
+
+/-! ## S1 project snapshot: the decision per path component -/
+
+/-- T3 `sourceBytes`: the supported checking inputs (not the spec's domain) — one source file's
+bytes + a snapshot's, over its implementation and proof modules together. -/
+structure SourceLimits where
+  fileBytes : Nat := 1048576
+  totalBytes : Nat := 16777216
+  deriving DecidableEq, Repr
+
+/-- A path component's file type as `fstat` reports it. -/
+inductive Kind where
+  | directory
+  | regular
+  | fifo
+  | socket
+  | charDevice
+  | blockDevice
+  | link
+  | other (mode : Nat)
+  deriving DecidableEq, Repr
+
+/-- Linux's `st_mode & S_IFMT` values (`<sys/stat.h>`). -/
+def Kind.ofMode : Nat → Kind
+  | 0o040000 => .directory
+  | 0o100000 => .regular
+  | 0o010000 => .fifo
+  | 0o140000 => .socket
+  | 0o020000 => .charDevice
+  | 0o060000 => .blockDevice
+  | 0o120000 => .link
+  | m => .other m
+
+/-- What `openat` + `fstat` answered for one path component (S1). -/
+inductive Opened where
+  | error (errno : Nat)
+  | file (kind : Kind) (size : Nat)
+  deriving DecidableEq, Repr
+
+/-- S1: why the snapshot refuses a module (its text: `FvdepIO.Snapshot.causeText`). -/
+inductive Refusal where
+  | notModuleName
+  | listedTwice
+  | unopened (errno : Nat)
+  | unread (errno : Nat)
+  | kind (k : Kind)
+  | fileOver (size cap : Nat)
+  | totalOver (total cap : Nat)
+  | grewFile (cap : Nat)
+  | grewTotal (cap : Nat)
+  deriving DecidableEq, Repr
+
+/-- S1: the snapshot's step at one path component. -/
+inductive Snap where
+  | descend
+  | read (cap : Nat)
+  | refuse (r : Refusal)
+  deriving DecidableEq, Repr
+
+/-- S1: the step at one path component (`leaf` = the module's file) from what `openat` + `fstat`
+answered + the bytes the snapshot already holds (`used`): a directory on the way → descend; the leaf
+a regular file within the per-file cap + the remaining total → read at most that much; anything
+else (an open error — a link, a missing name, a socket —, a FIFO or device, a directory as the leaf,
+another file on the way) → refuse. -/
+def snapDecide (l : SourceLimits) (used : Nat) (leaf : Bool) : Opened → Snap
+  | .error n => .refuse (.unopened n)
+  | .file k size =>
+    if leaf then
+      if k == .regular then
+        if l.fileBytes < size then .refuse (.fileOver size l.fileBytes)
+        else
+          if l.totalBytes < used + size then .refuse (.totalOver (used + size) l.totalBytes)
+          else .read (min l.fileBytes (l.totalBytes - used))
+      else .refuse (.kind k)
+    else if k == .directory then .descend else .refuse (.kind k)
+
+/-- S1: a leaf read under `cap` delivered `n` bytes (the read stops once past `cap`: more = the file
+grew after `fstat`, or never ends) → the snapshot's new total, else the refusal naming the cap that
+bound the read. -/
+def snapRead (l : SourceLimits) (used cap n : Nat) : Except Refusal Nat :=
+  if n ≤ cap then .ok (used + n)
+  else
+    if l.fileBytes ≤ l.totalBytes - used then .error (.grewFile l.fileBytes)
+    else .error (.grewTotal l.totalBytes)
+
+/-- S1: the first listed module (implementation, then proof) outside U3 T3's component grammar
+(`[A-Za-z_][A-Za-z0-9_']*`, dot-separated) or listed twice — decided before any path is opened. -/
+def snapNames (modules : List String) : Option (String × Refusal) := go [] modules
+where go (seen : List String) : List String → Option (String × Refusal)
+    | [] => none
+    | m :: rest =>
+      if !((m.splitOn ".").all fun c => FvdepCore.Manifest.isComponent c.toList) then
+        some (m, .notModuleName)
+      else if seen.contains m then some (m, .listedTwice) else go (m :: seen) rest
+
+/-- S1: module `A.B`'s path components under the project directory, `.lean` on the last
+(`["A", "B.lean"]`). -/
+def snapPath (module : String) : List String := go (module.splitOn ".")
+where go : List String → List String
+    | [] => []
+    | [c] => [c ++ ".lean"]
+    | c :: cs => c :: go cs
 
 end FvdepCore.Phase

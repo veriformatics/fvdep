@@ -1,6 +1,7 @@
 import FvdepCore
 import FvdepIO.Cache
 import FvdepIO.Sha256
+import FvdepIO.Snapshot
 import FvdepIO.Step
 import FvdepIO.Toml
 import FvdepIO.Toolchain
@@ -1711,6 +1712,267 @@ def ioCases : List (String × IO Bool) :=
 
 end Cache
 
+namespace Snapshot
+
+open FvdepCore.Phase FvdepIO.Snapshot
+
+def small : SourceLimits := { fileBytes := 10, totalBytes := 25 }
+
+def cases : List (String × (Unit → Bool)) :=
+  [("snapshot: T3's defaults = 1 MiB per source file + 16 MiB per snapshot", fun _ =>
+      ({} : SourceLimits) == { fileBytes := 1048576, totalBytes := 16777216 }),
+    ("snapshot: Linux's S_IF* values map to their kinds", fun _ =>
+      [(0o040000, Kind.directory), (0o100000, .regular), (0o010000, .fifo), (0o140000, .socket),
+            (0o020000, .charDevice), (0o060000, .blockDevice), (0o120000, .link), (7, .other 7)].all
+        fun x => Kind.ofMode x.1 == x.2),
+    ("snapshot: a directory on the way descends, any other kind there is refused", fun _ =>
+      snapDecide small 0 false (.file .directory 4096) == .descend &&
+        [Kind.regular, .fifo, .socket, .charDevice, .blockDevice, .link, .other 1].all fun k =>
+          snapDecide small 0 false (.file k 0) == .refuse (.kind k)),
+    ("snapshot: the module's file must be a regular file", fun _ =>
+      [Kind.directory, .fifo, .socket, .charDevice, .blockDevice, .link, .other 1].all fun k =>
+        snapDecide small 0 true (.file k 0) == .refuse (.kind k)),
+    ("snapshot: an open error refuses at either position", fun _ =>
+      [2, 6, 13, 40].all fun n =>
+        snapDecide small 0 true (.error n) == .refuse (.unopened n) &&
+          snapDecide small 0 false (.error n) == .refuse (.unopened n)),
+    ("snapshot: the per-file cap is inclusive (n read, n + 1 refused)", fun _ =>
+      snapDecide small 0 true (.file .regular 10) == .read 10 &&
+        snapDecide small 0 true (.file .regular 11) == .refuse (.fileOver 11 10)),
+    ("snapshot: the total is inclusive; a read's cap = the smaller remainder", fun _ =>
+      snapDecide small 15 true (.file .regular 10) == .read 10 &&
+        snapDecide small 20 true (.file .regular 5) == .read 5 &&
+        snapDecide small 20 true (.file .regular 6) == .refuse (.totalOver 26 25)),
+    ("snapshot: a read past its cap is refused by the cap that bound it", fun _ =>
+      (match snapRead small 0 10 10 with
+        | .ok 10 => true
+        | _ => false) &&
+        (match snapRead small 0 10 11 with
+        | .error (.grewFile 10) => true
+        | _ => false) &&
+        (match snapRead small 20 5 6 with
+        | .error (.grewTotal 25) => true
+        | _ => false) &&
+        match snapRead small 20 5 3 with
+        | .ok 23 => true
+        | _ => false),
+    ("snapshot: a name outside T3's grammar or listed twice is refused before any open", fun _ =>
+      ["A..B", "", ".A", "A.", "A/B", "/abs/A", "1A", "A-B", "A.B c"].all
+          (fun m => snapNames ["Ok.A", m] == some (m, .notModuleName)) &&
+        snapNames ["A.B", "C", "A.B"] == some ("A.B", .listedTwice) &&
+        snapNames ["A.B", "C", "A.D'"] == none),
+    ("snapshot: a module's path components (`.lean` on the last)", fun _ =>
+      snapPath "A.B.C" == ["A", "B", "C.lean"] && snapPath "X" == ["X.lean"]),
+    ("snapshot: a refusal's detail names the file, the component + the cause", fun _ =>
+      detail "A/B.lean" "A/B.lean" (.unopened 40) == "A/B.lean is a symbolic link" &&
+        detail "A/B.lean" "A" (.kind .regular) == "A/B.lean: A is not a directory" &&
+        detail "A/B.lean" "A/B.lean" (.fileOver 11 10) ==
+          "A/B.lean has 11 bytes, over the limit of 10 bytes per source file")]
+
+/-- `d`'s tree removed without following a link (a link, FIFO or socket goes as itself). -/
+partial def rmTree (d : System.FilePath) : IO Unit := do
+  for e in ← d.readDir do
+    if (← e.path.symlinkMetadata).type == .dir then
+      rmTree e.path
+    else
+      IO.FS.removeFile e.path
+  IO.FS.removeDir d
+
+/-- `f` on a fresh project directory (2nd argument) inside a fresh directory (1st: room for files
+outside the project). -/
+def withProject (f : System.FilePath → System.FilePath → IO Bool) : IO Bool := do
+  let d ← IO.FS.createTempDir
+  try
+    IO.FS.createDirAll (d / "p")
+    f d (d / "p")
+  finally
+    rmTree d
+
+def put (root : System.FilePath) (rel : String) (bytes : ByteArray) : IO Unit := do
+  let f := root / rel
+  if let some dir := f.parent then
+    IO.FS.createDirAll dir
+  IO.FS.writeBinFile f bytes
+
+def spaces (n : Nat) : ByteArray := ⟨(List.replicate n 0x20).toArray⟩
+
+/-- A fixture command's success (a failed `ln`, `mkfifo` or `python3` fails the case). -/
+def sh (cmd : String) (args : Array String) : IO Bool := do
+  return (← IO.Process.output { cmd, args }).exitCode == 0
+
+def refusedWith (r : Except String Sources) (d : String) : Bool :=
+  match r with
+  | .error e => e == d
+  | .ok _ => false
+
+def openFds : IO Nat := do
+  return (← System.FilePath.readDir "/proc/self/fd").size
+
+def ioCases : List (String × IO Bool) :=
+  [("snapshot: each module's bytes, read once, in the listed order + split",
+      withProject fun _ p => do
+        put p "A/B.lean" "ab".toUTF8
+        put p "C.lean" "c".toUTF8
+        put p "A/D.lean" "ad".toUTF8
+        match ← FvdepIO.Snapshot.read p ["A.B", "C"] ["A.D"] with
+        | .ok s =>
+          return s.impl.map (fun x => (x.1, x.2.toList)) ==
+                [("A.B", "ab".toUTF8.toList), ("C", "c".toUTF8.toList)] &&
+              s.proof.map (fun x => (x.1, x.2.toList)) == [("A.D", "ad".toUTF8.toList)]
+        | .error _ =>
+          return false),
+    ("snapshot: a link at the module's file is refused (O_NOFOLLOW)",
+      withProject fun d p => do
+        put d "outside.lean" "x".toUTF8
+        IO.FS.createDirAll (p / "A")
+        let made ← sh "ln" #["-s", (d / "outside.lean").toString, (p / "A" / "B.lean").toString]
+        return made &&
+            refusedWith (← FvdepIO.Snapshot.read p ["A.B"] []) "A/B.lean is a symbolic link"),
+    ("snapshot: a link at a directory on the way is refused, naming it",
+      withProject fun d p => do
+        put d "real/B.lean" "x".toUTF8
+        let made ← sh "ln" #["-s", (d / "real").toString, (p / "A").toString]
+        return made &&
+            refusedWith (← FvdepIO.Snapshot.read p ["A.B"] []) "A/B.lean: A is a symbolic link"),
+    ("snapshot: a FIFO is refused at once (O_NONBLOCK: no wait for a writer)",
+      withProject fun _ p => do
+        IO.FS.createDirAll (p / "A")
+        let fifo := p / "A" / "B.lean"
+        unless ← sh "mkfifo" #[fifo.toString] do
+          return false
+        -- A writer arrives after 3 s: an open that waits for one returns only then.
+        let opener ←
+          IO.Process.spawn
+              { cmd := "python3"
+                args :=
+                  #["-c", "import os, sys, time; time.sleep(3); os.open(sys.argv[1], os.O_RDWR)",
+                    fifo.toString] }
+        let t0 ← IO.monoMsNow
+        let r ← FvdepIO.Snapshot.read p ["A.B"] []
+        let t1 ← IO.monoMsNow
+        opener.kill
+        discard opener.wait
+        return t1 - t0 < 1500 && refusedWith r "A/B.lean is a named pipe (FIFO)"),
+    ("snapshot: a socket is refused (ENXIO)",
+      withProject fun _ p => do
+        IO.FS.createDirAll (p / "A")
+        let made ←
+          sh "python3"
+              #["-c", "import socket, sys; socket.socket(socket.AF_UNIX).bind(sys.argv[1])",
+                (p / "A" / "B.lean").toString]
+        return made &&
+            refusedWith (← FvdepIO.Snapshot.read p ["A.B"] [])
+              "A/B.lean is a socket or a device without a driver"),
+    ("snapshot: a directory at the module's file is refused",
+      withProject fun _ p => do
+        IO.FS.createDirAll (p / "A" / "B.lean")
+        return refusedWith (← FvdepIO.Snapshot.read p ["A.B"] []) "A/B.lean is a directory"),
+    ("snapshot: a file where a directory belongs is refused",
+      withProject fun _ p => do
+        put p "A" "x".toUTF8
+        return refusedWith (← FvdepIO.Snapshot.read p ["A.B"] []) "A/B.lean: A is not a directory"),
+    ("snapshot: a missing file or directory is refused, naming it",
+      withProject fun _ p => do
+        IO.FS.createDirAll (p / "A")
+        return refusedWith (← FvdepIO.Snapshot.read p ["A.B"] []) "A/B.lean does not exist" &&
+            refusedWith (← FvdepIO.Snapshot.read p ["X.B"] []) "X/B.lean: X does not exist"),
+    ("snapshot: a name outside T3's grammar is refused unread, a real file behind it",
+      withProject fun d p => do
+        put d "real/Impl.lean" "x".toUTF8
+        put d "Abs.lean" "x".toUTF8
+        let made ← sh "ln" #["-s", (d / "real").toString, (p / "Link").toString]
+        let abs := (d / "Abs").toString
+        return made &&
+            refusedWith (← FvdepIO.Snapshot.read p ["Link/Impl"] [])
+              "Link/Impl is not a module name" &&
+            refusedWith (← FvdepIO.Snapshot.read p [abs] []) s!"{abs} is not a module name"),
+    ("snapshot: the shim refuses a name other than one path component (EINVAL)",
+      withProject fun _ p => do
+        put p "A.lean" "x".toUTF8
+        match ← FvdepIO.Sys.Native.openDir p.toString with
+        | .error _ =>
+          return false
+        | .ok dir =>
+          let dir := dir.toUInt32
+          let refused ←
+            ["", ".", "..", "x/A.lean", "./A.lean", "/etc/hostname", "A.lean\x00x"].allM fun n => do
+                return (← openAt dir n) matches .error 22
+          let good ←
+            match ← openAt dir "A.lean" with
+            | .ok #[fd, _, 1] =>
+              discard <| FvdepIO.Sys.Native.close fd.toUInt32
+              pure true
+            | _ =>
+              pure false
+          discard <| FvdepIO.Sys.Native.close dir
+          return refused && good),
+    ("snapshot: the per-file cap holds at n bytes, refuses n + 1",
+      withProject fun _ p => do
+        put p "A.lean" (spaces 10)
+        put p "B.lean" (spaces 11)
+        let l : SourceLimits := { fileBytes := 10, totalBytes := 100 }
+        let a ← FvdepIO.Snapshot.read p ["A"] [] l
+        return a matches .ok _ &&
+            refusedWith (← FvdepIO.Snapshot.read p ["A"] ["B"] l)
+              "B.lean has 11 bytes, over the limit of 10 bytes per source file"),
+    ("snapshot: the total over implementation + proof holds at n, refuses n + 1",
+      withProject fun _ p => do
+        put p "A.lean" (spaces 10)
+        put p "B.lean" (spaces 10)
+        put p "C.lean" (spaces 5)
+        put p "D.lean" (spaces 6)
+        let a ← FvdepIO.Snapshot.read p ["A", "B"] ["C"] small
+        return a matches .ok _ &&
+            refusedWith (← FvdepIO.Snapshot.read p ["A", "B"] ["D"] small)
+              ("D.lean brings the sources to 26 bytes, over the limit of 25 bytes per " ++
+                "project snapshot")),
+    ("snapshot: the default cap: a 1 MiB file is read, one byte more is refused",
+      withProject fun _ p => do
+        put p "A.lean" (spaces 1048576)
+        put p "B.lean" (spaces 1048577)
+        let a ← FvdepIO.Snapshot.read p ["A"] []
+        return a matches .ok _ &&
+            refusedWith (← FvdepIO.Snapshot.read p ["B"] [])
+              "B.lean has 1048577 bytes, over the limit of 1048576 bytes per source file"),
+    ("snapshot: readCapped stops once past its limit (n + 1 bytes of a longer file)",
+      withProject fun _ p => do
+        put p "A.lean" (spaces 50)
+        match ← FvdepIO.Sys.Native.openRead (p / "A.lean").toString with
+        | .error _ =>
+          return false
+        | .ok fd =>
+          let r ← readCapped fd.toUInt32 10
+          discard <| FvdepIO.Sys.Native.close fd.toUInt32
+          match r with
+          | .ok b =>
+            return b.size == 11
+          | .error _ =>
+            return false),
+    ("snapshot: no descriptor outlives a read on any path (20 rounds after a warm-up)",
+      withProject fun d p => do
+        put p "Ok.lean" "x".toUTF8
+        put p "Deep/Er/Ok.lean" "x".toUTF8
+        put d "outside.lean" "x".toUTF8
+        unless ← sh "ln" #["-s", (d / "outside.lean").toString, (p / "L.lean").toString] do
+          return false
+        IO.FS.createDirAll (p / "Dir.lean")
+        put p "F" "x".toUTF8
+        put p "Big.lean" (spaces 11)
+        let l : SourceLimits := { fileBytes := 10, totalBytes := 100 }
+        let reads :=
+          [(["Ok"], ["Deep.Er.Ok"]), (["L"], []), (["Missing"], []), (["Dir"], []), (["F.X"], []),
+            (["Big"], []), (["Ok"], ["Deep.Er.Missing"]), (["Deep.Er.Ok.X"], [])]
+        let round : IO Unit := do
+          for (impl, proof) in reads do
+            discard <| FvdepIO.Snapshot.read p impl proof l
+        round
+        let before ← openFds
+        for _ in [0:20] do
+          round
+        return before == (← openFds))]
+
+end Snapshot
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -1752,12 +2014,13 @@ def main : IO UInt32 := do
                   Manifest.cases ++
                   Sandbox.cases ++
                   Step.cases ++
-                  Cache.cases).map
+                  Cache.cases ++
+                  Snapshot.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
-    (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases).mapM fun c =>
-        checkIO c.1 c.2
+    (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases).mapM
+        fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩
   let failed := (results.filter (!·.ok)).length

@@ -64,6 +64,8 @@ input_file fvdep_spawn.c where path := cDir / "fvdep_spawn.c"
 
 input_file fvdep_cache.c where path := cDir / "fvdep_cache.c"
 
+input_file fvdep_snapshot.c where path := cDir / "fvdep_snapshot.c"
+
 /-- HACL's upstream build flags; fvdep's shim adds warnings as errors (HACL's generated C keeps its
 own warning policy). -/
 target hacl_sha2.o pkg : FilePath := do
@@ -95,10 +97,15 @@ target fvdep_cache.o pkg : FilePath := do
   buildO (pkg.buildDir / "c" / "fvdep_cache.o") (← fvdep_cache.c.fetch) (← cWeakArgs pkg)
       #["-std=gnu11", "-O3", "-fPIC", "-Wall", "-Wextra", "-Werror"] (← getLeanCc) (cTrace pkg)
 
+/-- U5 S1's snapshot shim: the mechanism alone (`openat` + `fstat` of one path component). -/
+target fvdep_snapshot.o pkg : FilePath := do
+  buildO (pkg.buildDir / "c" / "fvdep_snapshot.o") (← fvdep_snapshot.c.fetch) (← cWeakArgs pkg)
+      #["-std=gnu11", "-O3", "-fPIC", "-Wall", "-Wextra", "-Werror"] (← getLeanCc) (cTrace pkg)
+
 target libfvdepnative pkg : FilePath := do
   buildStaticLib (pkg.staticLibDir / nameToStaticLib "fvdepnative")
       #[← hacl_sha2.o.fetch, ← fvdep_sha256_core.o.fetch, ← fvdep_sha256.o.fetch,
-        ← fvdep_sys.o.fetch, ← fvdep_spawn.o.fetch, ← fvdep_cache.o.fetch]
+        ← fvdep_sys.o.fetch, ← fvdep_spawn.o.fetch, ← fvdep_cache.o.fetch, ← fvdep_snapshot.o.fetch]
 
 /-! ## Lean targets -/
 
