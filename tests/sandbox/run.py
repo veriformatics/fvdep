@@ -738,8 +738,9 @@ for phase in (1, 2):
         p = c.project()
         path = "SandboxTrial/Impl.lean" if n == 1 else "SandboxTrial/Proof.lean"
         s = (p / path).read_text()
-        put(p, path, s + "\n#eval IO.sleep 30000\n")
-        r = c.phase(p, "--deadline", "1" if n == 1 else "10")
+        # Phase 1 (≈ 5 s alone) gets a 30 s window in case 2: 10 s ran out under concurrent load.
+        put(p, path, s + "\n#eval IO.sleep 120000\n")
+        r = c.phase(p, "--deadline", "1" if n == 1 else "30")
         infra(r)
         need(any(w in r.all_text.lower() for w in ("deadline", "timed", "limit")), "deadline cause absent")
         if n == 1:
