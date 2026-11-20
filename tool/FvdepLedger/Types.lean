@@ -19,9 +19,10 @@ structure Residue where
 /-- One claim about fvdep's own code. `claims` = (statement, theorem) pairs: the statement is a
 `Prop` definition in the ledger modules (the claim's exact proposition), the theorem's type must be
 it. `path` = a root's `main` → … → `subject` (the executed function), or `[]` while `noCaller`
-names the open unit that wires the subject in, or is `support` (a helper inside the closure of a
-row with a path). `residue` + `unproven` cite `Residue` ids: what the claims still assume, and what
-of the component has no theorem. -/
+names the open unit that wires the subject in, is `support` (a helper inside the closure of a row
+with a path) or `step` (inside a `StepSource`'s reach: run only in a sandbox step, from shipped
+source). `residue` + `unproven` cite `Residue` ids: what the claims still assume, and what of the
+component has no theorem. -/
 structure Row where
   component : Lean.Name
   contract : String
@@ -39,10 +40,24 @@ structure Root where
   interpreter : Lean.Name
   plan : Lean.Name
 
+/-- A sandbox step whose program fvdep ships as source: `driver` = the shipped definition that
+writes the program (a root reaches it); `embedded` = the shipped definition the driver reads the
+program's verbatim module texts from (a list literal of (module name, text) pairs; `lake test`
+holds each text = its module's file); `calls` = what the program's generated code calls;
+`classes` = the type classes whose instances the program's elaboration picks among (every instance
+of them an embedded module declares may run). Each call + class = a declaration of an embedded
+module. -/
+structure StepSource where
+  driver : Lean.Name
+  embedded : Lean.Name
+  calls : List Lean.Name
+  classes : List Lean.Name
+
 /-- The whole ledger: `fvdep`'s root (`main` = `interpreter` applied to `plan args`, checked by
-shape), the shipped lean_lib roots, the rows, the residue + one `Root` per further shipped
+shape), the shipped lean_lib roots, the rows, the residue, one `Root` per further shipped
 executable (an owned entry its root module's `main` calls whole: a second top-level `main` cannot
-share this environment with `fvdep`'s). -/
+share this environment with `fvdep`'s) + one `StepSource` per sandbox step running shipped
+source. -/
 structure Ledger where
   main : Lean.Name
   interpreter : Lean.Name
@@ -51,5 +66,6 @@ structure Ledger where
   rows : List Row
   residue : List Residue
   extraRoots : List Root := []
+  steps : List StepSource := []
 
 end FvdepLedger

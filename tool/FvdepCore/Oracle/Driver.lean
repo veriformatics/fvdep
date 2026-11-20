@@ -2,9 +2,10 @@ import FvdepCore.Oracle.Wire
 
 /-! The evaluation step's source (contract `docs/contracts/U5b-oracle.md` W0, W5, V3; residue
 `oracle-driver`): the entry module + version imports, then `Protocol/Types.lean` + `Wire.lean`
-after their import lines — their text as fvdep was built (`include_str`; this module imports Wire,
-so an edit of either file rebuilds it; `lake test` checks the embedded text = the files' bytes:
-Q4) — then a `main` answering `requests.txt` line by line into `/fvdep/work/out/replies.txt`. -/
+after their import lines (`embedded`) — their text as fvdep was built (`include_str`; this module
+imports Wire, so an edit of either file rebuilds it; `lake test` checks the embedded text = the
+files' bytes: Q4) — then a `main` answering `requests.txt` line by line into
+`/fvdep/work/out/replies.txt`. -/
 
 namespace FvdepCore.Oracle.Driver
 
@@ -13,6 +14,12 @@ def typesText : String := include_str ".." / "Protocol" / "Types.lean"
 
 /-- `FvdepCore/Oracle/Wire.lean` as fvdep was built with it. -/
 def wireText : String := include_str "Wire.lean"
+
+/-- The modules whose text the driver holds, with that text (the ledger's `StepSource` reads the
+names: the step runs `answer` + the instances among them; `lake test` compares each text with its
+file). -/
+def embedded : List (Lean.Name × String) :=
+  [(`FvdepCore.Protocol.Types, typesText), (`FvdepCore.Oracle.Wire, wireText)]
 
 /-- `t` after its leading `import` lines (W0: the driver states its own imports). -/
 def afterImports (t : String) : String :=
@@ -41,10 +48,8 @@ def mainText (spec : Lean.Name) : String :=
 
 /-- V3: the driver for entry module `M` + spec constant `spec`. -/
 def driverText (M spec : Lean.Name) : String :=
-  "import " ++ quoted M ++ "\nimport Fvdep.Semver.Version.V1_0_0\n" ++ afterImports typesText ++
-    "\n" ++
-    afterImports wireText ++
-    "\n" ++
+  "import " ++ quoted M ++ "\nimport Fvdep.Semver.Version.V1_0_0\n" ++
+    String.join (embedded.map fun m => afterImports m.2 ++ "\n") ++
     mainText spec
 
 end FvdepCore.Oracle.Driver

@@ -2925,12 +2925,15 @@ def cases : List (String × (Unit → Bool)) :=
         | _ => .done
       runOracle "a.b@1.0.0" ans == (["project", "manifest", "parse", "err"], some 2))]
 
-/-- Q4: the embedded texts = the files' bytes as built (a stale embedding fails). -/
+/-- Q4: the embedded list = W0's two modules, each text = its file's bytes as built (a stale
+embedding fails; the ledger's `StepSource` reads the same list). -/
 def ioCases : List (String × IO Bool) :=
   [("oracle: Q4 — the driver embeds Protocol/Types.lean + Oracle/Wire.lean exactly", do
-      return FvdepCore.Oracle.Driver.typesText ==
-            (← IO.FS.readFile "FvdepCore/Protocol/Types.lean") &&
-          FvdepCore.Oracle.Driver.wireText == (← IO.FS.readFile "FvdepCore/Oracle/Wire.lean"))]
+      let es := FvdepCore.Oracle.Driver.embedded
+      let same ←
+        es.allM fun m => do
+            return m.2 == (← IO.FS.readFile ⟨(m.1.toString.replace "." "/") ++ ".lean"⟩)
+      return same && es.map (·.1) == [`FvdepCore.Protocol.Types, `FvdepCore.Oracle.Wire])]
 
 end OracleT
 

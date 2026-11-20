@@ -138,13 +138,20 @@ queued=()
 suites_of=()
 builds_of=()
 probe() {
+    # FVDEP_PROBE = a name prefix: a narrowed run queues the matching probes alone (iteration; the
+    # gate's `probes` stage leaves it unset + runs every probe).
+    [[ -z "${FVDEP_PROBE:-}" || "$1" == "$FVDEP_PROBE"* ]] || return 0
     n=$((n + 1))
     printf -v 'queued[n]' '%q ' "$@"
     suites_of[n]="${with_suites:-0}"
     builds_of[n]="${with_build:-1}"
 }
-first=(coverage vendor-upstream coverage-extra-reach index-replay coverage-extra-root lean-fmt lean-style
-    sys-suite index-registry fast-gate cli index-drift manifest-suite codec-suite library-conformance)
+# The coverage probes (≈ 5 GiB each: the checker loads the whole environment) alternate with
+# lighter ones: four at once peak at the run's 24 GiB cap.
+first=(coverage vendor-upstream coverage-extra-reach index-replay coverage-extra-root lean-fmt
+    coverage-step-instance lean-style coverage-step-driver sys-suite coverage-step-class
+    index-registry coverage-step-nocaller fast-gate cli index-drift manifest-suite codec-suite
+    library-conformance)
 launch() {
     local i name order=() seen=" "
     for name in "${first[@]}"; do
@@ -539,10 +546,45 @@ plant_extra_reach() {
     printf '\n%s\n\n%s\n' 'def probePlan (args : List String) := FvdepCore.Cli.plan ("probe" :: args)' \
         'def probeMain (args : List String) : IO UInt32 := FvdepIO.execute (probePlan args)' \
         >>tool/Main.lean
-    sed -i 's/^          plan := ``FvdepIO.Step.plan }] }$/          plan := ``FvdepIO.Step.plan },\n        { main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }] }/' \
+    sed -i 's/^          plan := ``FvdepIO.Step.plan }]$/          plan := ``FvdepIO.Step.plan },\n        { main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }]/' \
         tool/FvdepLedger/Rows.lean
 }
 probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
+    bash -c 'source tools/gate.sh; coverage'
+
+# coverage, sandbox steps (U2 L1 + L2 + L4: a step's program = shipped source): an instance of a
+# step's class outside every row (the `Int` conversions' row dropped) → `uncovered` naming it; a
+# step's driver no root reaches → `step`; a listed class that is no class of the step's modules →
+# `step`; `noCaller "step"` on a subject outside every step's reach → `nocaller`.
+# shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
+plant_step_instance() {
+    sed -i 's/^        wireNativeIntRow, wireNativeOrderingRow,/        wireNativeOrderingRow,/' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-step-instance plant_step_instance \
+    'uncovered: FvdepCore.Oracle.Wire.intNative: reachable' bash -c 'source tools/gate.sh; coverage'
+# shellcheck disable=SC2016
+plant_step_driver() {
+    sed -i 's/^      \[{  driver := ``FvdepCore.Oracle.Driver.driverText$/      [{  driver := ``FvdepCore.Oracle.Wire.decodeArgs/' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-step-driver plant_step_driver \
+    "FvdepCore.Oracle.Wire.decodeArgs: no root reaches the step's driver" \
+    bash -c 'source tools/gate.sh; coverage'
+# shellcheck disable=SC2016
+plant_step_class() {
+    sed -i 's/^            \[``FvdepCore.Oracle.Wire.Native, /            [``FvdepCore.Protocol.Val, ``FvdepCore.Oracle.Wire.Native, /' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-step-class plant_step_class "FvdepCore.Protocol.Val: no class of the step's modules" \
+    bash -c 'source tools/gate.sh; coverage'
+# shellcheck disable=SC2016
+plant_step_nocaller() {
+    perl -0pi -e 's/(subject := ``FvdepCore\.Oracle\.Driver\.driverText\n    path := \[\]\n    noCaller := )"support"/$1"step"/' \
+        tool/FvdepLedger/Rows.lean
+}
+probe coverage-step-nocaller plant_step_nocaller \
+    "step: FvdepCore.Oracle.Driver.driverText inside no step's modules" \
     bash -c 'source tools/gate.sh; coverage'
 
 # ledger-suite: a negative case whose expected rc is flipped fails the suite, named (one case).

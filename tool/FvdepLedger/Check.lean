@@ -116,8 +116,16 @@ def rootValue (env : Environment) (e : Expr) : Except String Root := do
       interpreter := ← name env fuel a[1]!
       plan := ← name env fuel a[2]! }
 
+def stepValue (env : Environment) (e : Expr) : Except String StepSource := do
+  let a ← fields env ``StepSource.mk 4 e
+  return {
+      driver := ← name env fuel a[0]!
+      embedded := ← name env fuel a[1]!
+      calls := ← list env (name env fuel) fuel a[2]!
+      classes := ← list env (name env fuel) fuel a[3]! }
+
 def ledger (env : Environment) (e : Expr) : Except String Ledger := do
-  let a ← fields env ``Ledger.mk 7 e
+  let a ← fields env ``Ledger.mk 8 e
   return {
       main := ← name env fuel a[0]!
       interpreter := ← name env fuel a[1]!
@@ -125,7 +133,21 @@ def ledger (env : Environment) (e : Expr) : Except String Ledger := do
       libs := ← list env (name env fuel) fuel a[3]!
       rows := ← list env (row env) fuel a[4]!
       residue := ← list env (residue env) fuel a[5]!
-      extraRoots := ← list env (rootValue env) fuel a[6]! }
+      extraRoots := ← list env (rootValue env) fuel a[6]!
+      steps := ← list env (stepValue env) fuel a[7]! }
+
+/-- A step's embedded modules: the names of the `embedded` definition's (module name, text) list
+literal (the texts are the driver's, compared with the files by `lake test`). -/
+def embeddedNames (env : Environment) (n : Name) : Except String (List Name) :=
+  match env.find? n with
+  | some (.defnInfo d) =>
+    list env
+      (fun e =>
+        match (unfold env e).getAppFn.constName?, (unfold env e).getAppArgs with
+        | some ``Prod.mk, #[_, _, m, _] => name env fuel m
+        | _, _ => .error s!"not a (module, text) pair literal: {e}")
+      fuel d.value
+  | _ => .error "not a definition"
 
 /-- Every shipped executable's root: `fvdep`'s first, then the ledger's extra roots. -/
 def roots (l : Ledger) : List Root :=
@@ -248,10 +270,45 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
       | _ =>
         out := out.push ⟨root, "root", s!"{rt.main} is not a definition"⟩
     let reach := closure env mains
+    -- L1 + L2 steps: a step's program runs its generated calls + every instance of its classes the
+    -- embedded modules declare (its elaboration picks among them by the spec's types).
+    let mut stepEntries : Array Name := #[]
+    for st in l.steps do
+      unless reach.contains st.driver do
+        out := out.push ⟨root, "step", s!"{st.driver}: no root reaches the step's driver"⟩
+      unless (closure env [st.driver]).contains st.embedded do
+        out := out.push ⟨root, "step", s!"{st.driver} never reads {st.embedded}"⟩
+      match embeddedNames env st.embedded with
+      | .error e =>
+        out := out.push ⟨root, "step", s!"{st.embedded}: {e}"⟩
+      | .ok ms =>
+        let inStep (n : Name) : Bool := (moduleOf env n).any ms.contains
+        for m in ms do
+          match env.getModuleIdx? m with
+          | none =>
+            out := out.push ⟨root, "step", s!"{m}: no module of the environment"⟩
+          | some i =>
+            if ownedModule m then
+              for n in env.header.moduleData[i]!.constNames do
+                if let some ci := env.find? n then
+                  let cls := ci.type.getForallBody.getAppFn.constName?
+                  if Meta.isInstanceCore env n && cls.any st.classes.contains then
+                    stepEntries := stepEntries.push n
+            else
+              out := out.push ⟨root, "step", s!"{m}: not an owned module"⟩
+        for c in st.calls do
+          if inStep c && env.find? c matches some (.defnInfo _) then
+            stepEntries := stepEntries.push c
+          else
+            out := out.push ⟨root, "step", s!"{c}: no definition of the step's modules"⟩
+        for c in st.classes do
+          unless inStep c && isClass env c do
+            out := out.push ⟨root, "step", s!"{c}: no class of the step's modules"⟩
+    let stepReach := closure env stepEntries.toList
     -- Coverage counts definitions (constructors + types are data shapes); auxiliary ones (matchers,
     -- `_proof_`, `_eq_`) sit in their parent's closure.
     let code :=
-      reach.toList.filter fun c =>
+      (reach.toList ++ stepReach.toList.filter (!reach.contains ·)).filter fun c =>
         !mains.contains c && !auxiliary env c && (env.find? c matches some (.defnInfo _))
     let residueIds := l.residue.map (·.id)
     -- L2 coverage
@@ -320,11 +377,15 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
             out :=
               out.push ⟨place, "nocaller", s!"support: {r.subject} under no row with a valid path"⟩
         else
-          if r.noCaller.isEmpty then
-            out := out.push ⟨place, "nocaller", "an empty path needs noCaller"⟩
+          if r.noCaller == "step" then
+            unless stepReach.contains r.subject do
+              out := out.push ⟨place, "nocaller", s!"step: {r.subject} inside no step's modules"⟩
           else
-            unless openUnit spec r.noCaller do
-              out := out.push ⟨place, "nocaller", s!"{r.noCaller} has no open Tasks row"⟩
+            if r.noCaller.isEmpty then
+              out := out.push ⟨place, "nocaller", "an empty path needs noCaller"⟩
+            else
+              unless openUnit spec r.noCaller do
+                out := out.push ⟨place, "nocaller", s!"{r.noCaller} has no open Tasks row"⟩
           if reach.contains r.subject then
             out := out.push ⟨place, "nocaller", s!"{r.subject} is reachable: list its path"⟩
       else
@@ -421,7 +482,15 @@ def render (env : Environment) (l : Ledger) (decl : Name) : IO String := do
       "".intercalate
         ((roots l).map fun rt =>
           s!"Root: {code rt.main} = {code rt.interpreter} (interpreter) applied to " ++
-            s!"{code rt.plan} (shape checked).\n")
+            s!"{code rt.plan} (shape checked).\n") ++
+      "".intercalate
+        (l.steps.map fun st =>
+          let ms :=
+            match embeddedNames env st.embedded with
+            | .ok ms => ", ".intercalate (ms.map code)
+            | .error e => e
+          s!"Step: {code st.driver} writes a sandbox step's program, holding verbatim the " ++
+            s!"text of {ms} ({code st.embedded}).\n")
   for r in l.rows do
     out :=
       out ++ s!"\n## {code r.component}\n\n- Contract: {r.contract}\n- Claim: {r.claim}\n" ++
@@ -431,7 +500,9 @@ def render (env : Environment) (l : Ledger) (decl : Name) : IO String := do
         if !r.path.isEmpty then s!"- Path: {" → ".intercalate (r.path.map code)}\n"
         else
           if r.noCaller == "support" then "- Path: none (a supporting component)\n"
-          else s!"- Path: none yet (wired by {r.noCaller})\n"
+          else
+            if r.noCaller == "step" then "- Path: none (run inside a sandbox step)\n"
+            else s!"- Path: none yet (wired by {r.noCaller})\n"
     for (st, th) in r.claims do
       let prop := (statementOf env st).getD (.const st [])
       out :=

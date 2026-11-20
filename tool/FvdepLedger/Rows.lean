@@ -2258,8 +2258,9 @@ def residue : List Residue :=
         "the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` " ++
           "read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, " ++
           "type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the " ++
-          "spec's argument + result types, the toolchain elaborating + interpreting the text " ++
-          "(`lean --run`) inside a U5 step over the snapshot's view"
+          "spec's argument + result types, `answer` + the `Answer`/`Serve` instances (the typed " ++
+          "application through W's proved conversions), the toolchain elaborating + " ++
+          "interpreting the text (`lean --run`) inside a U5 step over the snapshot's view"
       reason :=
         "the step runs the snapshot's code under the toolchain, + fvdep owns no proof of Lean's " ++
           "elaborator or interpreter; the conversions it runs are W's proved functions, shipped " ++
@@ -3590,7 +3591,7 @@ def wireArgsRow : Row :=
         (``WireClaims.encodeArgsLayout, ``FvdepAudit.Oracle.Wire.Proof.encodeArgs_eq)]
     subject := ``FvdepCore.Oracle.Wire.decodeArgs
     path := []
-    noCaller := "U5b"
+    noCaller := "step"
     residue := ["runtime"]
     unproven := [] }
 
@@ -3611,28 +3612,178 @@ def wireResultRow : Row :=
     residue := ["runtime"]
     unproven := [] }
 
-/-- U5b W3: the native bridge (the step's conversions). -/
+/-- U5b W3: the native bridge for `List UInt8` + every representation's protocol value (the step's
+conversions). -/
 def wireNativeRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W3, W4"
     claim :=
-      "Per served representation, `ofVal v` is `x` exactly when `v` is `toVal x`, + `toVal x` " ++
-        "is its protocol value (bytes, characters + code units in order, the number itself)."
+      "`ofVal v` is `x : List UInt8` exactly when `v` is `toVal x`; per served representation " ++
+        "`toVal x` is its protocol value (bytes, characters + code units in order, the number " ++
+        "itself, the ordering, the version)."
     claims :=
       [(``WireClaims.nativeBytes, ``FvdepAudit.Oracle.Wire.Proof.native_bytes),
-        (``WireClaims.nativeByteArray, ``FvdepAudit.Oracle.Wire.Proof.native_byteArray),
-        (``WireClaims.nativeText, ``FvdepAudit.Oracle.Wire.Proof.native_text),
-        (``WireClaims.nativeUtf16, ``FvdepAudit.Oracle.Wire.Proof.native_utf16),
-        (``WireClaims.nativeNat, ``FvdepAudit.Oracle.Wire.Proof.native_nat),
-        (``WireClaims.nativeInt, ``FvdepAudit.Oracle.Wire.Proof.native_int),
-        (``WireClaims.nativeOrdering, ``FvdepAudit.Oracle.Wire.Proof.native_ordering),
-        (``WireClaims.nativeVersion, ``FvdepAudit.Oracle.Wire.Proof.native_version),
         (``WireClaims.nativeValues, ``FvdepAudit.Oracle.Wire.Proof.native_values)]
     subject := ``FvdepCore.Oracle.Wire.bytesNative
     path := []
-    noCaller := "U5b"
+    noCaller := "step"
     residue := []
     unproven := [] }
+
+/-- U5b W3 + W4: the ByteArray conversions (a step-side instance). -/
+def wireNativeByteArrayRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : ByteArray` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeByteArray, ``FvdepAudit.Oracle.Wire.Proof.native_byteArray)]
+    subject := ``FvdepCore.Oracle.Wire.byteArrayNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the List Char conversions (a step-side instance). -/
+def wireNativeTextRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : List Char` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeText, ``FvdepAudit.Oracle.Wire.Proof.native_text)]
+    subject := ``FvdepCore.Oracle.Wire.textNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the List UInt16 conversions (a step-side instance). -/
+def wireNativeUtf16Row : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : List UInt16` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeUtf16, ``FvdepAudit.Oracle.Wire.Proof.native_utf16)]
+    subject := ``FvdepCore.Oracle.Wire.utf16Native
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the Nat conversions (a step-side instance). -/
+def wireNativeNatRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : Nat` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeNat, ``FvdepAudit.Oracle.Wire.Proof.native_nat)]
+    subject := ``FvdepCore.Oracle.Wire.natNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the Int conversions (a step-side instance). -/
+def wireNativeIntRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : Int` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeInt, ``FvdepAudit.Oracle.Wire.Proof.native_int)]
+    subject := ``FvdepCore.Oracle.Wire.intNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the Ordering conversions (a step-side instance). -/
+def wireNativeOrderingRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : Ordering` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeOrdering, ``FvdepAudit.Oracle.Wire.Proof.native_ordering)]
+    subject := ``FvdepCore.Oracle.Wire.orderingNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W3 + W4: the Version conversions (a step-side instance). -/
+def wireNativeVersionRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim := "`ofVal v` is `x : Version` exactly when `v` is `toVal x`."
+    claims := [(``WireClaims.nativeVersion, ``FvdepAudit.Oracle.Wire.Proof.native_version)]
+    subject := ``FvdepCore.Oracle.Wire.versionNative
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := [] }
+
+/-- U5b W5: one request line answered by the spec function (the step's generated call). -/
+def wireAnswerRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W5, V3"
+    claim :=
+      "A request line answered by `f`: its W1 arguments read by `decodeArgs` at `f`'s " ++
+        "argument types (`Serve.args`), applied through the served instances; a line the " ++
+        "decoder or `f`'s types refuse → `malformed`, which `parseResult` never accepts."
+    claims := []
+    subject := ``FvdepCore.Oracle.Wire.answer
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := ["oracle-driver"] }
+
+/-- U5b W5: a plain served result (a step-side instance). -/
+def wirePlainAnswerRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W2, W5"
+    claim :=
+      "A plain result: its type = `.plain` of its `Native.ty`; its line = `printResult` of its " ++
+        "`toVal`."
+    claims := []
+    subject := ``FvdepCore.Oracle.Wire.plainAnswer
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := ["oracle-driver"] }
+
+/-- U5b W5: an optional served result (a step-side instance). -/
+def wireOptionAnswerRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W2, W5"
+    claim :=
+      "An optional result: its type = `.option` of its `Native.ty`; `some b`'s line = " ++
+        "`printResult` of `toVal b`, `none`'s = `printNone`."
+    claims := []
+    subject := ``FvdepCore.Oracle.Wire.optionAnswer
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := ["oracle-driver"] }
+
+/-- U5b W5: a served function's result (a step-side instance). -/
+def wireResultServeRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W5"
+    claim :=
+      "A result served: no argument types, its `Answer`'s type; applied to no value = its " ++
+        "line, to any value = none."
+    claims := []
+    subject := ``FvdepCore.Oracle.Wire.resultServe
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := ["oracle-driver"] }
+
+/-- U5b W5: a served function's next argument (a step-side instance). -/
+def wireArgServeRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W5"
+    claim :=
+      "A function served: its argument's `Native.ty` before the rest's types; applied to " ++
+        "`v :: vs` = `ofVal v`, then the rest applied to `vs`; to no value = none."
+    claims := []
+    subject := ``FvdepCore.Oracle.Wire.argServe
+    path := []
+    noCaller := "step"
+    residue := []
+    unproven := ["oracle-driver"] }
 
 /-- U5b V4 + V5: the merge of refusals + the step's reply lines. -/
 def oracleMergeRow : Row :=
@@ -4138,6 +4289,9 @@ def ledger : Ledger :=
         exportReadRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
         libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
         libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
+        wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow,
+        wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow,
+        wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
         oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
         stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
         snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
@@ -4147,6 +4301,13 @@ def ledger : Ledger :=
     extraRoots :=
       [{  main := ``FvdepIO.Step.main
           interpreter := ``FvdepIO.Step.execute
-          plan := ``FvdepIO.Step.plan }] }
+          plan := ``FvdepIO.Step.plan }]
+    steps :=
+      [{  driver := ``FvdepCore.Oracle.Driver.driverText
+          embedded := ``FvdepCore.Oracle.Driver.embedded
+          calls := [``FvdepCore.Oracle.Wire.answer]
+          classes :=
+            [``FvdepCore.Oracle.Wire.Native, ``FvdepCore.Oracle.Wire.Answer,
+              ``FvdepCore.Oracle.Wire.Serve] }] }
 
 end FvdepLedger.Rows
