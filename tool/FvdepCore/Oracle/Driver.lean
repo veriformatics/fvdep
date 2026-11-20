@@ -15,9 +15,9 @@ def typesText : String := include_str ".." / "Protocol" / "Types.lean"
 /-- `FvdepCore/Oracle/Wire.lean` as fvdep was built with it. -/
 def wireText : String := include_str "Wire.lean"
 
-/-- The modules whose text the driver holds, with that text (the ledger's `StepSource` reads the
-names: the step runs `answer` + the instances among them; `lake test` compares each text with its
-file). -/
+/-- The modules whose text the driver embeds, each with its full text (the program holds it after
+its import lines; the ledger's `StepSource` reads the names; `lake test` compares each text with
+its file). -/
 def embedded : List (Lean.Name × String) :=
   [(`FvdepCore.Protocol.Types, typesText), (`FvdepCore.Oracle.Wire, wireText)]
 
@@ -35,13 +35,19 @@ def parts : Lean.Name → List String
 component stays an identifier. -/
 def quoted (n : Lean.Name) : String := ".".intercalate ((parts n).map fun c => "«" ++ c ++ "»")
 
-/-- W5: `main` = each line of `requests.txt` (cwd `/fvdep/src`) answered by `answer (@spec)`, one
+/-- W5: the program's one call (the ledger's `StepSource` reads it: the step's reach starts
+here). -/
+def call : Lean.Name := ``FvdepCore.Oracle.Wire.answer
+
+/-- W5: `main` = each line of `requests.txt` (cwd `/fvdep/src`) answered by `call (@spec)`, one
 result line each, into `/fvdep/work/out/replies.txt`. -/
 def mainText (spec : Lean.Name) : String :=
   "def main : IO Unit := do\n" ++ "  let input ← IO.FS.readFile \"requests.txt\"\n" ++
     "  let out ← IO.FS.Handle.mk \"/fvdep/work/out/replies.txt\" .write\n" ++
     "  for line in (input.splitOn \"\\n\").dropLast do\n" ++
-    "    out.putStr (FvdepCore.Oracle.Wire.answer (@" ++
+    "    out.putStr (" ++
+    quoted call ++
+    " (@" ++
     quoted spec ++
     ") line ++ \"\\n\")\n" ++
     "  out.flush\n"

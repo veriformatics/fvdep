@@ -521,13 +521,6 @@ def firstLine (source : String) (err : ByteArray) : Option String :=
   (lines.find? fun l => (trimEnd l).any fun c => !c.isWhitespace).map fun l =>
     FvdepCore.Doc.escapeControls (scrub source (trimEnd l))
 
-/-- A failed git command's reason: `what` + its first line, else its exit. -/
-def gitFailure (source what : String) (exit : Option Nat) (err : ByteArray) : String :=
-  match firstLine source err, exit with
-  | some l, _ => s!"{what}: {l}"
-  | none, some c => s!"{what}: git exited with {c}"
-  | none, none => s!"{what}: git died by a signal"
-
 /-- L2 + L5: a store fault (`infra io`, exit 2). -/
 def damaged (source why : String) : String :=
   s!"infra io: the library store of {redact source} is damaged: {why}"

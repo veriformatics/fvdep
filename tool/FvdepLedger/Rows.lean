@@ -19,6 +19,7 @@ import FvdepAudit.Manifest.Proof.Text
 import FvdepAudit.Oracle.Command.Proof.Claims
 import FvdepAudit.Oracle.Proof
 import FvdepAudit.Oracle.Resolve.Proof
+import FvdepAudit.Oracle.Wire.Serve
 import FvdepAudit.Phase.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
@@ -1831,6 +1832,58 @@ def nativeValues : Prop :=
 
 end FvdepLedger.Rows.WireClaims
 
+namespace FvdepLedger.Rows.ServeClaims
+
+open FvdepCore.Protocol FvdepCore.Oracle FvdepAudit.Oracle.Wire.Spec
+
+/-- W5 `answer`: on a line that is the W1 layout of values of `f`'s argument types, `answer f` =
+`f`'s served call on those values (`malformed` where it gives none); on any other line,
+`malformed`. -/
+def answerExact : Prop :=
+  ∀ {F : Type} [Wire.Serve F] (f : F) (line : String),
+    (∀ xs : List Val,
+        xs.map Val.ty = Wire.Serve.args F →
+          line = argsLayout xs → Wire.answer f line = (Wire.Serve.call f xs).getD "malformed") ∧
+      ((∀ xs : List Val, ¬(xs.map Val.ty = Wire.Serve.args F ∧ line = argsLayout xs)) →
+        Wire.answer f line = "malformed")
+
+/-- W5 `resultServe`: no argument types, its answer's result type; applied to no value = its line,
+to any value = none. -/
+def serveResult : Prop :=
+  ∀ {β : Type} [Wire.Answer β] (b : β) (vs : List Val) (s : String),
+    Wire.Serve.args β = [] ∧
+      Wire.Serve.rty β = Wire.Answer.rty β ∧
+      (Wire.Serve.call b vs = some s ↔ vs = [] ∧ s = Wire.Answer.line b)
+
+/-- W5 `argServe`, its argument's conversions exact: its argument's type before the rest's;
+applied to `v :: vs` = `f x` applied to `vs` exactly when `v` is `x`'s value; to no value = none. -/
+def serveArg : Prop :=
+  ∀ {α β : Type} [Wire.Native α] [Wire.Serve β],
+    (∀ (v : Val) (x : α), Wire.Native.ofVal v = some x ↔ v = Wire.Native.toVal x) →
+      ∀ (f : α → β) (v : Val) (vs : List Val) (s : String),
+        Wire.Serve.args (α → β) = Wire.Native.ty α :: Wire.Serve.args β ∧
+          Wire.Serve.rty (α → β) = Wire.Serve.rty β ∧
+          Wire.Serve.call f [] = none ∧
+          (Wire.Serve.call f (v :: vs) = some s ↔
+            ∃ x, v = Wire.Native.toVal x ∧ Wire.Serve.call (f x) vs = some s)
+
+/-- W2 + W5 `plainAnswer`: its type = `.plain` of its representation's; its line = W2's layout of
+`ok` its value. -/
+def answerPlain : Prop :=
+  ∀ {β : Type} [Wire.Native β] (b : β),
+    Wire.Answer.rty β = .plain (Wire.Native.ty β) ∧
+      Wire.Answer.line b = resultLayout (.ok (Wire.Native.toVal b))
+
+/-- W2 + W5 `optionAnswer`: its type = `.option` of its representation's; `some b`'s line = W2's
+layout of `ok` its value, `none`'s = W2's `err`. -/
+def answerOption : Prop :=
+  ∀ {β : Type} [Wire.Native β] (b : β),
+    Wire.Answer.rty (Option β) = .option (Wire.Native.ty β) ∧
+      Wire.Answer.line (some b) = resultLayout (.ok (Wire.Native.toVal b)) ∧
+      Wire.Answer.line (none : Option β) = resultLayout .err
+
+end FvdepLedger.Rows.ServeClaims
+
 namespace FvdepLedger.Rows.OracleClaims
 
 open FvdepCore.Protocol FvdepCore.Oracle FvdepAudit.Oracle.Spec FvdepAudit.Oracle.Wire.Spec
@@ -2258,9 +2311,9 @@ def residue : List Residue :=
         "the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` " ++
           "read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, " ++
           "type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the " ++
-          "spec's argument + result types, `answer` + the `Answer`/`Serve` instances (the typed " ++
-          "application through W's proved conversions), the toolchain elaborating + " ++
-          "interpreting the text (`lean --run`) inside a U5 step over the snapshot's view"
+          "spec's argument + result types (the bodies of `answer` + those instances, the " ++
+          "dictionaries supplied: `ServeClaims`), the toolchain elaborating + interpreting the " ++
+          "text (`lean --run`) inside a U5 step over the snapshot's view"
       reason :=
         "the step runs the snapshot's code under the toolchain, + fvdep owns no proof of Lean's " ++
           "elaborator or interpreter; the conversions it runs are W's proved functions, shipped " ++
@@ -3719,71 +3772,72 @@ def wireAnswerRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W5, V3"
     claim :=
-      "A request line answered by `f`: its W1 arguments read by `decodeArgs` at `f`'s " ++
-        "argument types (`Serve.args`), applied through the served instances; a line the " ++
-        "decoder or `f`'s types refuse → `malformed`, which `parseResult` never accepts."
-    claims := []
+      "A request line answered by `f` (its dictionaries supplied): a line that is the W1 " ++
+        "layout of values of `f`'s argument types (`Serve.args`) → `f`'s served call on " ++
+        "them, `malformed` where it gives none; any other line → `malformed`."
+    claims := [(``ServeClaims.answerExact, ``FvdepAudit.Oracle.Wire.Proof.answer_exact)]
     subject := ``FvdepCore.Oracle.Wire.answer
     path := []
     noCaller := "step"
-    residue := []
-    unproven := ["oracle-driver"] }
+    residue := ["oracle-driver"]
+    unproven := [] }
 
 /-- U5b W5: a plain served result (a step-side instance). -/
 def wirePlainAnswerRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W2, W5"
     claim :=
-      "A plain result: its type = `.plain` of its `Native.ty`; its line = `printResult` of its " ++
-        "`toVal`."
-    claims := []
+      "A plain result: its type = `.plain` of its representation's; its line = W2's layout " ++
+        "of `ok` its value."
+    claims := [(``ServeClaims.answerPlain, ``FvdepAudit.Oracle.Wire.Proof.answer_plain)]
     subject := ``FvdepCore.Oracle.Wire.plainAnswer
     path := []
     noCaller := "step"
-    residue := []
-    unproven := ["oracle-driver"] }
+    residue := ["oracle-driver"]
+    unproven := [] }
 
 /-- U5b W5: an optional served result (a step-side instance). -/
 def wireOptionAnswerRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W2, W5"
     claim :=
-      "An optional result: its type = `.option` of its `Native.ty`; `some b`'s line = " ++
-        "`printResult` of `toVal b`, `none`'s = `printNone`."
-    claims := []
+      "An optional result: its type = `.option` of its representation's; `some b`'s line " ++
+        "= W2's layout of `ok` its value, `none`'s = W2's `err`."
+    claims := [(``ServeClaims.answerOption, ``FvdepAudit.Oracle.Wire.Proof.answer_option)]
     subject := ``FvdepCore.Oracle.Wire.optionAnswer
     path := []
     noCaller := "step"
-    residue := []
-    unproven := ["oracle-driver"] }
+    residue := ["oracle-driver"]
+    unproven := [] }
 
 /-- U5b W5: a served function's result (a step-side instance). -/
 def wireResultServeRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W5"
     claim :=
-      "A result served: no argument types, its `Answer`'s type; applied to no value = its " ++
-        "line, to any value = none."
-    claims := []
+      "A result served: no argument types, its answer's result type; applied to no value " ++
+        "= its line, to any value = none."
+    claims := [(``ServeClaims.serveResult, ``FvdepAudit.Oracle.Wire.Proof.serve_result)]
     subject := ``FvdepCore.Oracle.Wire.resultServe
     path := []
     noCaller := "step"
-    residue := []
-    unproven := ["oracle-driver"] }
+    residue := ["oracle-driver"]
+    unproven := [] }
 
 /-- U5b W5: a served function's next argument (a step-side instance). -/
 def wireArgServeRow : Row :=
   { component := `FvdepCore.Oracle.Wire
     contract := "U5b W5"
     claim :=
-      "A function served: its argument's `Native.ty` before the rest's types; applied to " ++
-        "`v :: vs` = `ofVal v`, then the rest applied to `vs`; to no value = none."
-    claims := []
+      "A function served (its argument's conversions exact, as `nativeExact` proves for " ++
+        "W's): its argument's type before the rest's; applied to `v :: vs` = `f x` applied " ++
+        "to `vs` exactly when `v` is `x`'s value; to no value = none."
+    claims := [(``ServeClaims.serveArg, ``FvdepAudit.Oracle.Wire.Proof.serve_arg)]
     subject := ``FvdepCore.Oracle.Wire.argServe
     path := []
     noCaller := "step"
-    residue := []
-    unproven := ["oracle-driver"] }
+    residue := ["oracle-driver"]
+    unproven := [] }
 
 /-- U5b V4 + V5: the merge of refusals + the step's reply lines. -/
 def oracleMergeRow : Row :=
@@ -4305,7 +4359,7 @@ def ledger : Ledger :=
     steps :=
       [{  driver := ``FvdepCore.Oracle.Driver.driverText
           embedded := ``FvdepCore.Oracle.Driver.embedded
-          calls := [``FvdepCore.Oracle.Wire.answer]
+          call := ``FvdepCore.Oracle.Driver.call
           classes :=
             [``FvdepCore.Oracle.Wire.Native, ``FvdepCore.Oracle.Wire.Answer,
               ``FvdepCore.Oracle.Wire.Serve] }] }

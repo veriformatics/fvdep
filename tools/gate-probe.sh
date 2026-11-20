@@ -95,8 +95,16 @@ jobs=4
 results="$(mktemp -d)"
 trap 'rm -rf "$scratch"' EXIT
 n=0
+# Every line of an expectation names the planted run's cause (a combined plant: one line per check).
+names_all() {
+    local e
+    while IFS= read -r e; do
+        grep -q -F -- "$e" "$2" || return 1
+    done <<<"$1"
+}
 run_probe() {
-    local name="$1" plant="$2" expect="$3" dir pristine control planted restored t took skip
+    local name="$1" plant="$2" expect="${3//$'\n'/ + }" lines="$3" dir pristine control planted
+    local restored t took skip
     shift 3
     # Wall-clock per phase (whole seconds; this background subshell's own SECONDS).
     SECONDS=0
@@ -122,7 +130,7 @@ run_probe() {
     restored=$?
     took="${SECONDS}s (copy ${t[0]}, control $((t[1] - t[0])), planted $((t[2] - t[1])), restored $((SECONDS - t[2])))"
     if [[ $control -eq 0 && $planted -ne 0 && $restored -eq 0 ]] &&
-        grep -q -F -- "$expect" "$pristine.planted"; then
+        names_all "$lines" "$pristine.planted"; then
         printf 'PROBE %s: fired (control 0, planted %d naming "%s", restored 0) %s\n' \
             "$name" "$planted" "$expect" "$took"
     else
@@ -149,9 +157,8 @@ probe() {
 # The coverage probes (≈ 5 GiB each: the checker loads the whole environment) alternate with
 # lighter ones: four at once peak at the run's 24 GiB cap.
 first=(coverage vendor-upstream coverage-extra-reach index-replay coverage-extra-root lean-fmt
-    coverage-step-instance lean-style coverage-step-driver sys-suite coverage-step-class
-    index-registry coverage-step-nocaller fast-gate cli index-drift manifest-suite codec-suite
-    library-conformance)
+    coverage-step lean-style coverage-step-binding sys-suite index-registry fast-gate cli
+    index-drift manifest-suite codec-suite library-conformance)
 launch() {
     local i name order=() seen=" "
     for name in "${first[@]}"; do
@@ -552,39 +559,50 @@ plant_extra_reach() {
 probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
     bash -c 'source tools/gate.sh; coverage'
 
-# coverage, sandbox steps (U2 L1 + L2 + L4: a step's program = shipped source): an instance of a
-# step's class outside every row (the `Int` conversions' row dropped) → `uncovered` naming it; a
-# step's driver no root reaches → `step`; a listed class that is no class of the step's modules →
-# `step`; `noCaller "step"` on a subject outside every step's reach → `nocaller`.
+# coverage, sandbox steps (U2 L1 + L2 + L4: a step's program = shipped source), one plant per check,
+# combined into two probes (each coverage run = the checker's ≈ 5 GiB environment + the replay: one
+# probe per check took CI's lean shard past 40 min): an instance of a step's class outside every row
+# (the `Int` conversions' row dropped) → `uncovered`; a listed class that is no class of the step's
+# modules → `step`; `noCaller "step"` on a subject outside every step's reach → `nocaller`; `call` =
+# the function itself (not the driver's definition naming it) → `step`; then a driver no root
+# reaches + `embedded` of another type → `step` each (an `embedded` that does not decode leaves the
+# module checks unrun: `call` stays in the first group).
 # shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
 plant_step_instance() {
     sed -i 's/^        wireNativeIntRow, wireNativeOrderingRow,/        wireNativeOrderingRow,/' \
         tool/FvdepLedger/Rows.lean
 }
-probe coverage-step-instance plant_step_instance \
-    'uncovered: FvdepCore.Oracle.Wire.intNative: reachable' bash -c 'source tools/gate.sh; coverage'
 # shellcheck disable=SC2016
 plant_step_driver() {
     sed -i 's/^      \[{  driver := ``FvdepCore.Oracle.Driver.driverText$/      [{  driver := ``FvdepCore.Oracle.Wire.decodeArgs/' \
         tool/FvdepLedger/Rows.lean
 }
-probe coverage-step-driver plant_step_driver \
-    "FvdepCore.Oracle.Wire.decodeArgs: no root reaches the step's driver" \
-    bash -c 'source tools/gate.sh; coverage'
 # shellcheck disable=SC2016
 plant_step_class() {
     sed -i 's/^            \[``FvdepCore.Oracle.Wire.Native, /            [``FvdepCore.Protocol.Val, ``FvdepCore.Oracle.Wire.Native, /' \
         tool/FvdepLedger/Rows.lean
 }
-probe coverage-step-class plant_step_class "FvdepCore.Protocol.Val: no class of the step's modules" \
-    bash -c 'source tools/gate.sh; coverage'
 # shellcheck disable=SC2016
 plant_step_nocaller() {
     perl -0pi -e 's/(subject := ``FvdepCore\.Oracle\.Driver\.driverText\n    path := \[\]\n    noCaller := )"support"/$1"step"/' \
         tool/FvdepLedger/Rows.lean
 }
-probe coverage-step-nocaller plant_step_nocaller \
-    "step: FvdepCore.Oracle.Driver.driverText inside no step's modules" \
+
+# shellcheck disable=SC2016
+plant_step_embedded() {
+    sed -i 's/^          embedded := ``FvdepCore.Oracle.Driver.embedded$/          embedded := ``FvdepCore.Oracle.Driver.typesText/' \
+        tool/FvdepLedger/Rows.lean
+}
+# shellcheck disable=SC2016
+plant_step_call() {
+    sed -i 's/^          call := ``FvdepCore.Oracle.Driver.call$/          call := ``FvdepCore.Oracle.Wire.answer/' \
+        tool/FvdepLedger/Rows.lean
+}
+plant_step() { plant_step_instance && plant_step_class && plant_step_nocaller && plant_step_call; }
+probe coverage-step plant_step $'uncovered: FvdepCore.Oracle.Wire.intNative: reachable\nFvdepCore.Protocol.Val: no class of the step\'s modules\nstep: FvdepCore.Oracle.Driver.driverText inside no step\'s modules\nFvdepCore.Oracle.Driver.driverText never reads FvdepCore.Oracle.Wire.answer' \
+    bash -c 'source tools/gate.sh; coverage'
+plant_step_binding() { plant_step_driver && plant_step_embedded; }
+probe coverage-step-binding plant_step_binding $'FvdepCore.Oracle.Wire.decodeArgs: no root reaches the step\'s driver\nFvdepCore.Oracle.Driver.typesText: not a List (Lean.Name × String) definition' \
     bash -c 'source tools/gate.sh; coverage'
 
 # ledger-suite: a negative case whose expected rc is flipped fails the suite, named (one case).

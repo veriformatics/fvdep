@@ -9,7 +9,7 @@ paths:
 - leanOptions (both lakefiles) carry autoImplicit off, relaxedAutoImplicit off, warningAsError + the extra core linters (`linter.extra.*`, `linter.redundantVisibility`): a lint is a build error. No Mathlib/Batteries: `swap` is unknown ⇒ `case neg =>` after `by_cases`; a contradiction = `Classical.byContradiction fun bad => …`.
 - A Lake `require x` declares the name `x` ⇒ a target of that name collides; the tool's exe target is `«fvdep-cli»` with `exeName := "fvdep"`.
 - Structure literals: every field at or right of the first field's column, else `unexpected identifier; expected '}'` ⇒ one field per line after `{ x with` / `{`.
-- `section`, `scoped`, `local`, `at` = keywords: never variable/field/hypothesis names.
+- `section`, `scoped`, `local`, `at`, `export`, `partial` = keywords: never variable/field/hypothesis/constructor names.
 - `if` on a mixed Bool/Prop condition can fail Decidable synthesis ⇒ Bool operators (`&&`, `||`, `!`, `!=`); membership in a Bool context ⇒ `xs.contains x`.
 - `if` guards do not reduce reliably under `rw [if_pos]`/`split` ⇒ `rcases` the head + `cases` the stream, then `simp_all [def, Bind.bind, Except.bind]`; `if_pos`/`if_neg` are deprecated (errors here) ⇒ state the reduced form by defeq or use `ite_eq_left`/`ite_eq_right`.
 - Recursion inside a tactic proof: `match` on the decreasing argument (tactic `match`), not `rcases`/`cases`, or `termination_by` loses the equation.
@@ -28,9 +28,10 @@ paths:
 - `rw [f]` with a wildcard arm's equation leaves side goals (`… → False`) → `rw [f.eq_def]` + `split`/`dsimp only`, or `simp [f]`; mutual WF soundness = `f.mutual_induct` with `(motive1 := …) (motive2 := …)` + one `?_` per generated case.
 - The kernel from compiled code = `Lean.Kernel.check` / `Kernel.isDefEq` (synchronous, an `Except`): 4.35's `addDecl` checks asynchronously — a kernel rejection is logged, never thrown, so a `try` around it reports success.
 - `try … catch` is a do-element, never a term ⇒ a term position takes `tryCatch act handler` / `tryFinally act finalizer`; a nested `try (try … catch …) finally` misparses (`Invalid try`) ⇒ `tryFinally (inner) (finalizer)`.
-- `Except` has no `BEq` instance ⇒ compare results by `match`. 4.35's `String.startsWith` takes a pattern class ⇒ point-free `xs.any m.startsWith` fails to elaborate: `xs.any fun p => m.startsWith p`.
+- `Except` has no `BEq` instance ⇒ compare results by `match`. 4.35's `String.startsWith` takes a pattern class ⇒ point-free `xs.any m.startsWith` fails to elaborate: `xs.any fun p => m.startsWith p`. `decide` on `String.startsWith` over literals gets stuck (4.35: `String.Slice`'s memcmp) ⇒ a parser a theorem must reduce matches on the argument's shape instead.
+- `include_str` paths resolve against the including file's directory (`include_str ".." / "X.lean"`).
 - Dot notation misses a function declared on an `abbrev` when the value's type is its unfolding (`header.isModule` fails) ⇒ the full name (`Lean.Elab.HeaderSyntax.isModule header`). A fold with `(· / ·)` over `System.FilePath` fails to elaborate ⇒ `fun (d : System.FilePath) (c : String) => d / c`.
 - Gate stage `lean-style` counts every column of a line, string literals included (lean-fmt leaves a long literal whole) ⇒ split a literal past column 100 with `++`; an edit after the last fast gate → recheck the changed `.lean` files' columns before the commit (no check runs between it and the full gate + CI).
 - A mutant leaving a binder unused fails the build (`linter.unusedVariables` under `warningAsError`) before its test runs = no verdict ⇒ write the binder `_` in the mutant.
-- A name an `open` brings in can collide with a root export (`read` vs `MonadReader.read`): `simp [read]` then fails (`Ambiguous term`, `Invalid simp theorem`) ⇒ qualify it (`FvdepCore.Step.read`).
+- A name an `open` brings in can collide with a root export (`read` vs `MonadReader.read`): `simp [read]` then fails (`Ambiguous term`, `Invalid simp theorem`) ⇒ qualify it (`FvdepCore.Step.read`). A declaration of the enclosing namespace shadows an `open`ed one (`FvdepLedger.Step` hid `FvdepCore.Phase.Step` inside `FvdepLedger.Rows`) ⇒ give the new one a distinct name.
 - `split at h` on a `match` over a pair's component leaves the case equation unreduced (`(a, b).snd = x :: xs`): `rw [he]` finds no occurrence ⇒ `simp only at he`, then `subst he`.

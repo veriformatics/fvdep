@@ -41,16 +41,16 @@ structure Root where
   plan : Lean.Name
 
 /-- A sandbox step whose program fvdep ships as source: `driver` = the shipped definition that
-writes the program (a root reaches it); `embedded` = the shipped definition the driver reads the
-program's verbatim module texts from (a list literal of (module name, text) pairs; `lake test`
-holds each text = its module's file); `calls` = what the program's generated code calls;
-`classes` = the type classes whose instances the program's elaboration picks among (every instance
-of them an embedded module declares may run). Each call + class = a declaration of an embedded
-module. -/
+writes the program (a root reaches it); `embedded` = the shipped `List (Lean.Name × String)` the
+driver writes the program's module texts from (`lake test` holds each text = its module's file);
+`call` = the shipped definition naming (a name literal) the function the program's generated code
+calls, which the driver renders; `classes` = the type classes whose instances the program's
+elaboration picks among. The driver reaches `embedded` + `call`; the call + each class = a
+declaration of an embedded module. -/
 structure StepSource where
   driver : Lean.Name
   embedded : Lean.Name
-  calls : List Lean.Name
+  call : Lean.Name
   classes : List Lean.Name
 
 /-- The whole ledger: `fvdep`'s root (`main` = `interpreter` applied to `plan args`, checked by

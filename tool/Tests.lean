@@ -2901,7 +2901,10 @@ def cases : List (String × (Unit → Bool)) :=
             "import Fvdep.Semver.Version.V1_0_0\n") &&
         (d.splitOn "\nimport ").length == 2 &&
         (d.splitOn "namespace FvdepCore.Oracle.Wire").length == 2 &&
-        (d.splitOn "(@«Fvdep».«Trial».«WeightMix».«V1_0_0».«foldPulse»)").length == 2),
+        (d.splitOn
+              ("(«FvdepCore».«Oracle».«Wire».«answer» " ++
+                "(@«Fvdep».«Trial».«WeightMix».«V1_0_0».«foldPulse»)")).length ==
+          2),
     ("oracle: an unknown target, a profile, a bad index → one stderr line, exit 2, stdin unread",
       fun _ =>
       let s := snap emptyIndex

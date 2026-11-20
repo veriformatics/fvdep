@@ -121,7 +121,7 @@ def stepValue (env : Environment) (e : Expr) : Except String StepSource := do
   return {
       driver := ← name env fuel a[0]!
       embedded := ← name env fuel a[1]!
-      calls := ← list env (name env fuel) fuel a[2]!
+      call := ← name env fuel a[2]!
       classes := ← list env (name env fuel) fuel a[3]! }
 
 def ledger (env : Environment) (e : Expr) : Except String Ledger := do
@@ -136,17 +136,29 @@ def ledger (env : Environment) (e : Expr) : Except String Ledger := do
       extraRoots := ← list env (rootValue env) fuel a[6]!
       steps := ← list env (stepValue env) fuel a[7]! }
 
+/-- `List (Lean.Name × String)`: L1's embedded list type. -/
+def textList (t : Expr) : Bool :=
+  match t.consumeMData.getAppFn.constName?, t.consumeMData.getAppArgs with
+  | some ``List, #[p] =>
+    match p.getAppFn.constName?, p.getAppArgs with
+    | some ``Prod, #[a, b] => a.isConstOf ``Lean.Name && b.isConstOf ``String
+    | _, _ => false
+  | _, _ => false
+
 /-- A step's embedded modules: the names of the `embedded` definition's (module name, text) list
-literal (the texts are the driver's, compared with the files by `lake test`). -/
+literal, the definition of type `List (Lean.Name × String)` (the texts are the driver's, compared
+with the files by `lake test`). -/
 def embeddedNames (env : Environment) (n : Name) : Except String (List Name) :=
   match env.find? n with
   | some (.defnInfo d) =>
-    list env
-      (fun e =>
-        match (unfold env e).getAppFn.constName?, (unfold env e).getAppArgs with
-        | some ``Prod.mk, #[_, _, m, _] => name env fuel m
-        | _, _ => .error s!"not a (module, text) pair literal: {e}")
-      fuel d.value
+    if textList d.type then
+      list env
+        (fun e =>
+          match (unfold env e).getAppFn.constName?, (unfold env e).getAppArgs with
+          | some ``Prod.mk, #[_, _, m, _] => name env fuel m
+          | _, _ => .error s!"not a (module, text) pair literal: {e}")
+        fuel d.value
+    else .error "not a List (Lean.Name × String) definition"
   | _ => .error "not a definition"
 
 /-- Every shipped executable's root: `fvdep`'s first, then the ledger's extra roots. -/
@@ -296,7 +308,12 @@ def findings (env : Environment) (l : Ledger) (spec : String) (axioms : NameMap 
                     stepEntries := stepEntries.push n
             else
               out := out.push ⟨root, "step", s!"{m}: not an owned module"⟩
-        for c in st.calls do
+        unless (closure env [st.driver]).contains st.call do
+          out := out.push ⟨root, "step", s!"{st.driver} never reads {st.call}"⟩
+        match name env fuel (.const st.call []) with
+        | .error e =>
+          out := out.push ⟨root, "step", s!"{st.call}: {e}"⟩
+        | .ok c =>
           if inStep c && env.find? c matches some (.defnInfo _) then
             stepEntries := stepEntries.push c
           else
@@ -489,8 +506,12 @@ def render (env : Environment) (l : Ledger) (decl : Name) : IO String := do
             match embeddedNames env st.embedded with
             | .ok ms => ", ".intercalate (ms.map code)
             | .error e => e
-          s!"Step: {code st.driver} writes a sandbox step's program, holding verbatim the " ++
-            s!"text of {ms} ({code st.embedded}).\n")
+          let c :=
+            match name env fuel (.const st.call []) with
+            | .ok c => code c
+            | .error e => e
+          s!"Step: {code st.driver} writes a sandbox step's program from the texts of {ms} " ++
+            s!"({code st.embedded}; their import lines dropped), calling {c} ({code st.call}).\n")
   for r in l.rows do
     out :=
       out ++ s!"\n## {code r.component}\n\n- Contract: {r.contract}\n- Claim: {r.claim}\n" ++

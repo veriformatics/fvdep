@@ -369,7 +369,8 @@ index() {
 index_history() { "$root/tool/.lake/build/bin/fvdep-dev" index history "$root"; }
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.
-probes() { bash tools/gate-probe.sh && python3 tools/test-vflab-identity.py; }
+# The full stage runs every probe: an inherited FVDEP_PROBE (a narrowing rehearsal's) is cleared.
+probes() { env -u FVDEP_PROBE bash tools/gate-probe.sh && python3 tools/test-vflab-identity.py; }
 
 # Library modules import Init, Std + the library; tool modules add Lean, Lake + the tool's libs.
 imports() { bash tools/check-imports.sh imports; }
