@@ -128,7 +128,11 @@ lean_exe «fvdep-tests» where root := `Tests
 real syscalls through it; never shipped (`Main` imports none of it; gate stage `imports`). -/
 lean_lib FvdepDev where roots := #[`FvdepDev, `DevMain]
 
-lean_exe «fvdep-dev» where root := `DevMain
+/-- `supportInterpreter`: `fvdep-dev profile` loads the toolchain's parser extensions
+(`importModules (loadExts := true)` runs their compiled code through the interpreter). -/
+lean_exe «fvdep-dev» where
+  root := `DevMain
+  supportInterpreter := true
 
 /-- The step helper (contract U5 R8): pid 2 of every sandbox step, located beside the executable
 that runs the step; `StepMain.main` = `FvdepIO.Step.main`. Every script that runs a step builds it
