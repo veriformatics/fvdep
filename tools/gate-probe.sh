@@ -113,7 +113,10 @@ run_probe() {
     (cd -- "$dir" && "$@") >"$pristine.planted" 2>&1
     planted=$?
     t+=("$SECONDS")
-    rsync -a --delete "${skip[@]}" "$pristine/" "$dir/"
+    # --ignore-times: rsync's quick check (size + mtime) keeps a planted file of the pristine size
+    # written in the same second (a planted branch ref: the restored HEAD then named a deleted
+    # commit), so every file is rewritten.
+    rsync -a --delete --ignore-times "${skip[@]}" "$pristine/" "$dir/"
     take "$dir"
     (cd -- "$dir" && "$@") >"$pristine.restored" 2>&1
     restored=$?
@@ -127,6 +130,7 @@ run_probe() {
             "$name" "$control" "$planted" "$restored" "$expect" "$took"
         sed 's/^/    control: /' "$pristine.control" | tail -n 10
         sed 's/^/    planted: /' "$pristine.planted" | tail -n 20
+        sed 's/^/    restored: /' "$pristine.restored" | tail -n 10
     fi
     rm -rf -- "$dir" "$pristine" "$pristine".{control,planted,restored}
 }

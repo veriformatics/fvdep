@@ -2243,7 +2243,7 @@ def sha256DigestRow : Row :=
     claims := []
     subject := ``FvdepIO.Hash.digest
     path := []
-    noCaller := "U5"
+    noCaller := "U8"
     residue := ["runtime"]
     unproven := ["hacl-sha256"] }
 

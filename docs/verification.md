@@ -1132,7 +1132,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 S1–S4 + H3
 - Claim: `digest t files` = lowercase hex of SHA-256 over `frame t.spelling files`; SHA-256 = HACL*'s verified C behind the FFI (tested residue `hacl-sha256`; `digest` itself: S5's blind suite, stage `codec-suite`, against an independent frame encoder). Its hash step `sha256Hex` = `fvdep index`'s (`Cli.sha` over `entryFrame` = `digest .entry` of the closure files, by `rfl` in `tool/Tests.lean`).
 - Subject: `FvdepIO.Hash.digest`
-- Path: none yet (wired by U5)
+- Path: none yet (wired by U8)
 - Uninterpreted: `FvdepIO.Hash.sha256`
 - Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`))
