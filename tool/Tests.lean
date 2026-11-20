@@ -2347,6 +2347,177 @@ def cases : List (String × (Unit → Bool)) :=
 
 end ExportR
 
+namespace LibraryT
+
+open FvdepCore.Library FvdepCore.Project
+
+/-- `n` pseudo-random tokens over `alphabet`, each 1–8 characters (an LCG over `seed`). -/
+def tokens (seed : UInt64) (n : Nat) (alphabet : List Char) : List String :=
+  Id.run do
+    let mut s := seed
+    let mut out := #[]
+    for _ in [0:n] do
+      s := s * 6364136223846793005 + 1442695040888963407
+      let len := (s >>> 33).toNat % 8 + 1
+      let mut t := ""
+      for _ in [0:len] do
+        s := s * 6364136223846793005 + 1442695040888963407
+        t := t.push (alphabet.getD ((s >>> 33).toNat % alphabet.length) 'x')
+      out := out.push t
+    return out.toList
+
+def oidA : String := "8a86ca5622e1112a7e5df7e2d2e6dd63516d5640"
+
+def oidB : String := "9e5aa9c65f9cbe28045f10463d324ee242412242"
+
+/-- One `ls-tree -z -l` record as git 2.53 prints it (`%06o %s %s %7s\t%s\0`). -/
+def rec (mode kind oid size path : String) : String :=
+  mode ++ " " ++ kind ++ " " ++ oid ++ " " ++
+    String.ofList (List.replicate (7 - size.length) ' ') ++
+    size ++
+    "\t" ++
+    path ++
+    "\x00"
+
+def blob (path : String) (n : Nat := 3) : String := rec "100644" "blob" oidA (toString n) path
+
+def dir (path : String) : String := rec "040000" "tree" oidB "-" path
+
+/-- A minimal library listing: its required files + one module under `Fvdep`. -/
+def library : List String :=
+  [blob "Fvdep.lean", dir "Fvdep", blob "Fvdep/Registry.lean", blob "index.json",
+    blob "lakefile.lean", blob "lean-toolchain"]
+
+def tree (rs : List String) : Option (List TreeEntry) := parseTree (String.join rs).toUTF8
+
+def plan (rs : List String) : Option (Except String (List Blob)) := (tree rs).map (planTree {})
+
+def refused (r : Option (Except String (List Blob))) (needle : String) : Bool :=
+  match r with
+  | some (.error why) => (why.splitOn needle).length > 1
+  | _ => false
+
+def head : Head := ⟨oidA, "2026-11-20T08:00:00Z", String.ofList (List.replicate 64 'a')⟩
+
+def cases (seed : UInt64) : List (String × (Unit → Bool)) :=
+  [("library: the source — FVDEP_LIBRARY_URL unset or empty = the default", fun _ =>
+      sourceOf none == defaultSource && sourceOf (some "") == defaultSource &&
+        sourceOf (some "/srv/lib") == "/srv/lib"),
+    ("library: git's URL rule + anchoring (a URL as written, a local path made absolute)", fun _ =>
+      isUrl "https://h/p" && isUrl "file:///srv/lib" && isUrl "git@h:p" && !isUrl "/srv/lib" &&
+        !isUrl "rel/lib" &&
+        !isUrl "./a:b" &&
+        anchor "/w" "rel" == "/w/rel" &&
+        anchor "/" "rel" == "/rel" &&
+        anchor "/w" "/abs" == "/abs" &&
+        anchor "/w" "https://h/p" == "https://h/p" &&
+        anchor "/w" "h:p" == "h:p"),
+    ("library: redaction — userinfo → ***, a local path unchanged", fun _ =>
+      redact ("https://u:" ++ "pw@h/p") == "https://***@h/p" &&
+        redact "https://h/p" == "https://h/p" &&
+        redact "ssh://u@h:22/p" == "ssh://***@h:22/p" &&
+        redact "u@h:p" == "***@h:p" &&
+        redact "/srv/a@b" == "/srv/a@b" &&
+        redact ("https://u:" ++ "p@x@h/p") == "https://***@h/p" &&
+        redact "https://h/a@b" == "https://h/a@b"),
+    (s!"library: redaction — 150 generated credentials never reach the text", fun _ =>
+      let alpha := "abcXYZ019-_.~!$&'()*+,;=%".toList
+      (tokens seed 150 alpha).zip (tokens (seed + 1) 150 alpha) |>.all fun (u, pw) =>
+        let r := redact ("https://" ++ u ++ ":" ++ pw ++ "secret" ++ "@host/path")
+        r == "https://***@host/path" && (r.splitOn "secret").length == 1),
+    ("library: head.json round trip; a changed byte, other spacing or schema = damaged", fun _ =>
+      let b := headText head
+      headOf b == some head && headOf ((b.toList.set 2 32).toByteArray) == none &&
+        headOf (("{ " ++ String.fromUTF8! (b.extract 1 b.size)).toUTF8) == none &&
+        headOf ((String.fromUTF8! b).replace "\"schema\":1" "\"schema\":2").toUTF8 == none &&
+        headOf (headText { head with commit := oidA.toUpper }) == none &&
+        headOf (headText { head with fetched := "2026-13-01T00:00:00Z" }) == none &&
+        headOf (headText { head with source := String.ofList (List.replicate 63 'a') }) == none),
+    ("library: ls-tree records read exactly (sizes, -, paths with TAB + LF)", fun _ =>
+      match tree [blob "a\tb\nc" 103, dir "Fvdep"] with
+      | some [x, y] =>
+        x.kind == .blob && x.size == some 103 && x.path == "a\tb\nc" && y.kind == .tree &&
+          y.size == none &&
+          y.path == "Fvdep"
+      | _ => false),
+    ("library: ls-tree refusals — unterminated, padding, uppercase hex, a tree's size", fun _ =>
+      (parseTree ((blob "a").toUTF8.extract 0 ((blob "a").utf8ByteSize - 1))).isNone &&
+        (tree [(blob "a").replace "      3" "     3"]).isNone &&
+        (tree [rec "100644" "blob" oidA.toUpper "3" "a"]).isNone &&
+        (tree [rec "040000" "tree" oidB "5" "Fvdep"]).isNone &&
+        tree [] == some []),
+    ("library: the tree policy plans a library's blobs in listing order", fun _ =>
+      match plan library with
+      | some (.ok bs) =>
+        bs.map (·.path) ==
+          ["Fvdep.lean", "Fvdep/Registry.lean", "index.json", "lakefile.lean", "lean-toolchain"]
+      | _ => false),
+    ("library: the tree policy refuses a link, a submodule, a dot path, a misplaced root", fun _ =>
+      refused (plan (library ++ [rec "120000" "blob" oidA "4" "Fvdep/l"])) "a link" &&
+        refused (plan (library ++ [rec "160000" "commit" oidA "-" "Fvdep/s"])) "a submodule" &&
+        refused (plan (library ++ [blob "Fvdep/.hidden"])) "unsafe path" &&
+        refused (plan (library ++ [dir "index.json"])) "unexpected entry" &&
+        refused (plan (library ++ [blob "README.md"])) "unexpected entry" &&
+        refused (plan (library ++ [rec "100600" "blob" oidA "1" "Fvdep/m"])) "mode 100600"),
+    ("library: the tree policy — a missing required file, the per-file cap", fun _ =>
+      refused (plan (library.filter (· != blob "Fvdep/Registry.lean"))) "no fvdep library" &&
+        refused (plan (library ++ [blob "Fvdep/big.lean" 1048577])) "size limits" &&
+        refused ((tree library).map (planTree { entries := 3 })) "limit of 3 tree entries" &&
+        refused ((tree library).map (planTree { depth := 1 })) "deeper than 1 components" &&
+        refused ((tree library).map (planTree { pathBytes := 12 })) "over 12 bytes" &&
+        refused ((tree library).map (planTree { pathTotal := 20 })) "limit of 20 path bytes"),
+    ("library: batch replies read in plan order; a missing object or extra byte refuses", fun _ =>
+      let x : Blob := ⟨"a", oidA.toUTF8.toList, 2⟩
+      let y : Blob := ⟨"b", oidB.toUTF8.toList, 0⟩
+      let reply := s!"{oidA} blob 2\x00hi\x00{oidB} blob 0\x00\x00"
+      parseBatch [x, y] reply.toUTF8 == some ["hi".toUTF8, ByteArray.empty] &&
+        (parseBatch [x, y] (reply ++ "x").toUTF8).isNone &&
+        (parseBatch [x] s!"{oidA} missing\x00".toUTF8).isNone),
+    ("library: toolchain — equal after trimming, else the interface §1 refusal", fun _ =>
+      toolchainRefusal oidA "leanprover/lean4:v4.35.0\n" "leanprover/lean4:v4.35.0" == none &&
+        match toolchainRefusal oidA "leanprover/lean4:v4.36.0" "leanprover/lean4:v4.35.0" with
+        | some m => m.startsWith s!"Library commit {oidA} uses Lean leanprover/lean4:v4.36.0;"
+        | none => false),
+    ("library: selection — pin never falls back; the head falls back on transport alone", fun _ =>
+      start (some oidA) true == .serve oidA && start (some oidA) false == .fetchPin oidA &&
+        start none true == .fetchHead &&
+        afterPin oidA (.transport "down") == .refuse "Fetch failed: down." &&
+        afterHead (.valid head) (.transport "down") ==
+          .serve oidA (some "Fetch failed: down. Last successful fetch: 2026-11-20T08:00:00Z.") &&
+        afterHead .absent (.transport "down") ==
+          .refuse "Fetch failed: down. Last successful fetch: never." &&
+        afterHead (.valid head) (.received "fsck") == .refuse "Fetch failed: fsck." &&
+        afterHead (.valid head) (.ok oidB) == .serve oidB none),
+    ("project: --project decides alone; the nearest manifest decides; links never followed",
+      fun _ =>
+      selectProject (.explicit "/p" .file) == .project "/p" &&
+        (match selectProject (.explicit "/p" .link) with
+        | .refuse r => (r.splitOn "link").length > 1 && (r.splitOn "fvdep.toml").length > 1
+        | _ => false) &&
+        selectProject (.ancestors [("/a/b", .absent), ("/a", .file), ("/", .file)]) ==
+          .project "/a" &&
+        (match selectProject (.ancestors [("/a/b", .absent), ("/a", .special), ("/", .file)]) with
+        | .refuse r => (r.splitOn "special").length > 1
+        | _ => false) &&
+        selectProject (.ancestors [("/a", .absent)]) == .none)]
+
+/-- The committed `git-tree` seed (byte 0 = the fuzz mode) = git 2.53.0's real `ls-tree -r -t -l -z
+--full-tree` output of this repository's library paths. -/
+def ioCases : List (String × IO Bool) :=
+  [("library: git 2.53.0's real listing of the library reads + plans (82 entries, 40 blobs)", do
+      let b ← IO.FS.readBinFile "../tests/fuzz/git-tree/library-listing"
+      match parseTree (b.extract 1 b.size) with
+      | some es =>
+        match planTree {} es with
+        | .ok bs =>
+          return es.length == 82 && bs.length == 40
+        | .error _ =>
+          return false
+      | none =>
+        return false)]
+
+end LibraryT
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -2391,12 +2562,14 @@ def main : IO UInt32 := do
                   Cache.cases ++
                   Snapshot.cases ++
                   PhaseD.cases ++
-                  ExportR.cases).map
+                  ExportR.cases ++
+                  LibraryT.cases seed).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
     (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases ++
-            PhaseIO.ioCases).mapM
+            PhaseIO.ioCases ++
+            LibraryT.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩

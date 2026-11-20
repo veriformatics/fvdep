@@ -22,6 +22,7 @@ root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "$root"
 
 TARGETS=(json-decode lock-decode unframe manifest-decode protocol-request index-decode export-decode
+    git-tree git-batch
     sha256 sys-actions)
 
 die() {
@@ -48,6 +49,8 @@ lean_target() {
     protocol-request) echo "FvdepFuzz.Protocol fvdep_fuzz_protocol 0" ;;
     index-decode) echo "FvdepFuzz.Index fvdep_fuzz_index 0" ;;
     export-decode) echo "FvdepFuzz.Export fvdep_fuzz_export 0" ;;
+    git-tree) echo "FvdepFuzz.Library fvdep_fuzz_git_tree 0" ;;
+    git-batch) echo "FvdepFuzz.Library fvdep_fuzz_git_batch 0" ;;
     *) return 1 ;;
     esac
 }

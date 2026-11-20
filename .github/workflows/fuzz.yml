@@ -33,6 +33,8 @@ jobs:
           - protocol-request
           - index-decode
           - export-decode
+          - git-tree
+          - git-batch
           - sha256
           - sys-actions
     runs-on: ubuntu-26.04

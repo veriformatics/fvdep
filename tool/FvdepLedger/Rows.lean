@@ -11,6 +11,8 @@ import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
+import FvdepAudit.Library.Proof.Batch
+import FvdepAudit.Library.Proof.Plan
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
@@ -1644,6 +1646,67 @@ def readFirst : Prop :=
 
 end FvdepLedger.Rows.ExportClaims
 
+namespace FvdepLedger.Rows.LibraryClaims
+
+open FvdepCore.Json FvdepCore.Library FvdepCore.Project FvdepAudit.Library.Spec
+
+/-- P3: the project choice (refusal text erased) = the table: `--project` decides alone, else the
+nearest candidate holding a manifest, else none. -/
+def selectProjectExact : Prop :=
+  ∀ (s : Seen) (p : Pick), pick (selectProject s) = p ↔ ProjectSpec s p
+
+/-- L6 before a fetch: a published pin is served; an unpublished pin is fetched; no project fetches
+the head. -/
+def startExact : Prop :=
+  ∀ (pin : Option String) (published : Bool) (s : Start),
+    start pin published = s ↔ StartSpec pin published s
+
+/-- L6 after a pin fetch: its tree, or a refusal on any failure (a pin never falls back). -/
+def pinExact : Prop :=
+  ∀ (pin : String) (f : Fetch) (v : Verdict), verdict (afterPin pin f) = v ↔ PinSpec pin f v
+
+/-- L6 after a head fetch: its tree; a transport failure serves the last fetched head with a
+notice (no record or a damaged one refuses); every other failure refuses. -/
+def headSelectExact : Prop :=
+  ∀ (s : HeadState) (f : Fetch) (v : Verdict), verdict (afterHead s f) = v ↔ HeadSpec s f v
+
+/-- L1: the key = `h` of exactly the anchored spelling's UTF-8 bytes, and unequal spellings have
+unequal bytes: a shared key on unequal sources = a collision of `h` (SHA-256 in IO) on two named
+inputs; no injectivity premise (SHA-256 is not injective). -/
+def sourceKeyExact : Prop :=
+  ∀ (h : ByteArray → String) (s t : String),
+    sourceKey h s = h s.toUTF8 ∧ (s ≠ t → s.toUTF8 ≠ t.toUTF8)
+
+/-- L7: the served tree passes exactly when its trimmed `lean-toolchain` equals fvdep's. -/
+def toolchainExact : Prop :=
+  ∀ (commit theirs ours : String),
+    toolchainRefusal commit theirs ours = none ↔ FvdepCore.Index.Assemble.trimText theirs = ours
+
+/-- L5: `headOf` reads back exactly the well-formed records' `head.json` bytes. -/
+def headExact : Prop := ∀ (b : ByteArray) (h : Head), headOf b = some h ↔ HeadWF h ∧ b = headBytes h
+
+/-- L4: `planTree` accepts exactly the listings the policy allows; its plan = their blobs in
+listing order. -/
+def planTreeExact : Prop :=
+  ∀ (caps : Caps) (es : List TreeEntry) (bs : List Blob),
+    planTree caps es = .ok bs ↔ Policy caps es ∧ bs = blobsOf es
+
+/-- L4: `parseTree` accepts exactly the NUL-terminated `ls-tree -z -l` layouts of well-formed
+entries + returns them in order. -/
+def treeExact : Prop :=
+  ∀ (b : ByteArray) (es : List TreeEntry),
+    parseTree b = some es ↔ b.data.toList = listing es ∧ ∀ e ∈ es, EntryWF e
+
+/-- L4: `parseBatch` accepts exactly the `cat-file --batch -Z` replies to the planned blobs +
+returns their contents in plan order. -/
+def batchExact : Prop :=
+  ∀ (plan : List Blob) (b : ByteArray) (cs : List ByteArray),
+    parseBatch plan b = some cs ↔
+      cs.length = plan.length ∧
+        (∀ p ∈ plan.zip cs, p.2.size = p.1.size) ∧ b.data.toList = batchLayout plan cs
+
+end FvdepLedger.Rows.LibraryClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -3076,6 +3139,128 @@ def exportReadRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5b P3: project selection (U8 reuses it). -/
+def projectSelectRow : Row :=
+  { component := `FvdepCore.Project
+    contract := "U5b P1–P3"
+    claim :=
+      "`selectProject`: `--project` decides alone, else the nearest candidate holding a " ++
+        "manifest."
+    claims := [(``LibraryClaims.selectProjectExact, ``FvdepAudit.Library.Proof.selectProject_exact)]
+    subject := ``FvdepCore.Project.selectProject
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L1: a library source's key. -/
+def librarySourceRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L1"
+    claim := "`sourceKey`: `h` over exactly the anchored spelling's bytes; unequal ones differ."
+    claims := [(``LibraryClaims.sourceKeyExact, ``FvdepAudit.Library.Proof.sourceKey_exact)]
+    subject := ``FvdepCore.Library.sourceKey
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L4: git's `ls-tree -z -l` records. -/
+def libraryTreeRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L4"
+    claim := "`parseTree`: exactly the NUL-terminated record layouts of well-formed entries."
+    claims := [(``LibraryClaims.treeExact, ``FvdepAudit.Library.Proof.parseTree_exact)]
+    subject := ``FvdepCore.Library.parseTree
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L4: the tree policy. -/
+def libraryPlanRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L4"
+    claim := "`planTree`: the policy's listings alone; the plan = their blobs in listing order."
+    claims := [(``LibraryClaims.planTreeExact, ``FvdepAudit.Library.Proof.planTree_exact)]
+    subject := ``FvdepCore.Library.planTree
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L4: git's `cat-file --batch -Z` replies. -/
+def libraryBatchRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L4"
+    claim := "`parseBatch`: exactly the replies to the planned blobs, contents in plan order."
+    claims := [(``LibraryClaims.batchExact, ``FvdepAudit.Library.Proof.parseBatch_exact)]
+    subject := ``FvdepCore.Library.parseBatch
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L5: the head record. -/
+def libraryHeadRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L5"
+    claim := "`headOf`: exactly the well-formed records' `head.json` bytes (`headText`)."
+    claims := [(``LibraryClaims.headExact, ``FvdepAudit.Library.Proof.head_exact)]
+    subject := ``FvdepCore.Library.headOf
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L6: the selection before + after a fetch. -/
+def libraryStartRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L6"
+    claim := "`start`: a published pin served, else the pin's or the head's fetch."
+    claims := [(``LibraryClaims.startExact, ``FvdepAudit.Library.Proof.start_exact)]
+    subject := ``FvdepCore.Library.start
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+def libraryPinRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L6"
+    claim := "`afterPin`: the pin's tree, or a refusal (no fallback)."
+    claims := [(``LibraryClaims.pinExact, ``FvdepAudit.Library.Proof.afterPin_exact)]
+    subject := ``FvdepCore.Library.afterPin
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+def libraryHeadSelectRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L6"
+    claim :=
+      "`afterHead`: the head's tree; a transport failure → the last head + a notice; else " ++
+        "refused."
+    claims := [(``LibraryClaims.headSelectExact, ``FvdepAudit.Library.Proof.afterHead_exact)]
+    subject := ``FvdepCore.Library.afterHead
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b L7: the served tree's toolchain. -/
+def libraryToolchainRow : Row :=
+  { component := `FvdepCore.Library
+    contract := "U5b L7"
+    claim := "`toolchainRefusal`: none exactly when the trimmed `lean-toolchain` equals fvdep's."
+    claims := [(``LibraryClaims.toolchainExact, ``FvdepAudit.Library.Proof.toolchain_exact)]
+    subject := ``FvdepCore.Library.toolchainRefusal
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
 /-- U5 R8: the supervisor's reading of the step helper's frame (the encoder: `stepFrameOfRow`). -/
 def stepFrameRow : Row :=
   { component := `FvdepCore.Step
@@ -3301,7 +3486,9 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
-        exportReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
+        exportReadRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
+        libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
+        libraryToolchainRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
         runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
         bundleWriteRow]
     residue := residue

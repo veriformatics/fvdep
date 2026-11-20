@@ -2710,6 +2710,179 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Project`
+
+- Contract: U5b P1–P3
+- Claim: `selectProject`: `--project` decides alone, else the nearest candidate holding a manifest.
+- Subject: `FvdepCore.Project.selectProject`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.selectProjectExact` (hash 0x5a7a30ab), proved by `FvdepAudit.Library.Proof.selectProject_exact`:
+
+  ```lean
+  ∀ (s : FvdepCore.Project.Seen) (p : FvdepAudit.Library.Spec.Pick),
+    FvdepAudit.Library.Spec.pick (FvdepCore.Project.selectProject s) = p ↔
+      FvdepAudit.Library.Spec.ProjectSpec s p
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L1
+- Claim: `sourceKey`: `h` over exactly the anchored spelling's bytes; unequal ones differ.
+- Subject: `FvdepCore.Library.sourceKey`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.sourceKeyExact` (hash 0x54092de8), proved by `FvdepAudit.Library.Proof.sourceKey_exact`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (s t : String),
+    FvdepCore.Library.sourceKey h s = h s.toUTF8 ∧ (s ≠ t → s.toUTF8 ≠ t.toUTF8)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L4
+- Claim: `parseTree`: exactly the NUL-terminated record layouts of well-formed entries.
+- Subject: `FvdepCore.Library.parseTree`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.treeExact` (hash 0xe9d1858b), proved by `FvdepAudit.Library.Proof.parseTree_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (es : List FvdepCore.Library.TreeEntry),
+    FvdepCore.Library.parseTree b = some es ↔
+      b.data.toList = FvdepAudit.Library.Spec.listing es ∧
+        ∀ (e : FvdepCore.Library.TreeEntry), e ∈ es → FvdepAudit.Library.Spec.EntryWF e
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L4
+- Claim: `planTree`: the policy's listings alone; the plan = their blobs in listing order.
+- Subject: `FvdepCore.Library.planTree`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.planTreeExact` (hash 0xb7f38b58), proved by `FvdepAudit.Library.Proof.planTree_exact`:
+
+  ```lean
+  ∀ (caps : FvdepCore.Library.Caps) (es : List FvdepCore.Library.TreeEntry)
+    (bs : List FvdepCore.Library.Blob),
+    FvdepCore.Library.planTree caps es = Except.ok bs ↔
+      FvdepAudit.Library.Spec.Policy caps es ∧ bs = FvdepAudit.Library.Spec.blobsOf es
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L4
+- Claim: `parseBatch`: exactly the replies to the planned blobs, contents in plan order.
+- Subject: `FvdepCore.Library.parseBatch`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.batchExact` (hash 0xff84ff98), proved by `FvdepAudit.Library.Proof.parseBatch_exact`:
+
+  ```lean
+  ∀ (plan : List FvdepCore.Library.Blob) (b : ByteArray) (cs : List ByteArray),
+    FvdepCore.Library.parseBatch plan b = some cs ↔
+      cs.length = plan.length ∧
+        (∀ (p : FvdepCore.Library.Blob × ByteArray), p ∈ plan.zip cs → p.snd.size = p.fst.size) ∧
+          b.data.toList = FvdepAudit.Library.Spec.batchLayout plan cs
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L5
+- Claim: `headOf`: exactly the well-formed records' `head.json` bytes (`headText`).
+- Subject: `FvdepCore.Library.headOf`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.headExact` (hash 0x14ba0350), proved by `FvdepAudit.Library.Proof.head_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (h : FvdepCore.Library.Head),
+    FvdepCore.Library.headOf b = some h ↔
+      FvdepAudit.Library.Spec.HeadWF h ∧ b = FvdepAudit.Library.Spec.headBytes h
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L6
+- Claim: `start`: a published pin served, else the pin's or the head's fetch.
+- Subject: `FvdepCore.Library.start`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.startExact` (hash 0xc54571c2), proved by `FvdepAudit.Library.Proof.start_exact`:
+
+  ```lean
+  ∀ (pin : Option String) (published : Bool) (s : FvdepCore.Library.Start),
+    FvdepCore.Library.start pin published = s ↔ FvdepAudit.Library.Spec.StartSpec pin published s
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L6
+- Claim: `afterPin`: the pin's tree, or a refusal (no fallback).
+- Subject: `FvdepCore.Library.afterPin`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.pinExact` (hash 0x68f3add1), proved by `FvdepAudit.Library.Proof.afterPin_exact`:
+
+  ```lean
+  ∀ (pin : String) (f : FvdepCore.Library.Fetch) (v : FvdepAudit.Library.Spec.Verdict),
+    FvdepAudit.Library.Spec.verdict (FvdepCore.Library.afterPin pin f) = v ↔
+      FvdepAudit.Library.Spec.PinSpec pin f v
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L6
+- Claim: `afterHead`: the head's tree; a transport failure → the last head + a notice; else refused.
+- Subject: `FvdepCore.Library.afterHead`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.headSelectExact` (hash 0xcd88be8f), proved by `FvdepAudit.Library.Proof.afterHead_exact`:
+
+  ```lean
+  ∀ (s : FvdepCore.Library.HeadState) (f : FvdepCore.Library.Fetch)
+    (v : FvdepAudit.Library.Spec.Verdict),
+    FvdepAudit.Library.Spec.verdict (FvdepCore.Library.afterHead s f) = v ↔
+      FvdepAudit.Library.Spec.HeadSpec s f v
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Library`
+
+- Contract: U5b L7
+- Claim: `toolchainRefusal`: none exactly when the trimmed `lean-toolchain` equals fvdep's.
+- Subject: `FvdepCore.Library.toolchainRefusal`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.LibraryClaims.toolchainExact` (hash 0x20fb9f7d), proved by `FvdepAudit.Library.Proof.toolchain_exact`:
+
+  ```lean
+  ∀ (commit theirs ours : String),
+    FvdepCore.Library.toolchainRefusal commit theirs ours = none ↔
+      FvdepCore.Index.Assemble.trimText theirs = ours
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Step`
 
 - Contract: U5 R8
