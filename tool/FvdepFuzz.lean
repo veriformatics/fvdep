@@ -5,4 +5,5 @@ import FvdepFuzz.Json
 import FvdepFuzz.Library
 import FvdepFuzz.Lock
 import FvdepFuzz.Manifest
+import FvdepFuzz.Oracle
 import FvdepFuzz.Protocol

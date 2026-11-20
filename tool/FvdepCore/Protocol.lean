@@ -1,7 +1,7 @@
-import Fvdep.Semver.Version.V1_0_0
 import FvdepCore.Hash.Frame
 import FvdepCore.Ids
 import FvdepCore.Json
+import FvdepCore.Protocol.Types
 
 /-! Adapter protocol v1 (`docs/interface.md` §8), the oracle side (contract
 `docs/contracts/U4-library.md` B): typed values, request lines, replies, line framing. Requests ride
@@ -11,56 +11,11 @@ namespace FvdepCore.Protocol
 
 open Fvdep.Semver.Version.V1_0_0
 
-/-- §8's value types. -/
-inductive Ty where
-  | bytes
-  | text
-  | utf16
-  | nat
-  | int
-  | ordering
-  | version
-  deriving DecidableEq, Repr
-
-/-- A result type: a value, or an optional value (`none` = the reply `err`). -/
-inductive RTy where
-  | plain (t : Ty)
-  | option (t : Ty)
-  deriving DecidableEq, Repr
-
-/-- A typed value. -/
-inductive Val where
-  | bytes (b : List UInt8)
-  | text (s : List Char)
-  | utf16 (u : List UInt16)
-  | nat (n : Nat)
-  | int (i : Int)
-  | ordering (o : Ordering)
-  | version (v : Version)
-  deriving DecidableEq, Repr
-
-/-- A value's type (`HasTy x t` ⟺ `x.ty = t`). -/
-def Val.ty : Val → Ty
-  | .bytes _ => .bytes
-  | .text _ => .text
-  | .utf16 _ => .utf16
-  | .nat _ => .nat
-  | .int _ => .int
-  | .ordering _ => .ordering
-  | .version _ => .version
-
 /-- An operation: its name, argument types (at least one) + result type. -/
 structure Sig where
   op : String
   args : List Ty
   result : RTy
-  deriving DecidableEq, Repr
-
-/-- A reply: a result, an optional result's `none` (wire `{"err":"none"}`), or a refused request. -/
-inductive Reply where
-  | ok (v : Val)
-  | err
-  | invalid (reason : String)
   deriving DecidableEq, Repr
 
 /-! ## Values (§8) -/

@@ -1,4 +1,5 @@
 import FvdepCore
+import FvdepCore.Oracle
 import FvdepIO.Library
 import FvdepIO.Phase
 import FvdepIO.Project
@@ -2520,6 +2521,197 @@ def ioCases : List (String × IO Bool) :=
 
 end LibraryT
 
+/-! ## U5b W: the internal wire codec -/
+
+namespace WireT
+
+open FvdepCore.Protocol FvdepCore.Oracle.Wire Fvdep.Semver.Version.V1_0_0
+
+/-- An LCG step: the next state + a draw below `m` (`m ≥ 1`). -/
+def draw (s : UInt64) (m : Nat) : UInt64 × Nat :=
+  let s := s * 6364136223846793005 + 1442695040888963407
+  (s, (s >>> 33).toNat % m)
+
+/-- `n` draws below `m`. -/
+def draws (s : UInt64) (n m : Nat) : UInt64 × List Nat :=
+  n.fold
+    (fun _ _ (acc : UInt64 × List Nat) =>
+      let (s', d) := draw acc.1 m
+      (s', d :: acc.2))
+    (s, [])
+
+/-- Characters across UTF-8's 1–4 byte forms + the line's separators. -/
+def chars : List Char := ['a', 'Z', '0', ' ', ':', '/', '.', '-', '\n', 'é', '中', '😀', '\x00']
+
+def charsOf (s : UInt64) (n : Nat) : UInt64 × List Char :=
+  let (s, ds) := draws s n chars.length
+  (s, ds.map fun d => chars.getD d 'a')
+
+/-- A generated value of type `t` (atypical shapes included: empty lists + identifiers, 0, a
+negative int, large numbers). -/
+def valOf (s : UInt64) : Ty → UInt64 × Val
+  | .bytes =>
+    let (s, n) := draw s 5
+    let (s, ds) := draws s n 256
+    (s, .bytes (ds.map (·.toUInt8)))
+  | .text =>
+    let (s, n) := draw s 5
+    let (s, cs) := charsOf s n
+    (s, .text cs)
+  | .utf16 =>
+    let (s, n) := draw s 4
+    let (s, ds) := draws s n 65536
+    (s, .utf16 (ds.map (·.toUInt16)))
+  | .nat =>
+    let (s, d) := draw s 4
+    let (s, n) := draw s 1000000007
+    (s, .nat (if d == 0 then 0 else n * 10 ^ (d * 7)))
+  | .int =>
+    let (s, d) := draw s 3
+    let (s, n) := draw s 1000000007
+    (s, .int (if d == 0 then 0 else if d == 1 then -(n : Int) - 1 else n))
+  | .ordering =>
+    let (s, d) := draw s 3
+    (s, .ordering (if d == 0 then .lt else if d == 1 then .eq else .gt))
+  | .version =>
+    let (s, a) := draw s 100
+    let (s, np) := draw s 3
+    let (s, pre) :=
+      np.fold
+        (fun _ _ (acc : UInt64 × List Ident) =>
+          let (s, k) := draw acc.1 2
+          let (s, n) := draw s 30
+          let (s, cs) := charsOf s (n % 3)
+          (s, (if k == 0 then .num n else .alnum cs) :: acc.2))
+        (s, [])
+    let (s, nb) := draw s 3
+    let (s, build) :=
+      nb.fold
+        (fun _ _ (acc : UInt64 × List (List Char)) =>
+          let (s, cs) := charsOf acc.1 (acc.2.length % 3)
+          (s, cs :: acc.2))
+        (s, [])
+    (s, .version ⟨a, a * 7, 0, pre, build⟩)
+
+def tys : List Ty := [.bytes, .text, .utf16, .nat, .int, .ordering, .version]
+
+/-- `n` generated argument lists (1–3 values of drawn types). -/
+def argLists (seed : UInt64) (n : Nat) : List (List Val) :=
+  (n.fold
+      (fun _ _ (acc : UInt64 × List (List Val)) =>
+        let (s, k) := draw acc.1 3
+        let (s, xs) :=
+          (k + 1).fold
+            (fun _ _ (b : UInt64 × List Val) =>
+              let (s, t) := draw b.1 tys.length
+              let (s, v) := valOf s (tys.getD t .nat)
+              (s, v :: b.2))
+            (s, [])
+        (s, xs :: acc.2))
+      (seed, [])).2
+
+def decodes (ts : List Ty) (s : String) (xs : List Val) : Bool :=
+  match decodeArgs ts s with
+  | some ys => ys == xs
+  | none => false
+
+def refused (t : Ty) (s : String) : Bool := (decodeArgs [t] s).isNone
+
+def cases (seed : UInt64) : List (String × (Unit → Bool)) :=
+  [("wire: 400 generated argument lists round-trip (encodeArgs → decodeArgs)", fun _ =>
+      (argLists seed 400).all fun xs => decodes (xs.map Val.ty) (encodeArgs xs) xs),
+    ("wire: tokens are canonical — lowercase hex, decimals without a leading zero, no -0", fun _ =>
+      encodeArgs [.bytes [0xAB, 0], .nat 0, .int (-5), .int 0, .utf16 [0xD800]] ==
+          "b:ab00 n:0 i:-5 i:0 u:d800" &&
+        refused .bytes "b:AB" &&
+        refused .bytes "b:abc" &&
+        refused .nat "n:01" &&
+        refused .nat "n:" &&
+        refused .int "i:-0" &&
+        refused .int "i:-" &&
+        refused .int "i:+1" &&
+        refused .utf16 "u:d80" &&
+        refused .ordering "o:LT" &&
+        refused .nat "x:1"),
+    ("wire: text = hex of UTF-8 — invalid UTF-8 + surrogate encodings refused", fun _ =>
+      encodeArgs [.text ['é']] == "t:c3a9" && refused .text "t:ff" && refused .text "t:eda080" &&
+        refused .text "t:c0af" &&
+        decodes [.text] "t:" [.text []]),
+    ("wire: versions — empty lists, an empty identifier keeps its tag, the three parts exact",
+      fun _ =>
+      let v : Version := ⟨1, 0, 2, [.num 0, .alnum []], [[]]⟩
+      encodeArgs [.version v] == "v:1.0.2/n0.a/x" &&
+        decodes [.version] "v:1.0.2//" [.version ⟨1, 0, 2, [], []⟩] &&
+        decodes [.version] "v:1.0.2/n0.a/x" [.version v] &&
+        refused .version "v:1.0/n0/" &&
+        refused .version "v:1.0.2/n/" &&
+        refused .version "v:1.0.2/n01/" &&
+        refused .version "v:1.0.2/b/" &&
+        refused .version "v:1.0.2//y" &&
+        refused .version "v:1.0.2/./" &&
+        refused .version "v:1.0.2///"),
+    ("wire: argument count + types — a missing, extra or mistyped token refused", fun _ =>
+      (decodeArgs [.nat, .nat] "n:1").isNone && (decodeArgs [.nat] "n:1 n:2").isNone &&
+        (decodeArgs [.nat] "t:31").isNone &&
+        (decodeArgs [.nat] "n:1 ").isNone &&
+        (decodeArgs [.nat] " n:1").isNone &&
+        (decodeArgs [] "").isSome &&
+        (decodeArgs [] "n:1").isNone),
+    ("wire: results — ok <token> for a value, err for an optional none alone", fun _ =>
+      parseResult (.plain .nat) (printResult (.nat 7)) == some (.ok (.nat 7)) &&
+        parseResult (.option .nat) printNone == some .err &&
+        parseResult (.plain .nat) printNone == none &&
+        parseResult (.plain .nat) "ok n:7 " == none &&
+        parseResult (.option .text) (printResult (.nat 7)) == none &&
+        (argLists seed 200).all fun xs =>
+          xs.all fun v => parseResult (.plain v.ty) (printResult v) == some (.ok v)),
+    ("wire: native bridge — ofVal ∘ toVal = some, another type = none", fun _ =>
+      Native.ofVal (Native.toVal ([1, 2] : List UInt8)) == some ([1, 2] : List UInt8) &&
+        (Native.ofVal (Native.toVal (ByteArray.mk #[3])) : Option ByteArray).map (·.toList) ==
+          some [3] &&
+        Native.ofVal (Native.toVal (-3 : Int)) == some (-3 : Int) &&
+        (Native.ofVal (Val.nat 1) : Option Int) == none &&
+        (Native.ofVal (Val.text ['a']) : Option (List UInt8)) == none &&
+        Native.ty (List UInt16) == .utf16 &&
+        Native.ty Version == .version),
+    ("wire: serve — arguments through ofVal in order, the result through printResult", fun _ =>
+      answer (fun (a b : Nat) => a - b) "n:5 n:2" == "ok n:3" &&
+        answer (fun (a : Int) (b : List Char) (c : Ordering) => (a, b, c).1) "i:-1 t:61 o:gt" ==
+          "ok i:-1" &&
+        answer (fun (s : List Char) => if s.isEmpty then none else some s) "t:" == "err" &&
+        answer (fun (s : List Char) => if s.isEmpty then none else some s) "t:61" == "ok t:61" &&
+        answer (fun (b : ByteArray) => b.size) "b:00ff" == "ok n:2" &&
+        answer (fun (a b : Nat) => a + b) "n:1" == "malformed" &&
+        Serve.args (Nat → List Char → Option Version) == [.nat, .text] &&
+        Serve.rty (Nat → List Char → Option Version) == .option .version),
+    ("merge: refusals stay where they stand, each valid request takes the next reply line", fun _ =>
+      let rt : RTy := .plain .nat
+      let merged (reqs : List FvdepCore.Oracle.Req) (b : String) (out : List Reply) : Bool :=
+        match FvdepCore.Oracle.merge rt reqs b.toUTF8 with
+        | Except.ok rs => rs == out
+        | Except.error _ => false
+      merged [.valid, .valid] "ok n:3\nok n:5\n" [Reply.ok (.nat 3), Reply.ok (.nat 5)] &&
+        merged [.invalid "x", .valid, .invalid "y"] "ok n:1\n"
+          [Reply.invalid "x", Reply.ok (.nat 1), Reply.invalid "y"] &&
+        merged [.invalid "x"] "" [Reply.invalid "x"] &&
+        merged [] "" []),
+    ("merge: a missing, extra, unterminated, malformed, mistyped or non-UTF-8 line → its rank",
+      fun _ =>
+      let rt : RTy := .plain .nat
+      let err (reqs : List FvdepCore.Oracle.Req) (b : ByteArray) (k : Nat) : Bool :=
+        match FvdepCore.Oracle.merge rt reqs b with
+        | Except.ok _ => false
+        | Except.error j => j == k
+      err [.valid, .valid] "ok n:1\n".toUTF8 2 && err [.valid] "ok n:1\nok n:2\n".toUTF8 2 &&
+        err [.valid] "ok n:1".toUTF8 1 &&
+        err [.valid] "ok x:1\n".toUTF8 1 &&
+        err [.valid] "ok t:61\n".toUTF8 1 &&
+        err [.valid] ⟨#[0xff, 0x0a]⟩ 1 &&
+        err [.invalid "x"] "ok n:1\n".toUTF8 1 &&
+        err [.valid, .invalid "x", .valid] "ok n:1\nerr\n".toUTF8 2)]
+
+end WireT
+
 /-! ## U5b L2: the library store + git (residues `git`, `library-store`) -/
 
 namespace LibraryR
@@ -3148,7 +3340,8 @@ def main : IO UInt32 := do
                   PhaseD.cases ++
                   ExportR.cases ++
                   LibraryT.cases seed ++
-                  LibraryR.cases seed).map
+                  LibraryR.cases seed ++
+                  WireT.cases seed).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←

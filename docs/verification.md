@@ -2883,6 +2883,196 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Protocol.Types`
+
+- Contract: U5b W0, W4
+- Claim: Each served representation's values carry its protocol type (`Val.ty`).
+- Subject: `FvdepCore.Protocol.Val.ty`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.WireClaims.nativeTys` (hash 0xef245057), proved by `FvdepAudit.Oracle.Wire.Proof.native_tys`:
+
+  ```lean
+  (∀ (x : List UInt8),
+      (FvdepCore.Oracle.Wire.Native.toVal x).ty = FvdepCore.Oracle.Wire.Native.ty (List UInt8)) ∧
+    (∀ (x : ByteArray),
+        (FvdepCore.Oracle.Wire.Native.toVal x).ty = FvdepCore.Oracle.Wire.Native.ty ByteArray) ∧
+      (∀ (x : List Char),
+          (FvdepCore.Oracle.Wire.Native.toVal x).ty = FvdepCore.Oracle.Wire.Native.ty (List Char)) ∧
+        (∀ (x : List UInt16),
+            (FvdepCore.Oracle.Wire.Native.toVal x).ty =
+              FvdepCore.Oracle.Wire.Native.ty (List UInt16)) ∧
+          (∀ (x : Nat),
+              (FvdepCore.Oracle.Wire.Native.toVal x).ty = FvdepCore.Oracle.Wire.Native.ty Nat) ∧
+            (∀ (x : Int),
+                (FvdepCore.Oracle.Wire.Native.toVal x).ty = FvdepCore.Oracle.Wire.Native.ty Int) ∧
+              (∀ (x : Ordering),
+                  (FvdepCore.Oracle.Wire.Native.toVal x).ty =
+                    FvdepCore.Oracle.Wire.Native.ty Ordering) ∧
+                ∀ (x : Fvdep.Semver.Version.V1_0_0.Version),
+                  (FvdepCore.Oracle.Wire.Native.toVal x).ty =
+                    FvdepCore.Oracle.Wire.Native.ty Fvdep.Semver.Version.V1_0_0.Version
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Wire`
+
+- Contract: U5b W1, W3, W4
+- Claim: A request line reads as typed values exactly when it is their W1 layout (tokens in argument order, space-separated); `encodeArgs` writes that layout.
+- Subject: `FvdepCore.Oracle.Wire.decodeArgs`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.WireClaims.argsExact` (hash 0x142d6638), proved by `FvdepAudit.Oracle.Wire.Proof.decodeArgs_exact`:
+
+  ```lean
+  ∀ (ts : List FvdepCore.Protocol.Ty) (s : String) (xs : List FvdepCore.Protocol.Val),
+    FvdepCore.Oracle.Wire.decodeArgs ts s = some xs ↔
+      List.map FvdepCore.Protocol.Val.ty xs = ts ∧ s = FvdepAudit.Oracle.Wire.Spec.argsLayout xs
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.encodeArgsLayout` (hash 0x38e86801), proved by `FvdepAudit.Oracle.Wire.Proof.encodeArgs_eq`:
+
+  ```lean
+  ∀ (xs : List FvdepCore.Protocol.Val),
+    FvdepCore.Oracle.Wire.encodeArgs xs = FvdepAudit.Oracle.Wire.Spec.argsLayout xs
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepCore.Oracle.Wire`
+
+- Contract: U5b W2, W3, W4
+- Claim: A result line reads as a reply exactly when the result type admits it + the line is its W2 layout (`ok <token>`, `err` for an optional none); the printers write that layout.
+- Subject: `FvdepCore.Oracle.Wire.parseResult`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.WireClaims.resultExact` (hash 0xcd546bec), proved by `FvdepAudit.Oracle.Wire.Proof.parseResult_exact`:
+
+  ```lean
+  ∀ (rt : FvdepCore.Protocol.RTy) (s : String) (r : FvdepCore.Protocol.Reply),
+    FvdepCore.Oracle.Wire.parseResult rt s = some r ↔
+      FvdepAudit.Oracle.Wire.Spec.Typed rt r ∧ s = FvdepAudit.Oracle.Wire.Spec.resultLayout r
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.printResultLayout` (hash 0xe0d6cbf0), proved by `FvdepAudit.Oracle.Wire.Proof.printResult_eq`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val),
+    FvdepCore.Oracle.Wire.printResult v =
+      FvdepAudit.Oracle.Wire.Spec.resultLayout (FvdepCore.Protocol.Reply.ok v)
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.printNoneLayout` (hash 0xbe0888c), proved by `FvdepAudit.Oracle.Wire.Proof.printNone_eq`:
+
+  ```lean
+  FvdepCore.Oracle.Wire.printNone =
+    FvdepAudit.Oracle.Wire.Spec.resultLayout FvdepCore.Protocol.Reply.err
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
+## `FvdepCore.Oracle.Wire`
+
+- Contract: U5b W3, W4
+- Claim: Per served representation, `ofVal v` is `x` exactly when `v` is `toVal x`, + `toVal x` is its protocol value (bytes, characters + code units in order, the number itself).
+- Subject: `FvdepCore.Oracle.Wire.bytesNative`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.WireClaims.nativeBytes` (hash 0x27ce1e25), proved by `FvdepAudit.Oracle.Wire.Proof.native_bytes`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : List UInt8),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeByteArray` (hash 0x637d6ed4), proved by `FvdepAudit.Oracle.Wire.Proof.native_byteArray`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : ByteArray),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeText` (hash 0xe1117a8), proved by `FvdepAudit.Oracle.Wire.Proof.native_text`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : List Char),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeUtf16` (hash 0x52f56b79), proved by `FvdepAudit.Oracle.Wire.Proof.native_utf16`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : List UInt16),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeNat` (hash 0xbe248e56), proved by `FvdepAudit.Oracle.Wire.Proof.native_nat`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : Nat),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeInt` (hash 0x72d8f298), proved by `FvdepAudit.Oracle.Wire.Proof.native_int`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : Int),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeOrdering` (hash 0xb31edbb9), proved by `FvdepAudit.Oracle.Wire.Proof.native_ordering`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : Ordering),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeVersion` (hash 0x6cbe70b0), proved by `FvdepAudit.Oracle.Wire.Proof.native_version`:
+
+  ```lean
+  ∀ (v : FvdepCore.Protocol.Val) (x : Fvdep.Semver.Version.V1_0_0.Version),
+    FvdepCore.Oracle.Wire.Native.ofVal v = some x ↔ v = FvdepCore.Oracle.Wire.Native.toVal x
+  ```
+- Statement `FvdepLedger.Rows.WireClaims.nativeValues` (hash 0x61e2cfac), proved by `FvdepAudit.Oracle.Wire.Proof.native_values`:
+
+  ```lean
+  (∀ (x : List UInt8), FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.bytes x) ∧
+    (∀ (x : ByteArray),
+        FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.bytes x.data.toList) ∧
+      (∀ (x : List Char), FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.text x) ∧
+        (∀ (x : List UInt16), FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.utf16 x) ∧
+          (∀ (x : Nat), FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.nat x) ∧
+            (∀ (x : Int), FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.int x) ∧
+              (∀ (x : Ordering),
+                  FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.ordering x) ∧
+                ∀ (x : Fvdep.Semver.Version.V1_0_0.Version),
+                  FvdepCore.Oracle.Wire.Native.toVal x = FvdepCore.Protocol.Val.version x
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle`
+
+- Contract: U5b V4, V5
+- Claim: The replies in request order: a refused request's `invalid` reply where it stands, a valid one's admitted reply whose W2 line is the step's next LF-terminated line, one line per valid request, else refused; W's encoder + decoder link up.
+- Subject: `FvdepCore.Oracle.merge`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.OracleClaims.trace` (hash 0xe9ed4668), proved by `FvdepAudit.Oracle.Proof.merge_exact`:
+
+  ```lean
+  ∀ (rt : FvdepCore.Protocol.RTy) (reqs : List FvdepCore.Oracle.Req) (b : ByteArray)
+    (out : List FvdepCore.Protocol.Reply),
+    FvdepCore.Oracle.merge rt reqs b = Except.ok out ↔
+      ∃ ls,
+        b.data.toList = FvdepAudit.Oracle.Spec.framed ls ∧
+          (∀ (l : List UInt8), l ∈ ls → ¬10 ∈ l) ∧ FvdepAudit.Oracle.Spec.Merged rt reqs ls out
+  ```
+- Statement `FvdepLedger.Rows.OracleClaims.wireLink` (hash 0x5d8b036a), proved by `FvdepAudit.Oracle.Proof.wire_link`:
+
+  ```lean
+  (∀ (xs : List FvdepCore.Protocol.Val),
+      FvdepCore.Oracle.Wire.decodeArgs (List.map FvdepCore.Protocol.Val.ty xs)
+          (FvdepCore.Oracle.Wire.encodeArgs xs) =
+        some xs) ∧
+    ∀ (rt : FvdepCore.Protocol.RTy) (r : FvdepCore.Protocol.Reply),
+      FvdepAudit.Oracle.Wire.Spec.Typed rt r →
+        FvdepCore.Oracle.Wire.parseResult rt (FvdepCore.Oracle.Wire.resultLine r) = some r
+  ```
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: none
+
 ## `FvdepIO.Git`
 
 - Contract: U5b L3–L4

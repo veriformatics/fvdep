@@ -16,6 +16,7 @@ import FvdepAudit.Library.Proof.Plan
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
+import FvdepAudit.Oracle.Proof
 import FvdepAudit.Phase.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
@@ -1709,6 +1710,115 @@ def batchExact : Prop :=
 
 end FvdepLedger.Rows.LibraryClaims
 
+namespace FvdepLedger.Rows.WireClaims
+
+open FvdepCore.Protocol FvdepCore.Oracle FvdepAudit.Oracle.Wire.Spec Fvdep.Semver.Version.V1_0_0
+
+/-- W4: a request line reads as `xs` exactly when `xs` has the argument types `ts` + the line is
+`xs`'s W1 layout. -/
+def argsExact : Prop :=
+  ∀ (ts : List Ty) (s : String) (xs : List Val),
+    Wire.decodeArgs ts s = some xs ↔ xs.map Val.ty = ts ∧ s = argsLayout xs
+
+/-- W4: `encodeArgs` writes W1's layout. -/
+def encodeArgsLayout : Prop := ∀ (xs : List Val), Wire.encodeArgs xs = argsLayout xs
+
+/-- W4: a result line reads as `r` exactly when the result type admits `r` + the line is `r`'s W2
+layout. -/
+def resultExact : Prop :=
+  ∀ (rt : RTy) (s : String) (r : Reply),
+    Wire.parseResult rt s = some r ↔ Typed rt r ∧ s = resultLayout r
+
+/-- W4: `printResult` writes W2's layout of `ok v`. -/
+def printResultLayout : Prop := ∀ (v : Val), Wire.printResult v = resultLayout (.ok v)
+
+/-- W4: `printNone` writes W2's `err`. -/
+def printNoneLayout : Prop := Wire.printNone = resultLayout .err
+
+/-- W4 `nativeExact`: `List UInt8` (`ofVal v = some x` exactly when `v = toVal x`). -/
+def nativeBytes : Prop :=
+  ∀ (v : Val) (x : List UInt8),
+    (Wire.Native.ofVal v : Option (List UInt8)) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `ByteArray`. -/
+def nativeByteArray : Prop :=
+  ∀ (v : Val) (x : ByteArray),
+    (Wire.Native.ofVal v : Option ByteArray) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `List Char`. -/
+def nativeText : Prop :=
+  ∀ (v : Val) (x : List Char),
+    (Wire.Native.ofVal v : Option (List Char)) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `List UInt16`. -/
+def nativeUtf16 : Prop :=
+  ∀ (v : Val) (x : List UInt16),
+    (Wire.Native.ofVal v : Option (List UInt16)) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `Nat`. -/
+def nativeNat : Prop :=
+  ∀ (v : Val) (x : Nat), (Wire.Native.ofVal v : Option Nat) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `Int`. -/
+def nativeInt : Prop :=
+  ∀ (v : Val) (x : Int), (Wire.Native.ofVal v : Option Int) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `Ordering`. -/
+def nativeOrdering : Prop :=
+  ∀ (v : Val) (x : Ordering),
+    (Wire.Native.ofVal v : Option Ordering) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: `Version`. -/
+def nativeVersion : Prop :=
+  ∀ (v : Val) (x : Version),
+    (Wire.Native.ofVal v : Option Version) = some x ↔ v = Wire.Native.toVal x
+
+/-- W4 `nativeExact`: each served representation's values carry its protocol type. -/
+def nativeTys : Prop :=
+  (∀ x : List UInt8, (Wire.Native.toVal x).ty = Wire.Native.ty (List UInt8)) ∧
+    (∀ x : ByteArray, (Wire.Native.toVal x).ty = Wire.Native.ty ByteArray) ∧
+    (∀ x : List Char, (Wire.Native.toVal x).ty = Wire.Native.ty (List Char)) ∧
+    (∀ x : List UInt16, (Wire.Native.toVal x).ty = Wire.Native.ty (List UInt16)) ∧
+    (∀ x : Nat, (Wire.Native.toVal x).ty = Wire.Native.ty Nat) ∧
+    (∀ x : Int, (Wire.Native.toVal x).ty = Wire.Native.ty Int) ∧
+    (∀ x : Ordering, (Wire.Native.toVal x).ty = Wire.Native.ty Ordering) ∧
+    ∀ x : Version, (Wire.Native.toVal x).ty = Wire.Native.ty Version
+
+/-- W3 + W4 `nativeValues`: each representation's value is its protocol value (bytes, characters +
+code units in order, the number, the ordering, the version itself). -/
+def nativeValues : Prop :=
+  (∀ x : List UInt8, Wire.Native.toVal x = Val.bytes x) ∧
+    (∀ x : ByteArray, Wire.Native.toVal x = Val.bytes x.data.toList) ∧
+    (∀ x : List Char, Wire.Native.toVal x = Val.text x) ∧
+    (∀ x : List UInt16, Wire.Native.toVal x = Val.utf16 x) ∧
+    (∀ x : Nat, Wire.Native.toVal x = Val.nat x) ∧
+    (∀ x : Int, Wire.Native.toVal x = Val.int x) ∧
+    (∀ x : Ordering, Wire.Native.toVal x = Val.ordering x) ∧
+    ∀ x : Version, Wire.Native.toVal x = Val.version x
+
+end FvdepLedger.Rows.WireClaims
+
+namespace FvdepLedger.Rows.OracleClaims
+
+open FvdepCore.Protocol FvdepCore.Oracle FvdepAudit.Oracle.Spec FvdepAudit.Oracle.Wire.Spec
+
+/-- V5 `trace`: the merge returns `out` exactly when the step's bytes frame LF-free lines that
+`Merged` pairs with the requests (a refused request's `invalid` reply where it stands; a valid one's
+admitted reply whose W2 line is the next line; one line per valid request). -/
+def trace : Prop :=
+  ∀ (rt : RTy) (reqs : List Req) (b : ByteArray) (out : List Reply),
+    merge rt reqs b = .ok out ↔
+      ∃ ls : List (List UInt8),
+        b.data.toList = framed ls ∧ (∀ l ∈ ls, 0x0A ∉ l) ∧ Merged rt reqs ls out
+
+/-- V5 `wireLink`: the typed arguments `encodeArgs` writes read back in order; an admitted reply's
+result line parses back to it. -/
+def wireLink : Prop :=
+  (∀ xs : List Val, Wire.decodeArgs (xs.map Val.ty) (Wire.encodeArgs xs) = some xs) ∧
+    ∀ (rt : RTy) (r : Reply), Typed rt r → Wire.parseResult rt (Wire.resultLine r) = some r
+
+end FvdepLedger.Rows.OracleClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -3299,6 +3409,91 @@ def libraryToolchainRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5b W0 + W4: the protocol's value types (shared with the evaluation step) + `Val.ty`. -/
+def protocolTypesRow : Row :=
+  { component := `FvdepCore.Protocol.Types
+    contract := "U5b W0, W4"
+    claim := "Each served representation's values carry its protocol type (`Val.ty`)."
+    claims := [(``WireClaims.nativeTys, ``FvdepAudit.Oracle.Wire.Proof.native_tys)]
+    subject := ``FvdepCore.Protocol.Val.ty
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b W1 + W3: request lines. -/
+def wireArgsRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W1, W3, W4"
+    claim :=
+      "A request line reads as typed values exactly when it is their W1 layout (tokens in " ++
+        "argument order, space-separated); `encodeArgs` writes that layout."
+    claims :=
+      [(``WireClaims.argsExact, ``FvdepAudit.Oracle.Wire.Proof.decodeArgs_exact),
+        (``WireClaims.encodeArgsLayout, ``FvdepAudit.Oracle.Wire.Proof.encodeArgs_eq)]
+    subject := ``FvdepCore.Oracle.Wire.decodeArgs
+    path := []
+    noCaller := "U5b"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U5b W2 + W3: result lines. -/
+def wireResultRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W2, W3, W4"
+    claim :=
+      "A result line reads as a reply exactly when the result type admits it + the line is its " ++
+        "W2 layout (`ok <token>`, `err` for an optional none); the printers write that layout."
+    claims :=
+      [(``WireClaims.resultExact, ``FvdepAudit.Oracle.Wire.Proof.parseResult_exact),
+        (``WireClaims.printResultLayout, ``FvdepAudit.Oracle.Wire.Proof.printResult_eq),
+        (``WireClaims.printNoneLayout, ``FvdepAudit.Oracle.Wire.Proof.printNone_eq)]
+    subject := ``FvdepCore.Oracle.Wire.parseResult
+    path := []
+    noCaller := "U5b"
+    residue := ["runtime"]
+    unproven := [] }
+
+/-- U5b W3: the native bridge (the step's conversions). -/
+def wireNativeRow : Row :=
+  { component := `FvdepCore.Oracle.Wire
+    contract := "U5b W3, W4"
+    claim :=
+      "Per served representation, `ofVal v` is `x` exactly when `v` is `toVal x`, + `toVal x` " ++
+        "is its protocol value (bytes, characters + code units in order, the number itself)."
+    claims :=
+      [(``WireClaims.nativeBytes, ``FvdepAudit.Oracle.Wire.Proof.native_bytes),
+        (``WireClaims.nativeByteArray, ``FvdepAudit.Oracle.Wire.Proof.native_byteArray),
+        (``WireClaims.nativeText, ``FvdepAudit.Oracle.Wire.Proof.native_text),
+        (``WireClaims.nativeUtf16, ``FvdepAudit.Oracle.Wire.Proof.native_utf16),
+        (``WireClaims.nativeNat, ``FvdepAudit.Oracle.Wire.Proof.native_nat),
+        (``WireClaims.nativeInt, ``FvdepAudit.Oracle.Wire.Proof.native_int),
+        (``WireClaims.nativeOrdering, ``FvdepAudit.Oracle.Wire.Proof.native_ordering),
+        (``WireClaims.nativeVersion, ``FvdepAudit.Oracle.Wire.Proof.native_version),
+        (``WireClaims.nativeValues, ``FvdepAudit.Oracle.Wire.Proof.native_values)]
+    subject := ``FvdepCore.Oracle.Wire.bytesNative
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
+/-- U5b V4 + V5: the merge of refusals + the step's reply lines. -/
+def oracleMergeRow : Row :=
+  { component := `FvdepCore.Oracle
+    contract := "U5b V4, V5"
+    claim :=
+      "The replies in request order: a refused request's `invalid` reply where it stands, a " ++
+        "valid one's admitted reply whose W2 line is the step's next LF-terminated line, one " ++
+        "line per valid request, else refused; W's encoder + decoder link up."
+    claims :=
+      [(``OracleClaims.trace, ``FvdepAudit.Oracle.Proof.merge_exact),
+        (``OracleClaims.wireLink, ``FvdepAudit.Oracle.Proof.wire_link)]
+    subject := ``FvdepCore.Oracle.merge
+    path := []
+    noCaller := "U5b"
+    residue := ["runtime"]
+    unproven := [] }
+
 /-- U5b L3–L4: git as a process (tested residue `git`). -/
 def gitRunRow : Row :=
   { component := `FvdepIO.Git
@@ -3575,9 +3770,10 @@ def ledger : Ledger :=
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
         libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
-        libraryToolchainRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow,
-        stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow,
-        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
+        libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
+        oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
+        stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
+        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

@@ -35,6 +35,7 @@ jobs:
           - export-decode
           - git-tree
           - git-batch
+          - oracle-result
           - sha256
           - sys-actions
     runs-on: ubuntu-26.04
