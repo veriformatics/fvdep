@@ -2680,6 +2680,36 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Export`
+
+- Contract: U5b X1–X6
+- Claim: `read`: one `leanexport` output → each declaration's name, kind, level params, type + value, every record validated in full under the pinned profile (dense indices, no `mdata`, J's bounds), or the first violating line + its class (`readAccepts`, `readFirst`).
+- Subject: `FvdepCore.Export.read`
+- Path: none yet (wired by U5b)
+- Statement `FvdepLedger.Rows.ExportClaims.readAccepts` (hash 0xe7b2c6e4), proved by `FvdepAudit.Export.Proof.read_accepts`:
+
+  ```lean
+  ∀ (githash version : String) (b : ByteArray) (ds : List FvdepCore.Export.Decl),
+    FvdepCore.Export.read githash version b = Except.ok ds ↔
+      ∃ t,
+        FvdepAudit.Export.Spec.Run githash version 1 FvdepAudit.Export.Spec.initial
+            (FvdepAudit.Protocol.Spec.linesSpec b.data.toList) (Except.ok t) ∧
+          ds = t.decls.toList
+  ```
+- Statement `FvdepLedger.Rows.ExportClaims.readFirst` (hash 0x8a612dca), proved by `FvdepAudit.Export.Proof.read_first`:
+
+  ```lean
+  ∀ (githash version : String) (b : ByteArray) (k : Nat) (c : FvdepCore.Export.Class),
+    (∃ why,
+        FvdepCore.Export.read githash version b =
+          Except.error { line := k, cls := c, reason := why }) ↔
+      FvdepAudit.Export.Spec.Run githash version 1 FvdepAudit.Export.Spec.initial
+        (FvdepAudit.Protocol.Spec.linesSpec b.data.toList) (Except.error (k, c))
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Step`
 
 - Contract: U5 R8

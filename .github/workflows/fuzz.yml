@@ -32,6 +32,7 @@ jobs:
           - manifest-decode
           - protocol-request
           - index-decode
+          - export-decode
           - sha256
           - sys-actions
     runs-on: ubuntu-26.04

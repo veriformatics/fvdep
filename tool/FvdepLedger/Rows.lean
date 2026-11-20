@@ -3,6 +3,7 @@ import FvdepAudit.Build.Proof.Key
 import FvdepAudit.Build.Proof.Plan
 import FvdepAudit.Doc.Proof.Envelope
 import FvdepAudit.Doc.Proof.Lock
+import FvdepAudit.Export.Proof
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Assemble.Proof.Claims
 import FvdepAudit.Index.Command.Proof.Claims
@@ -1622,6 +1623,27 @@ def frameExact : Prop :=
 
 end FvdepLedger.Rows.StepClaims
 
+namespace FvdepLedger.Rows.ExportClaims
+
+open FvdepCore.Json FvdepCore.Export FvdepAudit.Export.Spec FvdepAudit.Protocol.Spec
+
+/-- X1–X4 + X6: `read` accepts exactly the exports whose run over X1's lines (line 1 the header,
+then records against X2's tables from `initial`) stays in the profile, + returns the final tables'
+declarations in line order. -/
+def readAccepts : Prop :=
+  ∀ (githash version : String) (b : ByteArray) (ds : List Decl),
+    read githash version b = .ok ds ↔
+      ∃ t, Run githash version 1 initial (linesSpec b.data.toList) (.ok t) ∧ ds = t.decls.toList
+
+/-- X5 + X6: `read` refuses at line `k` with class `c` exactly when line `k` is the run's first
+violation, of class `c` (the reason text = tested presentation). -/
+def readFirst : Prop :=
+  ∀ (githash version : String) (b : ByteArray) (k : Nat) (c : Class),
+    (∃ why, read githash version b = .error ⟨k, c, why⟩) ↔
+      Run githash version 1 initial (linesSpec b.data.toList) (.error (k, c))
+
+end FvdepLedger.Rows.ExportClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -3036,6 +3058,24 @@ def phaseArgvRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5b X: the export reader (lean4export 3.1.0 as Lean 4.35.0 bundles it). -/
+def exportReadRow : Row :=
+  { component := `FvdepCore.Export
+    contract := "U5b X1–X6"
+    claim :=
+      "`read`: one `leanexport` output → each declaration's name, kind, level params, type + " ++
+        "value, every record validated in full under the pinned profile (dense indices, no " ++
+        "`mdata`, J's bounds), or the first violating line + its class (`readAccepts`, " ++
+        "`readFirst`)."
+    claims :=
+      [(``ExportClaims.readAccepts, ``FvdepAudit.Export.Proof.read_accepts),
+        (``ExportClaims.readFirst, ``FvdepAudit.Export.Proof.read_first)]
+    subject := ``FvdepCore.Export.read
+    path := []
+    noCaller := "U5b"
+    residue := []
+    unproven := [] }
+
 /-- U5 R8: the supervisor's reading of the step helper's frame (the encoder: `stepFrameOfRow`). -/
 def stepFrameRow : Row :=
   { component := `FvdepCore.Step
@@ -3261,8 +3301,9 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
-        stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow,
-        headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
+        exportReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
+        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
+        bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

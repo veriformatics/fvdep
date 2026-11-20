@@ -21,8 +21,8 @@ set -euo pipefail
 root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "$root"
 
-TARGETS=(json-decode lock-decode unframe manifest-decode protocol-request index-decode sha256
-    sys-actions)
+TARGETS=(json-decode lock-decode unframe manifest-decode protocol-request index-decode export-decode
+    sha256 sys-actions)
 
 die() {
     printf 'fuzz: %s\n' "$*" >&2
@@ -47,6 +47,7 @@ lean_target() {
     manifest-decode) echo "FvdepFuzz.Manifest fvdep_fuzz_manifest 1" ;;
     protocol-request) echo "FvdepFuzz.Protocol fvdep_fuzz_protocol 0" ;;
     index-decode) echo "FvdepFuzz.Index fvdep_fuzz_index 0" ;;
+    export-decode) echo "FvdepFuzz.Export fvdep_fuzz_export 0" ;;
     *) return 1 ;;
     esac
 }

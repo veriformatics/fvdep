@@ -2176,6 +2176,177 @@ def cases : List (String × (Unit → Bool)) :=
 
 end PhaseD
 
+namespace ExportR
+
+open FvdepCore.Export
+
+def hdr (githash : String := Lean.githash) : String :=
+  "{\"meta\":{\"exporter\":{\"name\":\"lean4export\",\"version\":\"3.1.0\"},\"format\":" ++
+    "{\"version\":\"3.1.0\"},\"lean\":{\"githash\":\"" ++
+    githash ++
+    "\",\"version\":\"" ++
+    Lean.versionString ++
+    "\"}}}"
+
+def rdWith (h : String) (ls : List String) : Except Refusal (List Decl) :=
+  read Lean.githash Lean.versionString ("\n".intercalate (h :: ls) ++ "\n").toUTF8
+
+def rd (ls : List String) : Except Refusal (List Decl) := rdWith (hdr) ls
+
+/-- name 1 = `a`, name 2 = `b`, level 1 = succ 0, expr 0 = Sort 1, expr 1 = const a. -/
+def tables : List String :=
+  ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"a\"}}", "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"b\"}}",
+    "{\"il\":1,\"succ\":0}", "{\"ie\":0,\"sort\":1}", "{\"const\":{\"name\":1,\"us\":[]},\"ie\":1}"]
+
+def axiomA : String := "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[],\"name\":1,\"type\":0}}"
+
+def defB : String :=
+  "{\"def\":{\"all\":[2],\"hints\":{\"regular\":1},\"levelParams\":[],\"name\":2," ++
+    "\"safety\":\"safe\",\"type\":0,\"value\":1}}"
+
+/-- The refusal's (line, class), or `none` when accepted. -/
+def refusal (r : Except Refusal (List Decl)) : Option (Nat × Class) :=
+  match r with
+  | .error e => some (e.line, e.cls)
+  | .ok _ => none
+
+/-- Every name, level + expression form and every declaration kind (Q4). -/
+def every : List String :=
+  ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"a\"}}", "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"b\"}}",
+    "{\"in\":3,\"num\":{\"i\":7,\"pre\":1}}", "{\"in\":4,\"str\":{\"pre\":0,\"str\":\"u\"}}",
+    "{\"in\":5,\"str\":{\"pre\":0,\"str\":\"T\"}}", "{\"in\":6,\"str\":{\"pre\":5,\"str\":\"mk\"}}",
+    "{\"in\":7,\"str\":{\"pre\":5,\"str\":\"rec\"}}",
+    "{\"in\":8,\"str\":{\"pre\":0,\"str\":\"q\"}}", "{\"in\":9,\"str\":{\"pre\":0,\"str\":\"o\"}}",
+    "{\"in\":10,\"str\":{\"pre\":0,\"str\":\"t\"}}", "{\"il\":1,\"succ\":0}",
+    "{\"il\":2,\"param\":4}", "{\"il\":3,\"max\":[1,2]}", "{\"il\":4,\"imax\":[2,1]}",
+    "{\"ie\":0,\"sort\":1}", "{\"const\":{\"name\":1,\"us\":[2,3]},\"ie\":1}",
+    "{\"bvar\":0,\"ie\":2}",
+    "{\"forallE\":{\"binderInfo\":\"default\",\"body\":0,\"name\":2,\"type\":0},\"ie\":3}",
+    "{\"ie\":4,\"lam\":{\"binderInfo\":\"implicit\",\"body\":2,\"name\":2,\"type\":0}}",
+    "{\"app\":{\"arg\":2,\"fn\":4},\"ie\":5}",
+    "{\"ie\":6,\"letE\":{\"body\":2,\"name\":2,\"nondep\":true,\"type\":0,\"value\":0}}",
+    "{\"ie\":7,\"proj\":{\"idx\":0,\"struct\":2,\"typeName\":5}}", "{\"ie\":8,\"natVal\":\"42\"}",
+    "{\"ie\":9,\"strVal\":\"s\"}", "{\"ie\":10,\"sort\":4}",
+    "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[4],\"name\":1,\"type\":8}}",
+    "{\"def\":{\"all\":[2],\"hints\":{\"regular\":3},\"levelParams\":[],\"name\":2," ++
+      "\"safety\":\"partial\",\"type\":3,\"value\":4}}",
+    "{\"thm\":{\"all\":[10],\"levelParams\":[3],\"name\":10,\"type\":0,\"value\":6}}",
+    "{\"opaque\":{\"all\":[9],\"isUnsafe\":true,\"levelParams\":[],\"name\":9,\"type\":1," ++
+      "\"value\":7}}",
+    "{\"quot\":{\"kind\":\"lift\",\"levelParams\":[4],\"name\":8,\"type\":10}}", block 6]
+where
+  /-- An inductive block whose constructor is named `n`. -/
+  block (n : Nat) : String :=
+    "{\"inductive\":{\"ctors\":[{\"cidx\":0,\"induct\":5,\"isUnsafe\":false,\"levelParams\":[]," ++
+      "\"name\":" ++
+      toString n ++
+      ",\"numFields\":0,\"numParams\":0,\"type\":9}],\"recs\":" ++
+      "[{\"all\":[5],\"isUnsafe\":false,\"k\":true,\"levelParams\":[4],\"name\":7," ++
+      "\"numIndices\":0,\"numMinors\":1,\"numMotives\":1,\"numParams\":0,\"rules\":" ++
+      "[{\"ctor\":6,\"nfields\":0,\"rhs\":2}],\"type\":5}],\"types\":[{\"all\":[5]," ++
+      "\"ctors\":[6],\"isRec\":false,\"isReflexive\":false,\"isUnsafe\":false," ++
+      "\"levelParams\":[],\"name\":5,\"numIndices\":0,\"numNested\":0,\"numParams\":0," ++
+      "\"type\":0}]}}"
+
+/-- A declaration's projection, `Expr`s compared with binder names + annotations. -/
+def projects (d : Decl) (n : Lean.Name) (k : Kind) (lps : List Lean.Name) (ty : Lean.Expr)
+    (v : Option Lean.Expr) : Bool :=
+  d.name == n && d.kind == k && d.levelParams == lps && d.type.equal ty &&
+    match d.value, v with
+    | some a, some b => a.equal b
+    | none, none => true
+    | _, _ => false
+
+def cases : List (String × (Unit → Bool)) :=
+  [("export: a hand-made export reads back (names, levels, exprs, an axiom + a def)", fun _ =>
+      match rd (tables ++ [axiomA, defB]) with
+      | .ok [a, b] =>
+        a.name == `a && a.kind == .axiom && a.type == .sort (.succ .zero) && a.value.isNone &&
+          b.name == `b &&
+          b.kind == .defn &&
+          b.type == .sort (.succ .zero) &&
+          b.value == some (.const `a [])
+      | _ => false),
+    ("export: every record form + declaration kind reads back (types, constructors, recursors)",
+      fun _ =>
+      let s1 : Lean.Expr := .sort (.succ .zero)
+      let u : Lean.Level := .param `u
+      let lam : Lean.Expr := .lam `b s1 (.bvar 0) .implicit
+      match rd every with
+      | .ok [a, b, t, o, q, ty, mk, rc] =>
+        projects a `a .axiom [`u] (.lit (.natVal 42)) none &&
+          projects b `b .defn [] (.forallE `b s1 s1 .default) (some lam) &&
+          projects t `t .thm [.num `a 7] s1 (some (.letE `b s1 s1 (.bvar 0) true)) &&
+          projects o `o .opaque [] (.const `a [u, .max (.succ .zero) u])
+            (some (.proj `T 0 (.bvar 0))) &&
+          projects q `q .quot [`u] (.sort (.imax u (.succ .zero))) none &&
+          projects ty `T .induct [] s1 none &&
+          projects mk `T.mk .ctor [] (.lit (.strVal "s")) none &&
+          projects rc `T.rec .recursor [`u] (.app lam (.bvar 0)) none
+      | _ => false),
+    ("export: a block member named like its type, a missing or extra member, a non-natural " ++
+        "mdata index, an integer beyond J's bound + a def height past 32 bits refuse (malformed)",
+      fun _ =>
+      let n := every.length + 1
+      let tall := every[26]!.replace "\"regular\":3" "\"regular\":4294967296"
+      refusal (rd (every.dropLast ++ [every.block 5])) == some (n, .malformed) &&
+        refusal (rd ["{\"il\":1,\"succ\":0,\"x\":1}"]) == some (2, .malformed) &&
+        refusal (rd ["{\"axiom\":{\"levelParams\":[],\"name\":0,\"type\":0}}"]) ==
+          some (2, .malformed) &&
+        refusal (rd ["{\"ie\":\"x\",\"mdata\":{}}"]) == some (2, .malformed) &&
+        refusal (rd ["{\"ie\":9007199254740992,\"sort\":0}"]) == some (2, .malformed) &&
+        refusal (rd (every.take 25 ++ [tall])) == some (27, .malformed)),
+    ("export: lines — empty = no header, a final LF optional, an empty line refused at its line",
+      fun _ =>
+      let ended := fun (ls : List String) (tail : String) =>
+        read Lean.githash Lean.versionString ("\n".intercalate (hdr :: ls) ++ tail).toUTF8
+      refusal (read Lean.githash Lean.versionString .empty) == some (1, .malformed) &&
+        refusal (read Lean.githash Lean.versionString "\n".toUTF8) == some (1, .malformed) &&
+        refusal (ended tables "") == none &&
+        refusal (ended tables "\n") == none &&
+        refusal (ended (tables.take 2 ++ [""] ++ tables.drop 2) "\n") == some (4, .malformed) &&
+        refusal (ended tables "\n\n") == some (7, .malformed)),
+    ("export: dense profile — a skipped index refuses at its line (profile)", fun _ =>
+      refusal (rd ["{\"in\":2,\"str\":{\"pre\":0,\"str\":\"a\"}}"]) == some (2, .profile)),
+    ("export: an unbound reference refuses at its line (malformed)", fun _ =>
+      refusal (rd ["{\"const\":{\"name\":5,\"us\":[]},\"ie\":0}"]) == some (2, .malformed)),
+    ("export: a declaration declared twice refuses (malformed)", fun _ =>
+      refusal (rd (tables ++ [axiomA, axiomA])) == some (8, .malformed)),
+    ("export: mdata is outside the profile", fun _ =>
+      refusal (rd (tables ++ ["{\"ie\":2,\"mdata\":{\"data\":{},\"expr\":0}}"])) ==
+        some (7, .profile)),
+    ("export: another Lean build's header is outside the profile; a header member more = malformed",
+      fun _ =>
+      refusal (rdWith (hdr "0000") tables) == some (1, .profile) &&
+        refusal (rdWith ("{\"extra\":1," ++ (hdr).drop 1) tables) == some (1, .malformed)),
+    ("export: a string over J's 64 KiB bound is outside the profile", fun _ =>
+      refusal
+          (rd
+            (tables ++
+              ["{\"ie\":2,\"strVal\":\"" ++ String.ofList (List.replicate 65537 'x') ++ "\"}"])) ==
+        some (7, .profile)),
+    ("export: natural literals — 0 + digits read, a leading zero, empty or non-digit refused",
+      fun _ =>
+      let lit := fun (s : String) =>
+        rd
+          (tables ++
+            ["{\"ie\":2,\"natVal\":\"" ++ s ++ "\"}",
+              "{\"axiom\":{\"isUnsafe\":false," ++ "\"levelParams\":[],\"name\":1,\"type\":2}}"])
+      let typeOf := fun (r : Except Refusal (List Decl)) =>
+        match r with
+        | .ok [d] => some d.type
+        | _ => none
+      typeOf (lit "0") == some (.lit (.natVal 0)) &&
+        typeOf (lit "120") == some (.lit (.natVal 120)) &&
+        refusal (lit "012") == some (7, .malformed) &&
+        refusal (lit "") == some (7, .malformed) &&
+        refusal (lit "1a") == some (7, .malformed)),
+    ("export: an unknown record + an unknown expression form refuse (malformed)", fun _ =>
+      refusal (rd ["{\"zz\":1,\"yy\":2}"]) == some (2, .malformed) &&
+        refusal (rd ["{\"ie\":0,\"zzz\":1}"]) == some (2, .malformed))]
+
+end ExportR
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -2219,7 +2390,8 @@ def main : IO UInt32 := do
                   Step.cases ++
                   Cache.cases ++
                   Snapshot.cases ++
-                  PhaseD.cases).map
+                  PhaseD.cases ++
+                  ExportR.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
