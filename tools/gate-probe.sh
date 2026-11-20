@@ -446,7 +446,7 @@ probe lean-fmt plant_misformat "Version.lean" lean_style_stage
 
 # fanout: a missing shard; a disabled gate step; a masked one; SHARD unbound; fail-fast on.
 fanout_stage() { bash -c 'source tools/gate.sh; fanout'; }
-plant_matrix() { sed -i 's/^\( *shard: \)\[lean, checks\]$/\1[lean]/' .github/workflows/gate.yml; }
+plant_matrix() { sed -i 's/^\( *shard: \)\[lean, suites, checks\]$/\1[lean, checks]/' .github/workflows/gate.yml; }
 with_build=0 probe fanout-shards plant_matrix "matrix shards" fanout_stage
 plant_disabled() {
     sed -i 's/^\(      - name: Run the gate shard\)$/\1\n        if: false/' .github/workflows/gate.yml
@@ -460,6 +460,15 @@ plant_unbound() { sed -i '/^      SHARD: \${{ matrix.shard }}$/d' .github/workfl
 with_build=0 probe fanout-unbound plant_unbound "SHARD bound" fanout_stage
 plant_failfast() { sed -i 's/^      fail-fast: false$/      fail-fast: true/' .github/workflows/gate.yml; }
 with_build=0 probe fanout-failfast plant_failfast "fail-fast false" fanout_stage
+# fanout, job `probes`: its probes step removed → the job no longer runs the probes shard.
+plant_probes_job() { sed -i '/^        run: bash tools\/gate.sh --shard probes$/d' .github/workflows/gate.yml; }
+with_build=0 probe fanout-probes-job plant_probes_job "job probes needs gate" fanout_stage
+
+# marks: a keyed stage's green mark from another input closure → `marks` refuses it, named (the
+# probes job's input: the run shards' marks).
+plant_stale_mark() { printf 'stale\n' >.gate/index.green; }
+with_build=0 probe marks plant_stale_mark "marks: index holds a mark of another input closure" \
+    bash -c 'source tools/gate.sh; marks'
 
 # deps: a pinned tool without a dependency-table row.
 plant_tool() {

@@ -21,13 +21,14 @@ concurrency:
 
 jobs:
   # Shards run in parallel, each on a fresh checkout (tools/gate.sh STAGES; its `fanout` stage holds
-  # this matrix equal to the shards there).
+  # this matrix + job `probes` equal to the shards there): `lean` + `suites` split the run phase so
+  # each job stays within 40 min; `checks` = the scanners.
   gate:
     name: gate (${{ matrix.shard }})
     strategy:
       fail-fast: false
       matrix:
-        shard: [lean, checks]
+        shard: [lean, suites, checks]
     runs-on: ubuntu-26.04
     timeout-minutes: 60
     env:
@@ -42,15 +43,59 @@ jobs:
 
       # Pinned elan, every download bounded + retried (tools/install-lean.sh).
       - name: Install the Lean toolchain named in lean-toolchain
-        if: matrix.shard == 'lean'
+        if: matrix.shard != 'checks'
         timeout-minutes: 10
         run: bash tools/install-lean.sh
 
       # U5's sandbox: bubblewrap + one step with its flags (tools/install-bwrap.sh).
       - name: Install bubblewrap and run one sandbox step
-        if: matrix.shard == 'lean'
+        if: matrix.shard != 'checks'
         timeout-minutes: 5
         run: bash tools/install-bwrap.sh
 
       - name: Run the gate shard
         run: bash tools/gate.sh --shard "$SHARD"
+
+      # Each keyed stage's green mark (`.gate/<stage>.green` = its input closure's content key) for
+      # job `probes`: a mark from this commit's checkout holds in that job's checkout.
+      - name: Upload the green marks
+        if: matrix.shard != 'checks'
+        uses: actions/upload-artifact@cf430e030ddbb5b0abf93d22962f4752f3646cd9 # v7.0.2
+        with:
+          name: marks-${{ matrix.shard }}
+          path: .gate/*.green
+          include-hidden-files: true
+          if-no-files-found: error
+          retention-days: 1
+
+  # The probes (tools/gate-probe.sh) after the run shards, on their green marks: every probe copy's
+  # control + restored runs reuse those verdicts; `marks` refuses a missing or stale one.
+  probes:
+    name: gate (probes)
+    needs: gate
+    runs-on: ubuntu-26.04
+    timeout-minutes: 60
+    steps:
+      - name: Check out the repository
+        uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1 # v7.0.1
+        with:
+          persist-credentials: false
+          fetch-depth: 0
+
+      - name: Install the Lean toolchain named in lean-toolchain
+        timeout-minutes: 10
+        run: bash tools/install-lean.sh
+
+      - name: Install bubblewrap and run one sandbox step
+        timeout-minutes: 5
+        run: bash tools/install-bwrap.sh
+
+      - name: Download the run shards' green marks
+        uses: actions/download-artifact@9000827ccba6bdab643e8b6fd33ac0654aef8333 # v8.0.2
+        with:
+          pattern: marks-*
+          merge-multiple: true
+          path: .gate
+
+      - name: Run the probes shard
+        run: bash tools/gate.sh --shard probes

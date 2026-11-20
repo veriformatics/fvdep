@@ -85,26 +85,28 @@ stage() {
 }
 
 # Stage · CI shards. A full run takes every stage in this order, each running the function of its
-# name (`-` → `_`). CI runs one job per shard (gate.yml matrix), each on a fresh checkout, so a
-# shard whose stages read the build lists lean-build too; `fanout` holds the matrix = these shards.
+# name (`-` → `_`). CI runs one job per shard (gate.yml: the matrix + job `probes`), each on a fresh
+# checkout, so a shard whose stages read the build lists lean-build too; `fanout` holds the jobs =
+# these shards. `lean` + `suites` split the run phase (each CI job ≤ 40 min); `probes` runs after
+# them on their green marks (CI: an artifact; `marks` refuses a missing or stale one).
 STAGES='
-tools       lean checks
-lean-build  lean
+tools       lean suites probes checks
+lean-build  lean suites probes
 lean-style  lean
 lean-test   lean
 cli         lean
 coverage    lean
 ledger-suite lean
-codec-suite lean
-manifest-suite lean
-library-suite lean
-index-suite lean
-fuzz-replay lean
-sys-suite   lean
+codec-suite suites
+manifest-suite suites
+library-suite suites
+index-suite suites
+fuzz-replay suites
+sys-suite   suites
 sandbox-suite lean
 isolation   lean
 oracle-suite lean
-acceptance  lean
+acceptance  suites
 index       lean
 index-history lean
 imports     checks
@@ -121,8 +123,8 @@ vendor-upstream checks
 deps        checks
 renovate    checks
 meta        checks
-probes      lean
-tree-clean  lean checks
+probes      probes
+tree-clean  lean suites probes checks
 '
 
 # Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
@@ -202,9 +204,7 @@ lean_build() {
 # reused like a suite's in the fast gate (input closure = every Lean source, the formatter's
 # configs + pin, the script).
 lean_style() {
-    suite lean-style \
-        "$(closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt)" "" \
-        bash tools/lean-style.sh
+    suite lean-style "$(stage_key lean-style)" "" bash tools/lean-style.sh
 }
 
 lean_test() { (cd tool && lake test); }
@@ -219,7 +219,7 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 # The checker loads `FvdepLedger.Rows` at run time (`lake exe` builds its own imports alone) ⇒ the
 # rows' build first: a row edit or plant is checked as written, never a stale `.olean`.
 coverage() {
-    suite coverage "$(shipped_closure tool docs/verification.md .agent/spec.md)" "" \
+    suite coverage "$(stage_key coverage)" "" \
         bash -c 'cd tool && lake build -q FvdepLedger && lake exe fvdep-ledger --check ../docs/verification.md'
 }
 
@@ -254,7 +254,7 @@ ledger_suite_key() {
 # The blind fixture suite (L9): the checker's planted breaches + clean controls; it grades the
 # checker alone.
 ledger_suite() {
-    suite ledger-suite "$(ledger_suite_key)" "${FVDEP_LEDGER_ONLY:-}" bash tests/ledger/run.sh
+    suite ledger-suite "$(stage_key ledger-suite)" "${FVDEP_LEDGER_ONLY:-}" bash tests/ledger/run.sh
 }
 
 # Shipped code the codec + manifest drivers build (the tool requires the root library by path).
@@ -267,40 +267,35 @@ shipped_closure() {
 # the codec driver + the S cases through the sanitized SHA-256 core; jq = the pinned one (its output
 # bytes are the printer cases' second oracle).
 codec_suite() {
-    local jq key
+    local jq
     jq="$(pinned jq)" || return 1
-    key="$({ shipped_closure tests/codec tests/sha256; awk '$1 == "jq"' tools/tools.lock; } |
-        sha256sum | cut -c1-64)"
-    suite codec-suite "$key" "${FVDEP_CODEC_CASE:-}" env PATH="${jq%/*}:$PATH" bash tests/codec/run.sh
+    suite codec-suite "$(stage_key codec-suite)" "${FVDEP_CODEC_CASE:-}" env PATH="${jq%/*}:$PATH" \
+        bash tests/codec/run.sh
 }
 
 # The blind manifest suite (tester-4; U3 T6): the reader, validator + printer through its driver.
 manifest_suite() {
-    suite manifest-suite "$(shipped_closure tests/manifest)" "${FVDEP_MANIFEST_CASE:-}" \
+    suite manifest-suite "$(stage_key manifest-suite)" "${FVDEP_MANIFEST_CASE:-}" \
         bash tests/manifest/run.sh ${FVDEP_MANIFEST_CASE:+--case "$FVDEP_MANIFEST_CASE"}
 }
 
 # The blind library suite (tester-5; U4 A + B): the launch specs + the protocol codec through its
 # Lean driver, `fvdep-dev spec` through its CLI.
 library_suite() {
-    local key
-    key="$(shipped_closure tests/library tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
-    suite library-suite "$key" "${FVDEP_LIBRARY_CASE:-}" bash tests/library/run.sh
+    suite library-suite "$(stage_key library-suite)" "${FVDEP_LIBRARY_CASE:-}" bash tests/library/run.sh
 }
 
 # The blind index suite (tester-5 batch 2; U4 C): `fvdep index [--check]` through the built binary
 # (fixture libraries, each built fresh; an LD_PRELOAD fault library) + `fvdep-dev index` (decode,
 # history).
 index_suite() {
-    local key
-    key="$(shipped_closure tests/index tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean tool/Main.lean)"
-    suite index-suite "$key" "${FVDEP_INDEX_CASE:-}" bash tests/index/run.sh
+    suite index-suite "$(stage_key index-suite)" "${FVDEP_INDEX_CASE:-}" bash tests/index/run.sh
 }
 
 # Fuzz corpora (contract U3 "Fuzz"; tools/fuzz.sh): every seed + pinned crash input through each
 # target's engine-free replay build (a Lean target's panic aborts; C targets under gcc ASan + UBSan).
 fuzz_replay() {
-    suite fuzz-replay "$(shipped_closure tests/fuzz tool/FvdepFuzz tool/FvdepFuzz.lean tools/fuzz.sh)" \
+    suite fuzz-replay "$(stage_key fuzz-replay)" \
         "${FVDEP_FUZZ_TARGET:-}" bash tools/fuzz.sh replay ${FVDEP_FUZZ_TARGET:+"$FVDEP_FUZZ_TARGET"}
 }
 
@@ -308,9 +303,7 @@ fuzz_replay() {
 # an LD_PRELOAD fault library + sanitizer harnesses (tests/sys/build.sh); its ZFS case needs
 # fvdep's dataset (a host without it reports that case SKIP: .claude/rules/checks.md).
 sys_suite() {
-    local key
-    key="$(shipped_closure tests/sys tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
-    suite sys-suite "$key" "${FVDEP_SYS_CASE:-}" bash tests/sys/run.sh \
+    suite sys-suite "$(stage_key sys-suite)" "${FVDEP_SYS_CASE:-}" bash tests/sys/run.sh \
         ${FVDEP_SYS_CASE:+--case "$FVDEP_SYS_CASE"}
 }
 
@@ -327,7 +320,7 @@ sandbox_closure() {
 sandbox_suite() {
     local cases=(--case R. --case K. --case P. --case S. --case B.)
     [[ -z "${FVDEP_SANDBOX_CASE:-}" ]] || cases=(--case "$FVDEP_SANDBOX_CASE")
-    suite sandbox-suite "$(sandbox_closure tests/sandbox)" "${FVDEP_SANDBOX_CASE:-}" \
+    suite sandbox-suite "$(stage_key sandbox-suite)" "${FVDEP_SANDBOX_CASE:-}" \
         bash tests/sandbox/run.sh "${cases[@]}"
 }
 
@@ -335,7 +328,7 @@ sandbox_suite() {
 # fresh bwrap namespace), each killed by a mutant of tests/isolation/mutants.py. Its steps run
 # fvdep-step ⇒ tests/isolation/run.sh refuses outside a PID namespace of the job's own.
 isolation() {
-    suite isolation "$(sandbox_closure tests/isolation)" "${FVDEP_ISOLATION_CASE:-}" \
+    suite isolation "$(stage_key isolation)" "${FVDEP_ISOLATION_CASE:-}" \
         bash tests/isolation/run.sh ${FVDEP_ISOLATION_CASE:+--case "$FVDEP_ISOLATION_CASE"}
 }
 
@@ -344,14 +337,14 @@ isolation() {
 # FVDEP_CACHE (a toolchain record seeded once per run). Its steps run fvdep-step ⇒
 # tests/oracle/run.sh refuses outside a PID namespace of the job's own.
 oracle_suite() {
-    suite oracle-suite "$(sandbox_closure tests/oracle tool/Main.lean)" "${FVDEP_ORACLE_CASE:-}" \
+    suite oracle-suite "$(stage_key oracle-suite)" "${FVDEP_ORACLE_CASE:-}" \
         bash tests/oracle/run.sh ${FVDEP_ORACLE_CASE:+--case "$FVDEP_ORACLE_CASE"}
 }
 
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the
 # gate (MANIFEST status `merged`) through the built `fvdep`; the rest wait for their units.
 acceptance() {
-    suite acceptance "$(shipped_closure tests/acceptance tool/Main.lean)" \
+    suite acceptance "$(stage_key acceptance)" \
         "${FVDEP_ACCEPTANCE_CASE:-}" env FVDEP_BIN="$root/tool/.lake/build/bin/fvdep" \
         python3 -I tests/acceptance/run.py --merged ${FVDEP_ACCEPTANCE_CASE:+-k "$FVDEP_ACCEPTANCE_CASE"}
 }
@@ -360,8 +353,58 @@ acceptance() {
 # snapshot build, its observations + the kernel replay; `--check` never writes); verdict reused like
 # the suites'. Drift after a library change → regenerate: bash tools/update-index.sh (desktop).
 index_key() { shipped_closure index.json tool/Main.lean; }
+
+# Each keyed stage's input-closure key (its `suite` mark holds it): one place, read by the stage +
+# by `marks`.
+KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite acceptance index'
+stage_key() { # NAME
+    case "$1" in
+    lean-style) closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt ;;
+    coverage) shipped_closure tool docs/verification.md .agent/spec.md ;;
+    ledger-suite) ledger_suite_key ;;
+    codec-suite)
+        { shipped_closure tests/codec tests/sha256; awk '$1 == "jq"' tools/tools.lock; } |
+            sha256sum | cut -c1-64
+        ;;
+    manifest-suite) shipped_closure tests/manifest ;;
+    library-suite) shipped_closure tests/library tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean ;;
+    index-suite)
+        shipped_closure tests/index tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean tool/Main.lean
+        ;;
+    fuzz-replay) shipped_closure tests/fuzz tool/FvdepFuzz tool/FvdepFuzz.lean tools/fuzz.sh ;;
+    sys-suite) shipped_closure tests/sys tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean ;;
+    sandbox-suite) sandbox_closure tests/sandbox ;;
+    isolation) sandbox_closure tests/isolation ;;
+    oracle-suite) sandbox_closure tests/oracle tool/Main.lean ;;
+    acceptance) shipped_closure tests/acceptance tool/Main.lean ;;
+    index) index_key ;;
+    *)
+        printf 'stage_key: %s is no keyed stage\n' "$1" >&2
+        return 1
+        ;;
+    esac
+}
+
+# The probes' input: every keyed stage's green mark = its recomputed key ⇒ each probe copy's control
+# + restored runs reuse those verdicts (CI: the run shards' marks, downloaded by job `probes`); a
+# missing or stale mark refuses, named (else the copies would rerun whole suites: slow, unnamed).
+marks() {
+    local s key rc=0
+    for s in $KEYED_STAGES; do
+        key="$(stage_key "$s")" || return 1
+        if [[ ! -f ".gate/$s.green" ]]; then
+            printf 'marks: %s has no green mark (.gate/%s.green)\n' "$s" "$s" >&2
+            rc=1
+        elif [[ "$(cat ".gate/$s.green")" != "$key" ]]; then
+            printf 'marks: %s holds a mark of another input closure (%s, its key %s)\n' "$s" \
+                "$(head -c 12 ".gate/$s.green")" "${key:0:12}" >&2
+            rc=1
+        fi
+    done
+    return "$rc"
+}
 index() {
-    suite index "$(index_key)" "" "$root/tool/.lake/build/bin/fvdep" index --check
+    suite index "$(stage_key index)" "" "$root/tool/.lake/build/bin/fvdep" index --check
 }
 
 # C7 + C9 `history`: the working tree's index.json against HEAD's + each of HEAD's parents' committed
@@ -370,7 +413,7 @@ index_history() { "$root/tool/.lake/build/bin/fvdep-dev" index history "$root"; 
 
 # Each purpose-built check passes on a clean copy, fails on its planted input, passes restored.
 # The full stage runs every probe: an inherited FVDEP_PROBE (a narrowing rehearsal's) is cleared.
-probes() { env -u FVDEP_PROBE bash tools/gate-probe.sh && python3 tools/test-vflab-identity.py; }
+probes() { marks && env -u FVDEP_PROBE bash tools/gate-probe.sh && python3 tools/test-vflab-identity.py; }
 
 # Library modules import Init, Std + the library; tool modules add Lean, Lake + the tool's libs.
 imports() { bash tools/check-imports.sh imports; }
@@ -449,7 +492,7 @@ fanout() {
     awk 'NF == 1 { print "fanout: stage " $1 " has no CI shard"; bad = 1 } END { exit bad }' \
         <<<"$STAGES" >&2 || rc=1
     matrix="$(sed -n 's/^ *shard: \[\(.*\)\]$/\1/p' "$wf" | tr -d ' ' | tr ',' '\n' | sort)"
-    shards="$(shard_names | sort)"
+    shards="$(shard_names | grep -v -x -F probes | sort)"
     if [[ -z "$matrix" || "$matrix" != "$shards" ]]; then
         printf 'fanout: %s matrix shards [%s] != tools/gate.sh shards [%s]\n' "$wf" \
             "$(paste -sd, - <<<"$matrix")" "$(paste -sd, - <<<"$shards")" >&2
@@ -471,6 +514,27 @@ fanout() {
         END { flush(); print runs + 0, masked + 0, jobmask + 0, failfast + 0, bound + 0 }' "$wf")"
     if [[ "$facts" != "1 0 0 1 1" ]]; then
         printf 'fanout: %s job gate needs one unconditional, unmasked gate step, SHARD bound to the matrix + fail-fast false (runs masked job-mask fail-fast bound = %s)\n' \
+            "$wf" "$facts" >&2
+        rc=1
+    fi
+    # Job `probes` (shard `probes`): after the matrix, on the run shards' green marks (`marks`).
+    # shellcheck disable=SC2016
+    facts="$(awk '
+        function flush() { if (run) { runs++; if (cond) masked++ } run = 0; cond = 0 }
+        /^[^ #]/ { flush(); top = $0 }
+        top == "jobs:" && /^  [^ #]/ { flush(); job = $1 }
+        job == "probes:" {
+            if ($0 ~ /^    (if|continue-on-error):/) jobmask = 1
+            if ($0 ~ /^    needs: gate$/) needs = 1
+            if ($0 ~ /^      - /) flush()
+            if ($0 ~ /^        uses: actions\/download-artifact@/) dl = 1
+            if ($0 ~ /^          path: \.gate$/) into = 1
+            if ($0 ~ /^        run: bash tools\/gate\.sh --shard probes$/) run = 1
+            if ($0 ~ /^(      - |        )(if|continue-on-error):/) cond = 1
+        }
+        END { flush(); print runs + 0, masked + 0, jobmask + 0, needs + 0, dl * into }' "$wf")"
+    if [[ "$facts" != "1 0 0 1 1" ]]; then
+        printf 'fanout: %s job probes needs gate, the green marks downloaded into .gate + one unconditional, unmasked probes step (runs masked job-mask needs marks = %s)\n' \
             "$wf" "$facts" >&2
         rc=1
     fi
