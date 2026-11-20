@@ -1,5 +1,7 @@
 import FvdepCore
+import FvdepIO.Library
 import FvdepIO.Phase
+import FvdepIO.Project
 import FvdepIO.Sha256
 import FvdepIO.Snapshot
 import FvdepIO.Step
@@ -2518,6 +2520,588 @@ def ioCases : List (String × IO Bool) :=
 
 end LibraryT
 
+/-! ## U5b L2: the library store + git (residues `git`, `library-store`) -/
+
+namespace LibraryR
+
+open FvdepCore.Library FvdepCore.Project
+
+/-- git 2.53.0's lines measured per class (U5b-L2: `tools/vflab-run bash tools/git-probe.sh`). -/
+def transportLines : List String :=
+  ["fatal: '/w/gone' does not appear to be a git repository",
+    "fatal: Could not read from remote repository.",
+    "fatal: couldn't find remote ref refs/heads/main",
+    "fatal: unable to access 'https://nonexistent.invalid/x.git/': Could not resolve host: " ++
+      "nonexistent.invalid",
+    "fatal: unable to access 'https://127.0.0.1:1/x.git/': Failed to connect to 127.0.0.1 port " ++
+      "1 after 0 ms: Could not connect to server",
+    "ssh: Could not resolve hostname nonexistent.invalid: Name or service not known\r",
+    "ssh: connect to host 127.0.0.1 port 1: Connection refused\r",
+    "fatal: unable to look up nonexistent.invalid (port 9418) (Name or service not known)",
+    "fatal: unable to connect to 127.0.0.1:", "fatal: unable to get password from user"]
+
+def receivedLines : List String :=
+  ["error: object 10b02062df2d8cd0581e07dfafa73e829b0e98d8: badFilemode: contains bad file modes",
+    "fatal: fsck error in packed object", "fatal: index-pack failed",
+    "fatal: remote error: upload-pack: not our ref 0123456789abcdef0123456789abcdef01234567",
+    "remote: fatal: '/w/gone' does not appear to be a git repository",
+    "fatal: the remote end hung up unexpectedly", "fatal: early EOF", ""]
+
+def errIs {α : Type} (r : Except String α) (msg : String) : Bool :=
+  match r with
+  | .error e => e == msg
+  | .ok _ => false
+
+def entry (path : String) (dir : Bool := false) : TreeEntry :=
+  if dir then ⟨modeTree, .tree, List.replicate 40 98, none, path⟩
+  else ⟨modeFile, .blob, List.replicate 40 97, some 1, path⟩
+
+def cases (seed : UInt64) : List (String × (Unit → Bool)) :=
+  [("library: transport = a line git prints before any object arrives; the rest + server text " ++
+        "never",
+      fun _ =>
+      transportLines.all transportLine && !receivedLines.any transportLine &&
+        transport ("x\n".toUTF8 ++ (transportLines.headD "").toUTF8) &&
+        !transport ("\n".intercalate receivedLines).toUTF8),
+    ("library: the first nonblank stderr line, CR dropped, scrubbed + escaped (§1)", fun _ =>
+      firstLine "/s" "\n  \nfatal: x\r\nsecond\n".toUTF8 == some "fatal: x" &&
+        firstLine "/s" "\x1b[2Jboom\tz".toUTF8 == some "\\u001B[2Jboom\\tz" &&
+        firstLine "/s" " \n\n".toUTF8 == none),
+    ("library: a source's userinfo never reaches a diagnostic (its spelling redacted, each copy " ++
+        "masked)",
+      fun _ =>
+      let src := "file://user:" ++ "pw@h/x"
+      scrub src s!"fatal: '{src}' does not appear" == "fatal: 'file://***@h/x' does not appear" &&
+        scrub src ("token user:" ++ "pw here") == "token *** here" &&
+        scrub "/local/a@b" "at /local/a@b" == "at /local/a@b" &&
+        userinfo ("u@h:" ++ "p") == some "u" &&
+        userinfo "https://h/p" == none &&
+        (LibraryT.tokens seed 200 "ab:x".toList).all fun t =>
+          let u := t ++ ":" ++ t
+          let s := "https://" ++ u ++ "@h/p"
+          ((scrub s s!"fatal: '{s}' with {u} and {s}").splitOn u).length == 1),
+    ("library: git's environment — L3's eight names, HOME = the private repository; SSH keeps " ++
+        "the caller's HOME + agent",
+      fun _ =>
+      gitEnv "/src" "/r.git" (some "/bin") (some "/home") (some "/sock") ==
+          ["PATH=/bin", "LC_ALL=C", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+            "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=", "HOME=/r.git"] &&
+        gitEnv "h:p" "/r.git" none (some "/home") (some "/sock") ==
+          ["LC_ALL=C", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null",
+            "GIT_TERMINAL_PROMPT=0", "GIT_ASKPASS=", "SSH_ASKPASS=", "HOME=/home",
+            "SSH_AUTH_SOCK=/sock"] &&
+        isSsh "ssh://h/p" &&
+        isSsh "u@h:p" &&
+        isSsh "git+ssh://h/p" &&
+        !isSsh "https://h/p" &&
+        !isSsh "file:///p" &&
+        !isSsh "/p"),
+    ("library: L3's fetch argv — each config its own element, the source + refspec last", fun _ =>
+      let a := fetchArgs "/r.git" "/src" none
+      a.take 28 == fetchConfig.flatMap (fun c => ["-c", c]) &&
+        a.drop 28 ==
+          ["-C", "/r.git", "fetch", "--depth=1", "--atomic", "--no-tags", "--no-prune",
+            "--no-recurse-submodules", "--no-auto-maintenance", "--no-write-commit-graph",
+            "--no-write-fetch-head", "--refmap=", "--", "/src",
+            "+refs/heads/main:refs/fvdep/head"] &&
+        (fetchArgs "/r.git" "/src" (some "ab")).getLast? == some "+ab:refs/fvdep/pin" &&
+        initArgs "/r.git" == ["init", "--bare", "-q", "--template=", "/r.git"] &&
+        (subArgs "/r" "c" "Fvdep").getLast? == some "Fvdep" &&
+        !((topArgs "/r" "c" ++ subArgs "/r" "c" "Fvdep" ++ batchArgs "/r" ++ typeArgs "/r" "x" ++
+                revArgs "/r" "x").any
+            fun x => x == "fetch" || x == "init")),
+    ("library: the listings combine into one entry list (each root directory once)", fun _ =>
+      let top := [entry "Fvdep" true, entry "index.json", entry "FvdepProofs" true]
+      let fv := [entry "Fvdep" true, entry "Fvdep/A.lean"]
+      combine top [("Fvdep", fv), ("FvdepProofs", [entry "FvdepProofs" true])] ==
+          [entry "Fvdep" true, entry "Fvdep/A.lean", entry "index.json",
+            entry "FvdepProofs" true] &&
+        combine [entry "Fvdep"] [("Fvdep", fv)] == [entry "Fvdep"]),
+    ("library: path bytes counted over every printed record — at the cap accepted, one byte " ++
+        "over refused at that record",
+      fun _ =>
+      let caps : Caps := { pathTotal := 12 }
+      listedRefusal caps [entry "Fvdep" true, entry "Fvdep" true, entry "ab"] == none &&
+        listedRefusal caps [entry "Fvdep" true, entry "Fvdep" true, entry "abc"] ==
+          some "exceeds the limit of 12 path bytes at abc"),
+    ("library: --limit names (fetchSeconds, lockSeconds, gitBytes, treeEntries, snapshotBytes)",
+      fun _ =>
+      let l : Limits := {}
+      (l.set "fetchSeconds" 2).map (·.fetchSeconds) == some 2 &&
+        (l.set "lockSeconds" 1).map (·.lockSeconds) == some 1 &&
+        (l.set "gitBytes" 192).map (·.gitBytes) == some 192 &&
+        (l.set "treeEntries" 9).map (·.caps.entries) == some 9 &&
+        (l.set "snapshotBytes" 7).map (·.caps.totalBytes) == some 7 &&
+        l.set "pathBytes" 1 == none),
+    ("library: cat-file's requests + the reply length parseBatch accepts", fun _ =>
+      let plan : List Blob := [⟨"a", [97, 98], 3⟩, ⟨"b", [99], 0⟩]
+      (batchInput plan).toList == [97, 98, 0, 99, 0] &&
+        batchBytes plan == (batchHeader [97, 98] 3).length + 4 + (batchHeader [99] 0).length + 1),
+    ("library: UTC text of a second count (epoch, leap day, year ends) + Doc.isUtc on " ++
+        "generated counts",
+      fun _ =>
+      utcText 0 == "1970-01-01T00:00:00Z" && utcText 951782400 == "2000-02-29T00:00:00Z" &&
+        utcText 1767225599 == "2025-12-31T23:59:59Z" &&
+        utcText 4107542400 == "2100-03-01T00:00:00Z" &&
+        utcText 253402300799 == "9999-12-31T23:59:59Z" &&
+        (List.range 300).all fun i =>
+          FvdepCore.Doc.isUtc (utcText ((seed.toNat * (i + 7919)) % 253402300800))),
+    ("library: head.json read back — a record of this store's key, else damaged (decoded, " ++
+        "another source)",
+      fun _ =>
+      let k := String.ofList (List.replicate 64 'a')
+      let h : Head := ⟨String.ofList (List.replicate 40 'c'), "2026-11-20T08:00:00Z", k⟩
+      (match recordOf k (headText h) with
+        | .ok h' => h' == h
+        | .error _ => false) &&
+        errIs (recordOf (String.ofList (List.replicate 64 'b')) (headText h))
+          "head.json names another source" &&
+        errIs (recordOf k "{".toUTF8) "head.json is no head record")]
+
+/-- `git` with a neutral configuration (no user or system config, an identity, no hooks). -/
+def git (repo : System.FilePath) (args : Array String) : IO String := do
+  let o ←
+    IO.Process.output
+        { cmd := "git"
+          args :=
+            #["-C", repo.toString, "-c", "user.name=t", "-c", "user.email=t@t.invalid", "-c",
+                "core.hooksPath=/dev/null", "-c", "commit.gpgSign=false"] ++
+              args
+          env := #[("GIT_CONFIG_GLOBAL", some "/dev/null"), ("GIT_CONFIG_NOSYSTEM", some "1")] }
+  unless o.exitCode == 0 do
+    throw (IO.userError s!"git {args}: {o.stderr}")
+  return o.stdout
+
+def commitAll (src : System.FilePath) (msg : String) : IO String := do
+  discard <| git src #["add", "-A"]
+  discard <| git src #["commit", "-qm", msg]
+  return FvdepCore.Index.Assemble.trimText (← git src #["rev-parse", "HEAD"])
+
+/-- A fixture library at `src`: the required files + a file outside the roots (`first`), then one
+more module (`second`). -/
+def library (src : System.FilePath) : IO (String × String) := do
+  IO.FS.createDirAll src
+  discard <| git src #["init", "-q", "-b", "main"]
+  Snapshot.put src "lakefile.lean" "-- fixture\n".toUTF8
+  Snapshot.put src "lean-toolchain" (FvdepCore.Index.Command.toolchain ++ "\n").toUTF8
+  Snapshot.put src "index.json" "{}\n".toUTF8
+  Snapshot.put src "Fvdep.lean" "import Fvdep.Registry\n".toUTF8
+  Snapshot.put src "Fvdep/Registry.lean" "-- registry\n".toUTF8
+  Snapshot.put src "outside.txt" "not a root\n".toUTF8
+  let first ← commitAll src "one"
+  Snapshot.put src "Fvdep/Second.lean" "-- second\n".toUTF8
+  return (first, ← commitAll src "two")
+
+def withTmp (f : System.FilePath → IO Bool) : IO Bool := do
+  let d ← IO.FS.createTempDir
+  try
+    f d
+  finally
+    Snapshot.rmTree d
+
+def store (d src : System.FilePath) (l : Limits := {}) (program := "git") :
+    IO FvdepIO.Library.Store := FvdepIO.Library.Store.of (d / "cache") src.toString l program
+
+/-- An executable shell script. -/
+def script (path : System.FilePath) (body : String) : IO Unit := do
+  IO.FS.writeFile path ("#!/bin/sh\n" ++ body)
+  IO.setAccessRights path
+      { user := { read := true, write := true, execution := true }
+        group := { read := true, execution := true } }
+
+def mode (p : System.FilePath) : IO String := do
+  return FvdepCore.Index.Assemble.trimText
+      (← IO.Process.output { cmd := "stat", args := #["-c", "%a", p.toString] }).stdout
+
+def bytesOf (p : System.FilePath) : IO (List UInt8) := do
+  return (← IO.FS.readBinFile p).toList
+
+def isError (r : Except String FvdepIO.Library.Served) (needle : String) : Bool :=
+  match r with
+  | .error e => (e.splitOn needle).length > 1
+  | .ok _ => false
+
+def libraryFiles : List String :=
+  ["lakefile.lean", "lean-toolchain", "index.json", "Fvdep.lean", "Fvdep/Registry.lean",
+    "Fvdep/Second.lean"]
+
+def ioCases : List (String × IO Bool) :=
+  [("spawn: killGroup refuses 0, 1, a value read as negative + the caller's own group (EINVAL; " ++
+        "a group leader by setsid: a job's PID namespace shows the caller's group as 0)",
+      do
+      let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+      let o ←
+        IO.Process.output
+            { cmd := "setsid", args := #["-w", dev.toString, "library", "killgroup", "self"] }
+      return (← FvdepIO.Git.killGroup 0 0) matches .error 22 &&
+          (← FvdepIO.Git.killGroup 1 0) matches .error 22 &&
+          (← FvdepIO.Git.killGroup 0x80000000 0) matches .error 22 &&
+          o.stdout == "refused 22\n"),
+    ("library: a head fetch publishes the roots' blobs (0644) + `.complete`, records the head, " ++
+        "removes its temps",
+      withTmp fun d => do
+        let src := d / "src"
+        let (_, second) ← library src
+        let s ← store d src
+        match ← FvdepIO.Library.snapshot s none with
+        | .error _ =>
+          return false
+        | .ok sv =>
+          let same ←
+            libraryFiles.allM fun (f : String) => do
+                let shown ← git src #["show", s!"{second}:{f}"]
+                return (← bytesOf (sv.tree / f)) == shown.toUTF8.toList
+          let modes ← libraryFiles.allM fun (f : String) => return (← mode (sv.tree / f)) == "644"
+          let head := recordOf s.key (← IO.FS.readBinFile (s.dir / "head.json"))
+          return sv.commit == second && sv.notice.isNone && same && modes &&
+              !(← (sv.tree / "outside.txt").pathExists) &&
+              (← FvdepIO.Library.kind (sv.tree / ".complete")) matches some .file &&
+              (match head with
+              | .ok h => h.commit == second && FvdepCore.Doc.isUtc h.fetched
+              | .error _ => false) &&
+              (← s.tmp.readDir).isEmpty),
+    ("library: a pin's tree served (head.json untouched); a published pin runs no git",
+      withTmp fun d => do
+        let src := d / "src"
+        let (first, _) ← library src
+        let r ← FvdepIO.Library.snapshot (← store d src) (some first)
+        let gitless ← store d src (program := "/nonexistent/git")
+        let warm ← FvdepIO.Library.snapshot gitless (some first)
+        let cold ← FvdepIO.Library.snapshot gitless (some (String.ofList (List.replicate 40 'e')))
+        let servedFirst (x : Except String FvdepIO.Library.Served) : Bool :=
+          match x with
+          | .ok sv => sv.commit == first && sv.notice.isNone
+          | .error _ => false
+        return servedFirst r && servedFirst warm &&
+            isError cold "Fetch failed: git could not start: " &&
+            !(← ((← store d src).dir / "head.json").pathExists)),
+    ("library: an unreachable source (gone, no main) serves the last head + its notice; never " ++
+        "fetched → never",
+      withTmp fun d => do
+        let src := d / "src"
+        let (_, second) ← library src
+        let s ← store d src
+        let _ ← FvdepIO.Library.snapshot s none
+        let raw ← bytesOf (s.dir / "head.json")
+        let fetched :=
+          match recordOf s.key (← IO.FS.readBinFile (s.dir / "head.json")) with
+          | .ok h => h.fetched
+          | .error _ => ""
+        IO.FS.rename src (d / "away")
+        let r ← FvdepIO.Library.snapshot s none
+        let never ← FvdepIO.Library.snapshot (← store (d / "other") src) none
+        let gone := s!"Fetch failed: fatal: '{src}' does not appear to be a git repository."
+        let rawAfter ← bytesOf (s.dir / "head.json")
+        IO.FS.rename (d / "away") src
+        discard <| git src #["branch", "-m", "main", "side"]
+        let noMain ← FvdepIO.Library.snapshot s none
+        let lastNotice (x : Except String FvdepIO.Library.Served) (first : String) : Bool :=
+          match x with
+          | .ok sv =>
+            sv.commit == second && sv.notice == some s!"{first} Last successful fetch: {fetched}."
+          | .error _ => false
+        return lastNotice r gone && errIs never s!"{gone} Last successful fetch: never." &&
+            rawAfter == raw &&
+            lastNotice noMain "Fetch failed: fatal: couldn't find remote ref refs/heads/main." &&
+            (← bytesOf (s.dir / "head.json")) == raw),
+    ("library: after a transport failure a damaged store refuses (record bytes, another source, " ++
+        "the tree missing or incomplete) + keeps the record",
+      withTmp fun d => do
+        let src := d / "src"
+        let (_, second) ← library src
+        let s ← store d src
+        let _ ← FvdepIO.Library.snapshot s none
+        let good ← IO.FS.readBinFile (s.dir / "head.json")
+        IO.FS.rename src (d / "away")
+        let pre := s!"infra io: the library store of {src} is damaged: "
+        let damagedBy (bytes : ByteArray) (why : String) : IO Bool := do
+          IO.FS.writeBinFile (s.dir / "head.json") bytes
+          let r ← FvdepIO.Library.snapshot s none
+          return errIs r (pre ++ why) && (← bytesOf (s.dir / "head.json")) == bytes.toList
+        let other :=
+          headText ⟨second, "2026-11-20T08:00:00Z", String.ofList (List.replicate 64 'f')⟩
+        let a ← damagedBy "{".toUTF8 "head.json is no head record"
+        let b ← damagedBy other "head.json names another source"
+        IO.FS.rename (s.trees / second) (d / "aside")
+        let gone := s!"the snapshot {second} that head.json names is missing or incomplete"
+        let c ← damagedBy good gone
+        IO.FS.rename (d / "aside") (s.trees / second)
+        IO.FS.removeFile (s.trees / second / ".complete")
+        let e ← damagedBy good gone
+        return a && b && c && e),
+    ("library: a received candidate that fails (link, submodule, missing required file, a path " ++
+        "not UTF-8, a tag at the ref) never falls back, publishes nothing + removes its temps",
+      withTmp fun d => do
+        let src := d / "src"
+        let (first, second) ← library src
+        let s ← store d src
+        let _ ← FvdepIO.Library.snapshot s none
+        let raw ← bytesOf (s.dir / "head.json")
+        let refusedAs (needle : String) (add := true) : IO Bool := do
+          if add then
+            discard <| git src #["add", "-A"]
+          discard <| git src #["commit", "-qm", "bad"]
+          let c := FvdepCore.Index.Assemble.trimText (← git src #["rev-parse", "HEAD"])
+          let r ← FvdepIO.Library.snapshot s none
+          let ok :=
+            isError r needle && !isError r "Last successful fetch" &&
+              (← bytesOf (s.dir / "head.json")) == raw &&
+              !(← (s.trees / c).pathExists) &&
+              (← s.tmp.readDir).isEmpty
+          discard <| git src #["reset", "-q", "--hard", second]
+          return ok
+        let made ← Snapshot.sh "ln" #["-s", "../lakefile.lean", (src / "Fvdep" / "l").toString]
+        let a ← refusedAs "holds a link at Fvdep/l"
+        discard <| git src #["update-index", "--add", "--cacheinfo", s!"160000,{first},Fvdep/sub"]
+        let b ← refusedAs "holds a submodule at Fvdep/sub" (add := false)
+        IO.FS.removeFile (src / "Fvdep" / "Registry.lean")
+        let c ← refusedAs "is no fvdep library"
+        let tag ← git src #["tag", "-a", "-m", "t", "v1"] *> git src #["rev-parse", "v1"]
+        IO.FS.writeFile (src / ".git" / "refs" / "heads" / "main")
+            (FvdepCore.Index.Assemble.trimText tag ++ "\n")
+        let r ← FvdepIO.Library.snapshot s none
+        let t :=
+          isError r "the fetched ref names a tag, not a commit" && !isError r "Last successful"
+        let t := t && (← s.tmp.readDir).isEmpty
+        IO.FS.writeFile (src / ".git" / "refs" / "heads" / "main") (second ++ "\n")
+        discard <| git src #["reset", "-q", "--hard", second]
+        let made2 ←
+          Snapshot.sh "sh"
+              #["-c", "printf x > \"$1/Fvdep/bad$(printf '\\377').txt\"", "sh", src.toString]
+        let e ← refusedAs "holds a path that is not valid UTF-8"
+        return made && a && b && c && t && made2 && e),
+    ("library: an incomplete tree is rebuilt + stale temps removed under the lock",
+      withTmp fun d => do
+        let src := d / "src"
+        let (first, _) ← library src
+        let s ← store d src
+        Snapshot.put (s.trees / first) "index.json" "not json".toUTF8
+        Snapshot.put (s.trees / first) "junk" "must go".toUTF8
+        IO.FS.createDirAll (s.tmp / "2147483647.1.git" / "objects")
+        let r ← FvdepIO.Library.snapshot s (some first)
+        return (r matches .ok _) && !(← (s.trees / first / "junk").pathExists) &&
+            (← bytesOf (s.trees / first / "index.json")) == "{}\n".toUTF8.toList &&
+            (← FvdepIO.Library.kind (s.trees / first / ".complete")) matches some .file &&
+            (← s.tmp.readDir).isEmpty),
+    ("library: the store lock's wait ends after lockSeconds (stayed locked), before any git " ++
+        "run; a published pin is served without the lock",
+      withTmp fun d => do
+        let src := d / "src"
+        let (first, _) ← library src
+        let _ ← FvdepIO.Library.snapshot (← store d src) (some first)
+        let s ← store d src { lockSeconds := 1 } "/nonexistent/git"
+        let h ← IO.FS.Handle.mk (s.dir / "lock") .append
+        h.lock
+        let t0 ← IO.monoMsNow
+        let r ← FvdepIO.Library.snapshot s none
+        let t1 ← IO.monoMsNow
+        let warm ← FvdepIO.Library.snapshot s (some first)
+        let t2 ← IO.monoMsNow
+        h.unlock
+        let served :=
+          match warm with
+          | .ok sv => sv.commit == first
+          | .error _ => false
+        return errIs r s!"infra io: the library store of {src} stayed locked" && 900 ≤ t1 - t0 &&
+            t1 - t0 < 5000 &&
+            served &&
+            t2 - t1 < 500),
+    ("library: the fetch deadline kills git's process group (a helper too) + reaps it",
+      withTmp fun d => do
+        let src := d / "src"
+        let _ ← library src
+        let log := d / "pids"
+        script (d / "git")
+            ("for a in \"$@\"; do if [ \"$a\" = fetch ]; then sleep 30 & echo \"$$ $!\" > '" ++
+              log.toString ++
+              "'; wait; exit 1; fi; done\nexec git \"$@\"\n")
+        let s ← store d src { fetchSeconds := 2 } (d / "git").toString
+        let t0 ← IO.monoMsNow
+        let r ← FvdepIO.Library.snapshot s none
+        let t1 ← IO.monoMsNow
+        let pids :=
+          ((FvdepCore.Index.Assemble.trimText (← IO.FS.readFile log)).splitOn " ").filterMap
+            String.toNat?
+        let stopped (pid : Nat) : IO Bool := do
+          let st := s!"/proc/{pid}/stat"
+          unless ← System.FilePath.pathExists st do
+            return true
+          let text ← IO.FS.readFile st
+          return ((text.splitOn ") ").getLastD "").startsWith "Z"
+        let mut helper := false
+        for _ in [0:30] do
+          if ← stopped (pids.getD 1 0) then
+            helper := true
+            break
+          IO.sleep 100
+        let leaderGone := !(← System.FilePath.pathExists s!"/proc/{pids.getD 0 0}")
+        return errIs r "Fetch failed: git fetch passed its deadline of 2 seconds." &&
+            t1 - t0 < 10000 &&
+            pids.length == 2 &&
+            helper &&
+            leaderGone &&
+            (← s.tmp.readDir).isEmpty),
+    ("library: git runs with exactly L3's environment + argv (init, fetch) in a private repository",
+      withTmp fun d => do
+        let src := d / "src"
+        let _ ← library src
+        let log := d / "calls"
+        let record :=
+          "{ printf 'ARGS'; for a in \"$@\"; do printf '\\t%s' \"$a\"; done; " ++
+            "printf '\\nENV'; tr '\\000' '\\n' < /proc/$$/environ | sed 's/=.*//' | sort | " ++
+            "tr '\\n' ' '; printf '\\nHOME %s\\n' \"$HOME\"; }"
+        script (d / "git") (record ++ " >> '" ++ log.toString ++ "'\nexec git \"$@\"\n")
+        let s ← store d src {} (d / "git").toString
+        let r ← FvdepIO.Library.snapshot s none
+        let lines := (← IO.FS.readFile log).splitOn "\n"
+        let calls :=
+          lines.filterMap fun l =>
+            if l.startsWith "ARGS" then some ((l.splitOn "\t").drop 1) else none
+        let envs := lines.filter (·.startsWith "ENV")
+        let homes := lines.filter (·.startsWith "HOME ")
+        let init := calls.headD []
+        let repo := init.getLastD ""
+        let fetch := calls.getD 1 []
+        return (r matches .ok _) && init == initArgs repo &&
+            repo.startsWith (s.tmp.toString ++ "/") &&
+            repo.endsWith ".git" &&
+            fetch == fetchArgs repo src.toString none &&
+            envs.all
+              (· ==
+                "ENVGIT_ASKPASS GIT_CONFIG_GLOBAL GIT_CONFIG_NOSYSTEM GIT_TERMINAL_PROMPT HOME " ++
+                  "LC_ALL PATH SSH_ASKPASS ") &&
+            homes.all (· == s!"HOME {repo}") &&
+            !(← System.FilePath.pathExists repo) &&
+            calls.length == envs.length &&
+            (calls.filter (·.contains "fetch")).length == 1),
+    ("library: a failed fetch's line — the source's userinfo masked, §1 escapes, the kept bytes " ++
+        "alone",
+      withTmp fun d => do
+        let err := d / "err"
+        script (d / "git")
+            ("for a in \"$@\"; do if [ \"$a\" = fetch ]; then cat '" ++ err.toString ++
+              "' >&2; exit 128; fi; done\nexec git \"$@\"\n")
+        let src := "file://user:" ++ "pw@localhost/nonexistent"
+        let run (l : Limits) : IO (Except String FvdepIO.Library.Served) := do
+          let st ← FvdepIO.Library.Store.of (d / "cache") src l (d / "git").toString
+          FvdepIO.Library.snapshot st none
+        IO.FS.writeFile err
+            s!"fatal: '{src}' does not appear to be a git repository\nuser:pw again\n"
+        let a ← run {}
+        IO.FS.writeFile err "\x1b[2Jboom\tz\nsecond\n"
+        let b ← run {}
+        IO.FS.writeFile err ("0123456789" ++ String.ofList (List.replicate 300 'X') ++ "PLANT\n")
+        let c ← run { gitBytes := 40 }
+        return errIs a
+              ("Fetch failed: fatal: 'file://***@localhost/nonexistent' does not " ++
+                "appear to be a git repository. Last successful fetch: never.") &&
+            errIs b "Fetch failed: \\u001B[2Jboom\\tz." &&
+            errIs c ("Fetch failed: 0123456789" ++ String.ofList (List.replicate 30 'X') ++ ".")),
+    ("library: a listing past its stdout cap is refused before any plan",
+      withTmp fun d => do
+        let src := d / "src"
+        let (_, second) ← library src
+        let st ← store d src { caps := { entries := 1, pathTotal := 10 } }
+        let r ← FvdepIO.Library.snapshot st none
+        return errIs r
+            (s!"Fetch failed: the library snapshot {second} lists more than its " ++
+              "limits allow (1 tree entries, 10 path bytes).")),
+    ("library: path bytes counted over both listings (the root directory's name twice): 93 " ++
+        "printed > 90 refused at the crossing record, though the distinct entries hold 88",
+      withTmp fun d => do
+        let src := d / "src"
+        let (_, second) ← library src
+        let st ← store d src { caps := { pathTotal := 90 } }
+        let r ← FvdepIO.Library.snapshot st none
+        let st93 ← store (d / "b") src { caps := { pathTotal := 93 } }
+        let ok ← FvdepIO.Library.snapshot st93 none
+        return errIs r
+              (s!"Fetch failed: the library snapshot {second} exceeds the limit of 90 " ++
+                "path bytes at Fvdep/Second.lean.") &&
+            ok matches .ok _),
+    ("project: fvdep.toml by lstat — a file, a link, a FIFO, a directory, absent",
+      withTmp fun d => do
+        Snapshot.put (d / "f") "fvdep.toml" "x".toUTF8
+        IO.FS.createDirAll (d / "l")
+        let target := (d / "f" / "fvdep.toml").toString
+        let a ← Snapshot.sh "ln" #["-s", target, (d / "l" / "fvdep.toml").toString]
+        IO.FS.createDirAll (d / "p")
+        let b ← Snapshot.sh "mkfifo" #[(d / "p" / "fvdep.toml").toString]
+        IO.FS.createDirAll (d / "dir" / "fvdep.toml")
+        return a && b && (← FvdepIO.Project.found (d / "f")) == .file &&
+            (← FvdepIO.Project.found (d / "l")) == .link &&
+            (← FvdepIO.Project.found (d / "p")) == .special &&
+            (← FvdepIO.Project.found (d / "dir")) == .special &&
+            (← FvdepIO.Project.found (d / "none")) == .absent &&
+            (FvdepIO.Project.ancestors "/a/b").map (·.toString) == ["/a/b", "/a", "/"]),
+    ("project: the pin through U3's reader; its refusals name the file (syntax, schema, size)",
+      withTmp fun d => do
+        let pin := String.ofList (List.replicate 40 'a')
+        let m := s!"schema = 1\n\n[library]\ncommit = \"{pin}\"\n"
+        let file := s!"{d}/fvdep.toml"
+        Snapshot.put d "fvdep.toml" m.toUTF8
+        let ok ← FvdepIO.Project.pin d.toString
+        Snapshot.put d "fvdep.toml" "schema = [\n".toUTF8
+        let syn ← FvdepIO.Project.pin d.toString
+        Snapshot.put d "fvdep.toml" (m.replace "schema = 1" "schema = 2").toUTF8
+        let schema ← FvdepIO.Project.pin d.toString
+        let body := m.toUTF8 ++ "#".toUTF8
+        Snapshot.put d "fvdep.toml" (body ++ ⟨(List.replicate (65537 - body.size) 0x78).toArray⟩)
+        let big ← FvdepIO.Project.pin d.toString
+        Snapshot.put d "fvdep.toml" (body ++ ⟨(List.replicate (200000 - body.size) 0x78).toArray⟩)
+        let huge ← FvdepIO.Project.pin d.toString
+        let tooLarge := s!"infra schema: {file}: too_large (more than 65536 bytes)"
+        return (match ok with
+            | .ok p => p == pin
+            | .error _ => false) &&
+            (match syn with
+            | .error e => e.startsWith s!"infra schema: {file}: syntax at 2:1: "
+            | .ok _ => false) &&
+            (match schema with
+            | .error e => e.startsWith s!"infra schema: {file}: " && (e.splitOn "schema").length > 2
+            | .ok _ => false) &&
+            errIs big tooLarge &&
+            errIs huge tooLarge &&
+            errIs (← FvdepIO.Project.pin (d / "none").toString)
+              s!"No fvdep.toml found in {d}/none."),
+    ("library: fvdep-dev library fetch end to end — a project's pin under umask 077 still " ++
+        "writes 0644 files; git through PATH, no inherited descriptor; stdout = served <commit>",
+      withTmp fun d => do
+        let src := d / "src"
+        let (first, _) ← library src
+        Snapshot.put (d / "proj") "fvdep.toml"
+            s!"schema = 1\n\n[library]\ncommit = \"{first}\"\n".toUTF8
+        IO.FS.createDirAll (d / "proj" / "a")
+        let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+        let real :=
+          FvdepCore.Index.Assemble.trimText
+            (← IO.Process.output { cmd := "sh", args := #["-c", "command -v git"] }).stdout
+        let fds := (d / "fds").toString
+        IO.FS.createDirAll (d / "bin")
+        script (d / "bin" / "git")
+            ("ls /proc/$$/fd | tr '\\n' ' ' >> '" ++ fds ++ "'; echo >> '" ++ fds ++ "'\nexec '" ++
+              real ++
+              "' \"$@\"\n")
+        let path := (d / "bin").toString ++ ":" ++ ((← IO.getEnv "PATH").getD "/usr/bin:/bin")
+        let o ←
+          IO.Process.output
+              { cmd := "sh"
+                args :=
+                  #["-c", "umask 077 && exec 7</dev/null && cd \"$1\" && exec \"$2\" library fetch",
+                    "sh", (d / "proj" / "a").toString, dev.toString]
+                env :=
+                  #[("FVDEP_CACHE", some (d / "cache").toString),
+                    ("FVDEP_LIBRARY_URL", some src.toString), ("PATH", some path)] }
+        let seen := ((← IO.FS.readFile (d / "fds")).splitOn "\n").filter (· != "")
+        let s ← store d src
+        return o.exitCode == 0 && o.stdout == s!"served {first}\n" && o.stderr == "" &&
+            !seen.isEmpty &&
+            seen.all (fun l => !(l.splitOn " ").contains "7") &&
+            (← mode (s.trees / first / "Fvdep/Registry.lean")) == "644" &&
+            !(← (s.dir / "head.json").pathExists))]
+
+end LibraryR
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -2563,13 +3147,15 @@ def main : IO UInt32 := do
                   Snapshot.cases ++
                   PhaseD.cases ++
                   ExportR.cases ++
-                  LibraryT.cases seed).map
+                  LibraryT.cases seed ++
+                  LibraryR.cases seed).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
     (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases ++
             PhaseIO.ioCases ++
-            LibraryT.ioCases).mapM
+            LibraryT.ioCases ++
+            LibraryR.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩

@@ -198,6 +198,125 @@ fail:
     return fvdep_error(e);
 }
 
+/* Git (docs/contracts/U5b-oracle.md L3–L4; residue `git`): stdout + stderr pipes, every end ≥ 3 (a
+ * free 0–2 would be clobbered by the child's dup2), then posix_spawnp(file, argv, envp) — `file`
+ * searched in the caller's PATH, the one the Lean side passes in envp — with stdin = the file at
+ * `stdin_path` ("" = /dev/null), every descriptor ≥ 3 closed, the fvdep_attr signal state + its own
+ * process group (pgid = its pid: a deadline kill reaches its helpers) → .ok #[pid, stdout, stderr]
+ * (the read ends, close-on-exec). */
+LEAN_EXPORT lean_obj_res fvdep_spawn_proc(b_lean_obj_arg file, b_lean_obj_arg argv,
+                                          b_lean_obj_arg envp, b_lean_obj_arg stdin_path) {
+    const char *cfile;
+    const char *cin;
+    int e = fvdep_cstr(file, &cfile);
+    if (e == 0) {
+        e = fvdep_cstr(stdin_path, &cin);
+    }
+    if (e != 0) {
+        return fvdep_error(e);
+    }
+    /* read + write ends of stdout, stderr */
+    int fds[4];
+    int made = 0;
+    while (made < 4) {
+        int p[2];
+        if (pipe2(p, O_CLOEXEC) != 0) {
+            e = errno;
+            goto fail;
+        }
+        for (int k = 0; k < 2; k++) {
+            if (p[k] < 3) {
+                int moved = fcntl(p[k], F_DUPFD_CLOEXEC, 3);
+                if (moved < 0) {
+                    e = errno;
+                    close(p[0]);
+                    close(p[1]);
+                    goto fail;
+                }
+                close(p[k]);
+                p[k] = moved;
+            }
+        }
+        fds[made] = p[0];
+        fds[made + 1] = p[1];
+        made += 2;
+    }
+    fvdep_closefrom_fn closefrom = fvdep_closefrom();
+    if (closefrom == NULL) {
+        e = ENOSYS;
+        goto fail;
+    }
+    char **cargv = fvdep_argv(argv, &e);
+    if (cargv == NULL) {
+        goto fail;
+    }
+    char **cenv = fvdep_argv(envp, &e);
+    if (cenv == NULL) {
+        free(cargv);
+        goto fail;
+    }
+    posix_spawn_file_actions_t fa;
+    if ((e = posix_spawn_file_actions_init(&fa)) != 0) {
+        free(cargv);
+        free(cenv);
+        goto fail;
+    }
+    if ((e = posix_spawn_file_actions_addopen(&fa, 0, cin[0] == '\0' ? "/dev/null" : cin, O_RDONLY,
+                                              0)) != 0 ||
+        (e = posix_spawn_file_actions_adddup2(&fa, fds[1], 1)) != 0 ||
+        (e = posix_spawn_file_actions_adddup2(&fa, fds[3], 2)) != 0 ||
+        (e = closefrom(&fa, 3)) != 0) {
+        posix_spawn_file_actions_destroy(&fa);
+        free(cargv);
+        free(cenv);
+        goto fail;
+    }
+    posix_spawnattr_t attr;
+    if ((e = fvdep_attr(&attr)) != 0) {
+        posix_spawn_file_actions_destroy(&fa);
+        free(cargv);
+        free(cenv);
+        goto fail;
+    }
+    if ((e = posix_spawnattr_setpgroup(&attr, 0)) != 0 ||
+        (e = posix_spawnattr_setflags(&attr, POSIX_SPAWN_SETSIGMASK | POSIX_SPAWN_SETSIGDEF |
+                                                 POSIX_SPAWN_SETPGROUP)) != 0) {
+        posix_spawnattr_destroy(&attr);
+        posix_spawn_file_actions_destroy(&fa);
+        free(cargv);
+        free(cenv);
+        goto fail;
+    }
+    pid_t pid;
+    e = posix_spawnp(&pid, cfile, &fa, &attr, cargv, cenv);
+    posix_spawnattr_destroy(&attr);
+    posix_spawn_file_actions_destroy(&fa);
+    free(cargv);
+    free(cenv);
+    if (e != 0) {
+        goto fail;
+    }
+    close(fds[1]);
+    close(fds[3]);
+    size_t vs[3] = {(size_t)pid, (size_t)fds[0], (size_t)fds[2]};
+    return fvdep_values(3, vs);
+fail:
+    for (int k = 0; k < made; k++) {
+        close(fds[k]);
+    }
+    return fvdep_error(e);
+}
+
+LEAN_EXPORT lean_obj_res fvdep_spawn_killpg(uint32_t pgid, uint32_t sig) {
+    /* A git child's own group alone: 0 (the caller's group), 1 (init's), a value that reads as
+     * negative and the caller's own group are refused. */
+    if ((pid_t)pgid <= 1 || (pid_t)pgid == getpgrp()) {
+        errno = EINVAL;
+        return fvdep_unit(-1);
+    }
+    return fvdep_unit(killpg((pid_t)pgid, (int)sig));
+}
+
 LEAN_EXPORT lean_obj_res fvdep_spawn_poll(b_lean_obj_arg fds, uint32_t timeout) {
     size_t n = lean_array_size(fds);
     struct pollfd *p = calloc(n ? n : 1, sizeof(struct pollfd));

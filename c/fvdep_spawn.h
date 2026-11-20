@@ -14,6 +14,13 @@
  * every catchable signal at its default; → .ok #[pid, stdout, stderr, status (3), output (4)] (the
  * read ends, close-on-exec). */
 LEAN_EXPORT lean_obj_res fvdep_spawn_bwrap(b_lean_obj_arg path, b_lean_obj_arg argv);
+/* Git (U5b L3–L4, residue `git`): posix_spawnp(file, argv, envp) in its own process group, stdin =
+ * the file at stdin_path ("" = /dev/null), stdout + stderr = pipes, every descriptor ≥ 3 closed →
+ * .ok #[pid, stdout, stderr] (the read ends, close-on-exec). */
+LEAN_EXPORT lean_obj_res fvdep_spawn_proc(b_lean_obj_arg file, b_lean_obj_arg argv,
+                                          b_lean_obj_arg envp, b_lean_obj_arg stdin_path);
+/* killpg(pgid, sig); pgid ≤ 1 or the caller's own group → .error EINVAL */
+LEAN_EXPORT lean_obj_res fvdep_spawn_killpg(uint32_t pgid, uint32_t sig);
 /* poll(fds, timeout ms) → .ok #[revents per fd] */
 LEAN_EXPORT lean_obj_res fvdep_spawn_poll(b_lean_obj_arg fds, uint32_t timeout);
 /* kill(pid, sig) */

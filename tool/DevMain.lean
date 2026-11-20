@@ -13,7 +13,7 @@ measure FAMILY N TASKS` (J5 resources: `tools/json-resources.sh`); `fvdep-dev or
 (contract U4 B5: the launch specs over adapter protocol v1); `fvdep-dev index decode <file>`
 (contract U4 C9); `fvdep-dev sandbox run …` (contract U5 D2); `fvdep-dev cache …` (contract U5
 D3); `fvdep-dev phase check …` (contract U5 D1); `fvdep-dev export read …` (contract U5b X);
-`fvdep-dev library tree|plan …` (contract U5b L4); never shipped. -/
+`fvdep-dev library tree|plan|batch|fetch …` (contract U5b L2–L7); never shipped. -/
 def main (args : List String) : IO UInt32 :=
   match args with
   | "sys" :: "run" :: ops => FvdepDev.Sys.run ops

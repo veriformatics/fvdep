@@ -1,4 +1,4 @@
-import FvdepCore.Index.Assemble
+import FvdepCore.Index.Command
 import FvdepCore.Manifest
 import FvdepCore.Step
 
@@ -401,5 +401,231 @@ def afterHead (head : HeadState) : Fetch → Selected
     | .absent => .refuse s!"Fetch failed: {r}. Last successful fetch: never."
     | .damaged why => .refuse why
   | .received r | .localFault r | .unclassified r => .refuse s!"Fetch failed: {r}."
+
+/-! ## L2–L6 the residue's settings + texts (tested; outside the claims) -/
+
+/-- T's library limits (L2–L4): seconds one git process may run, seconds to wait for the store
+lock, bytes kept per git diagnostic stream, the tree caps (`treeEntries` = `caps.entries`,
+`snapshotBytes` = `caps.totalBytes`). -/
+structure Limits where
+  fetchSeconds : Nat := 300
+  lockSeconds : Nat := 60
+  gitBytes : Nat := 65536
+  caps : Caps := {}
+  deriving DecidableEq, Repr
+
+/-- One `--limit <name>=<n>` of the dev seam (Q3): `none` = no library limit of that name. -/
+def Limits.set (l : Limits) (name : String) (n : Nat) : Option Limits :=
+  match name with
+  | "fetchSeconds" => some { l with fetchSeconds := n }
+  | "lockSeconds" => some { l with lockSeconds := n }
+  | "gitBytes" => some { l with gitBytes := n }
+  | "treeEntries" => some { l with caps := { l.caps with entries := n } }
+  | "snapshotBytes" => some { l with caps := { l.caps with totalBytes := n } }
+  | _ => none
+
+/-- L3's `-c` settings, in order. -/
+def fetchConfig : List String :=
+  ["fetch.fsckObjects=true", "fetch.fsck.badFilemode=error",
+    "fetch.fsck.gitattributesSymlink=error", "fetch.fsck.gitignoreSymlink=error",
+    "fetch.fsck.gitmodulesParse=error", "core.hooksPath=/dev/null", "core.fsmonitor=false",
+    "credential.helper=", "credential.interactive=false", "core.sshCommand=ssh -o BatchMode=yes",
+    "http.followRedirects=false", "transfer.bundleURI=false", "promisor.acceptFromServer=none",
+    "gc.auto=0"]
+
+/-- L3: the fixed ref of a head fetch (`none`) or a pin's. -/
+def refOf : Option String → String
+  | none => "refs/fvdep/head"
+  | some _ => "refs/fvdep/pin"
+
+def refspec : Option String → String
+  | none => "+refs/heads/main:refs/fvdep/head"
+  | some pin => s!"+{pin}:refs/fvdep/pin"
+
+/-- L3: `git init` of the private repository `repo`. -/
+def initArgs (repo : String) : List String := ["init", "--bare", "-q", "--template=", repo]
+
+/-- L3: the fetch (each `-c` value its own element; the source + refspec last). -/
+def fetchArgs (repo source : String) (pin : Option String) : List String :=
+  fetchConfig.flatMap (fun c => ["-c", c]) ++
+    ["-C", repo, "fetch", "--depth=1", "--atomic", "--no-tags", "--no-prune",
+      "--no-recurse-submodules", "--no-auto-maintenance", "--no-write-commit-graph",
+      "--no-write-fetch-head", "--refmap=", "--", source, refspec pin]
+
+/-- L3–L4: a read of the private repository (no replacement objects, no lazy fetch). -/
+def readArgs (repo : String) (rest : List String) : List String :=
+  ["--no-replace-objects", "--no-lazy-fetch", "-C", repo] ++ rest
+
+/-- L3: the fixed ref's direct type (`commit` required: a tag is refused) + its object. -/
+def typeArgs (repo ref : String) : List String := readArgs repo ["cat-file", "-t", ref]
+
+def revArgs (repo ref : String) : List String := readArgs repo ["rev-parse", "--verify", ref]
+
+/-- L4: the top listing over the roots. -/
+def topArgs (repo commit : String) : List String :=
+  readArgs repo
+    (["ls-tree", "-t", "-l", "-z", "--full-tree", commit, "--"] ++ rootFiles ++ rootDirs)
+
+/-- L4: one root directory's recursive listing (the root = the last element). -/
+def subArgs (repo commit root : String) : List String :=
+  readArgs repo ["ls-tree", "-r", "-t", "-l", "-z", "--full-tree", commit, "--", root]
+
+/-- L4: the blob batch (its requests on stdin). -/
+def batchArgs (repo : String) : List String := readArgs repo ["cat-file", "--batch", "-Z"]
+
+/-- A URL in `scheme://` form (the first `:` opens `://`). -/
+def schemeForm (s : String) : Bool := (s.toList.dropWhile (· != ':')).take 3 == [':', '/', '/']
+
+/-- L3: an SSH source (`ssh://`, `git+ssh://`, `ssh+git://`, the scp-like `host:path`). -/
+def isSsh (s : String) : Bool :=
+  isUrl s &&
+    (!schemeForm s || s.startsWith "ssh://" || s.startsWith "git+ssh://" ||
+      s.startsWith "ssh+git://")
+
+/-- L3: git's whole environment: `PATH` (the caller's, when set), `LC_ALL=C`, no system or global
+config, no prompt or askpass; `HOME` = the private repository `repo` (no ambient `.netrc` or
+credentials), except an SSH source: the caller's `HOME` + `SSH_AUTH_SOCK` (its deliberate SSH
+authentication). -/
+def gitEnv (source repo : String) (path home sock : Option String) : List String :=
+  (path.map fun p => "PATH=" ++ p).toList ++
+    ["LC_ALL=C", "GIT_CONFIG_NOSYSTEM=1", "GIT_CONFIG_GLOBAL=/dev/null", "GIT_TERMINAL_PROMPT=0",
+      "GIT_ASKPASS=", "SSH_ASKPASS="] ++
+    (if isSsh source then
+      (home.map fun h => "HOME=" ++ h).toList ++ (sock.map fun k => "SSH_AUTH_SOCK=" ++ k).toList
+    else ["HOME=" ++ repo])
+
+/-- `l` without its trailing CR, space + tab. -/
+def trimEnd (l : String) : String :=
+  String.ofList (l.toList.reverse.dropWhile fun c => c == '\r' || c == ' ' || c == '\t').reverse
+
+/-- L6's transport class, per stderr line: a line git itself prints before any object of the
+candidate arrives (measured, git 2.53.0: a missing repository or ref, a failed name lookup,
+connection or authentication); server text (`remote: …`, `remote error: …`) never counts. -/
+def transportLine (raw : String) : Bool :=
+  let l := trimEnd raw
+  !l.startsWith "remote:" && (l.splitOn "remote error:").length == 1 &&
+    (l.startsWith "fatal: '" && l.endsWith "' does not appear to be a git repository" ||
+      l == "fatal: Could not read from remote repository." ||
+      l.startsWith "fatal: unable to access '" ||
+      l.startsWith "fatal: couldn't find remote ref " ||
+      l.startsWith "fatal: unable to look up " ||
+      l.startsWith "fatal: unable to connect to " ||
+      l.startsWith "ssh: " ||
+      l.startsWith "fatal: repository '" && l.endsWith "' not found" ||
+      l == "fatal: unable to get password from user" ||
+      l.startsWith "fatal: could not read Username" ||
+      l.startsWith "fatal: could not read Password" ||
+      l.startsWith "fatal: Authentication failed for '")
+
+/-- L6: a failed fetch's class from its kept stderr: transport when any line is; else the residue
+cannot tell (no fallback). -/
+def transport (err : ByteArray) : Bool :=
+  ((FvdepCore.Index.Command.textOfBytes err).splitOn "\n").any transportLine
+
+/-- `s` with each occurrence of the nonempty `pat` replaced by `r`. -/
+def replaceAll (s pat r : String) : String :=
+  if pat.isEmpty then s else r.intercalate (s.splitOn pat)
+
+/-- A URL source's userinfo (its authority's part before the last `@`), when nonempty. -/
+def userinfo (s : String) : Option String :=
+  let auth : List Char :=
+    match s.splitOn "://" with
+    | _ :: rest@(_ :: _) => ("://".intercalate rest).toList.takeWhile (· != '/')
+    | _ => if scpLike s.toList then s.toList.takeWhile (· != ':') else []
+  let u := (auth.reverse.dropWhile (· != '@')).reverse.dropLast
+  if u.isEmpty then none else some (String.ofList u)
+
+/-- L1: git's text about `source`: its spelling replaced by `redact source`, each other copy of its
+userinfo by `***` (a credential never reaches a diagnostic). -/
+def scrub (source line : String) : String :=
+  let l := replaceAll line source (redact source)
+  match userinfo source with
+  | some u => replaceAll l u "***"
+  | none => l
+
+/-- L3: what a failed git command leaves: the first nonblank line of its kept stderr (`none`: no
+such line), its trailing CR + blanks dropped, scrubbed + through §1's line rule. -/
+def firstLine (source : String) (err : ByteArray) : Option String :=
+  let lines := (FvdepCore.Index.Command.textOfBytes err).splitOn "\n"
+  (lines.find? fun l => (trimEnd l).any fun c => !c.isWhitespace).map fun l =>
+    FvdepCore.Doc.escapeControls (scrub source (trimEnd l))
+
+/-- A failed git command's reason: `what` + its first line, else its exit. -/
+def gitFailure (source what : String) (exit : Option Nat) (err : ByteArray) : String :=
+  match firstLine source err, exit with
+  | some l, _ => s!"{what}: {l}"
+  | none, some c => s!"{what}: git exited with {c}"
+  | none, none => s!"{what}: git died by a signal"
+
+/-- L2 + L5: a store fault (`infra io`, exit 2). -/
+def damaged (source why : String) : String :=
+  s!"infra io: the library store of {redact source} is damaged: {why}"
+
+def stayedLocked (source : String) : String :=
+  s!"infra io: the library store of {redact source} stayed locked"
+
+/-- L5: `head.json`'s record for the store of `key`: a record of another source = damaged. -/
+def recordOf (key : String) (b : ByteArray) : Except String Head :=
+  match headOf b with
+  | none => .error "head.json is no head record"
+  | some h => if h.source == key then .ok h else .error "head.json names another source"
+
+/-- L4: a root directory's record (its own listing follows). -/
+def isRootDir (e : TreeEntry) : Bool := rootDirs.contains e.path && isDir e
+
+/-- L4: the snapshot's entries = the top listing's records in order, each root directory's record
+replaced by its own listing (`subs`; git's `-r -t` listing opens with that record) = one
+`ls-tree -r -t` over the roots: each entry once. -/
+def combine (top : List TreeEntry) (subs : List (String × List TreeEntry)) : List TreeEntry :=
+  top.flatMap fun e => if isRootDir e then (subs.lookup e.path).getD [e] else [e]
+
+/-- L4: the cumulative path bytes over every record git printed (the top listing + each root
+directory's: a root directory's name counts in both): the first record past `pathTotal` → its
+refusal. -/
+def listedRefusal (caps : Caps) (records : List TreeEntry) : Option String := go 0 records
+where go (n : Nat) : List TreeEntry → Option String
+    | [] => none
+    | e :: es =>
+      if caps.pathTotal < n + e.path.utf8ByteSize then
+        some s!"exceeds the limit of {caps.pathTotal} path bytes at {e.path}"
+      else go (n + e.path.utf8ByteSize) es
+
+/-- L4: a listing's stdout cap: a record = at most 77 bytes + its path. -/
+def listingCap (caps : Caps) : Nat := caps.entries * 80 + caps.pathTotal
+
+/-- Why `parseTree` refused a listing (presentation): a path that is not UTF-8 (a record's other
+fields are ASCII), else output outside git's format. -/
+def listingReason (b : ByteArray) : String :=
+  if (String.fromUTF8? b).isNone then "holds a path that is not valid UTF-8"
+  else "printed a tree listing outside git's ls-tree format"
+
+/-- L4: `cat-file --batch -Z`'s requests: each planned object name, NUL-terminated. -/
+def batchInput (plan : List Blob) : ByteArray := (plan.flatMap fun x => x.oid ++ [0]).toByteArray
+
+/-- The length of the replies `parseBatch` accepts for `plan` (the stdout cap). -/
+def batchBytes (plan : List Blob) : Nat :=
+  plan.foldl (fun n x => n + (batchHeader x.oid x.size).length + x.size + 1) 0
+
+/-- `n` as at least `w` decimal digits, zero-padded. -/
+def padNat (w n : Nat) : String :=
+  let s := toString n
+  String.ofList (List.replicate (w - s.length) '0') ++ s
+
+/-- L5: `Doc.isUtc`'s text of `secs` seconds after 1970-01-01T00:00:00Z (the proleptic Gregorian
+calendar: H. Hinnant's days-to-civil). -/
+def utcText (secs : Nat) : String :=
+  let days := secs / 86400
+  let rem := secs % 86400
+  let z := days + 719468
+  let era := z / 146097
+  let doe := z - era * 146097
+  let yoe := (doe - doe / 1460 + doe / 36524 - doe / 146096) / 365
+  let doy := doe - (365 * yoe + yoe / 4 - yoe / 100)
+  let mp := (5 * doy + 2) / 153
+  let d := doy - (153 * mp + 2) / 5 + 1
+  let m := if mp < 10 then mp + 3 else mp - 9
+  let y := yoe + era * 400 + (if m ≤ 2 then 1 else 0)
+  s!"{padNat 4 y}-{padNat 2 m}-{padNat 2 d}T{padNat 2 (rem / 3600)}:" ++
+    s!"{padNat 2 (rem % 3600 / 60)}:{padNat 2 (rem % 60)}Z"
 
 end FvdepCore.Library

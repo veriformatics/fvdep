@@ -23,6 +23,8 @@ import FvdepAudit.Protocol.Proof.Sig
 import FvdepAudit.Sandbox.Proof
 import FvdepAudit.Step.Proof
 import FvdepAudit.Sys.Proof.Claims
+import FvdepIO.Library
+import FvdepIO.Project
 import FvdepLedger.Types
 import Main
 
@@ -1965,6 +1967,42 @@ def residue : List Residue :=
           "tested by `lake test` (reason, picks) + tester-6's bundle cases (B.retention; " ++
           "B.complete + B.incomplete with D4)"
       ruling := "the failure bundle's writes"
+      boundary := [] },
+    { id := "git"
+      what :=
+        "git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` " ++
+          "(`posix_spawnp` through the caller's `PATH`, its own process group, an exact " ++
+          "environment, stdin from a file or `/dev/null`, stdout + stderr pipes above " ++
+          "descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative " ++
+          "value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's " ++
+          "cap, stderr's head, the group killed at the deadline or past the cap before the " ++
+          "reap, a 5 s drain bound) + what git does with L3's configuration over a remote " ++
+          "(fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`)"
+      reason :=
+        "an external program over a remote, with no Lean semantics: its two machine outputs " ++
+          "are read by proved readers (`parseTree`, `parseBatch`) + the selection decided by " ++
+          "the proved tables; tested by `lake test`'s library cases (real git over local " ++
+          "fixture repositories: head, pin, warm pin, offline head, never fetched, received " ++
+          "failures; " ++
+          "the transport classifier over git 2.53.0's measured lines; a fake git: the exact " ++
+          "environment + argv, the deadline's group kill, diagnostics scrubbed + escaped) + " ++
+          "tester-7's L cases (U5b-O)"
+      ruling := "`git` (an external program over a remote)"
+      boundary := [``FvdepIO.Git.spawn, ``FvdepIO.Git.killGroup] },
+    { id := "library-store"
+      what :=
+        "the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock " ++
+          "(`flock` polled within `lockSeconds`), stale temps removed, staging (files written " ++
+          "0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + " ++
+          "`trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; " ++
+          "each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader"
+      reason :=
+        "filesystem semantics have no Lean model here; the selection + every refusal over the " ++
+          "observed state are the proved tables (`start`, `afterPin`, `afterHead`) or tested " ++
+          "texts; tested by `lake test`'s library cases (layout + modes, incomplete trees " ++
+          "rebuilt, damaged records, the lock's timeout, a pin's warm serve) + tester-7's L + P " ++
+          "cases (U5b-O)"
+      ruling := "`library-store` (filesystem effects)"
       boundary := [] }]
 
 def cliRow : Row :=
@@ -3261,6 +3299,55 @@ def libraryToolchainRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U5b L3–L4: git as a process (tested residue `git`). -/
+def gitRunRow : Row :=
+  { component := `FvdepIO.Git
+    contract := "U5b L3–L4"
+    claim :=
+      "One git run: spawned through `PATH` in its own process group with exactly the given " ++
+        "environment + stdin file, stdout kept to its cap, stderr's head kept, the group killed " ++
+        "at the deadline or past the cap before the reap, then reaped."
+    claims := []
+    subject := ``FvdepIO.Git.run
+    path := []
+    noCaller := "U5b"
+    residue := ["sandbox-spawn", "sys-shim", "os", "runtime"]
+    unproven := ["git"] }
+
+/-- U5b L2–L6: the library store + its one fetch (tested residues `library-store`, `git`). -/
+def librarySnapshotRow : Row :=
+  { component := `FvdepIO.Library
+    contract := "U5b L2–L6"
+    claim :=
+      "The snapshot for a pin or the head: a published pin served without the lock; else the " ++
+        "store locked within `lockSeconds`, stale temps removed, `start` → at most one fetch " ++
+        "into a fresh private bare repository (L3's argv + environment) → the reads through " ++
+        "`parseTree` + `planTree` + `parseBatch` → durable publication (`.complete` last) + " ++
+        "`head.json` → `afterPin` | `afterHead` (the head record read only after a transport " ++
+        "failure); the repository + staging removed after every attempt."
+    claims := []
+    subject := ``FvdepIO.Library.snapshot
+    path := []
+    noCaller := "U5b"
+    residue := ["sandbox-spawn", "sys-shim", "hacl-sha256", "os", "runtime"]
+    unproven := ["library-store", "git"] }
+
+/-- U5b P1–P2: each candidate's manifest observed + the chosen one read (tested residue
+`library-store`). -/
+def projectReadRow : Row :=
+  { component := `FvdepIO.Project
+    contract := "U5b P1–P2"
+    claim :=
+      "`fvdep.toml` candidates observed by `lstat` (never followed, never opened); the chosen " ++
+        "manifest read (at most 64 KiB + 1 bytes) through U3's reader → its pin, or U3's " ++
+        "refusal naming the file."
+    claims := []
+    subject := ``FvdepIO.Project.pin
+    path := []
+    noCaller := "U5b"
+    residue := ["sys-shim", "toml-parse", "os", "runtime"]
+    unproven := ["library-store"] }
+
 /-- U5 R8: the supervisor's reading of the step helper's frame (the encoder: `stepFrameOfRow`). -/
 def stepFrameRow : Row :=
   { component := `FvdepCore.Step
@@ -3488,9 +3575,9 @@ def ledger : Ledger :=
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
         libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
-        libraryToolchainRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
-        bundleWriteRow]
+        libraryToolchainRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow,
+        stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow,
+        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main
