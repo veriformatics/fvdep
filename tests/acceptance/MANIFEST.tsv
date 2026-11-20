@@ -22,20 +22,20 @@ library.identity-source-sensitive	U4	Decisions Library layout + identity; librar
 library.identity-unrelated-entry	U4	library Registry (identity); Decisions Spec modularity	Adding a separately versioned entry leaves the original identity unchanged	property	merged
 library.index-drift	U4	interface §3 index	index --check reports byte drift without rewriting the committed index	example	merged
 library.index-pure	U4	Decisions Library layout + identity; library Registry; interface §3	Index generation is byte-idempotent and --check is read-only	property	merged
-oracle.base64.decode.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
-oracle.base64.decode_url.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode_url accepts exactly strict canonical encodings over seeded valid and malformed strings	property	unmerged
-oracle.base64.encode.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode agrees with an independent bit-level encoder over seeded byte strings	property	unmerged
-oracle.base64.encode_url.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode_url agrees with an independent bit-level encoder over seeded byte strings	property	unmerged
-oracle.base64.round-trip	U4	library Operations; RFC 4648 §3.5	Decode after encode returns every sampled input for both alphabets	property	unmerged
-oracle.protocol.ident-tags	U4	interface §8; library Shared type	num and alnum identifiers never share an encoding	example	unmerged
-oracle.protocol.integer-boundaries	U4	interface §8	Large Nat uses a canonical decimal string; in-range strings and noncanonical values are invalid	example	unmerged
-oracle.protocol.recovery	U4	interface §8	Malformed requests produce invalid and the oracle continues to a valid request	example	unmerged
-oracle.protocol.scalar-values	U4	interface §8; Decisions Data formats	An escaped lone surrogate is invalid; a nonalphabet Unicode scalar is a decode rejection	example	unmerged
-oracle.protocol.string-limit	U4	interface §8; Decisions Data formats	The differential codec accepts the 64-KiB string boundary and refuses the next byte	example	unmerged
-oracle.semver.compare.preorder	U4	library Shared type obligations	Compare is antisymmetric in ordering, transitive, and ignores build metadata	property	unmerged
-oracle.semver.compare.reference	U4	library Shared type; SemVer 2.0.0 §11	Compare follows the whole-type reference including arbitrary tagged identifiers	property	unmerged
-oracle.semver.parse.reference	U4	library Shared type; SemVer 2.0.0 §§2/9/10	SemVer parse matches the independent grammar including large numeric components	property	unmerged
-oracle.unknown-target	U4	interface §§2–3	An absent oracle target exits 2 rather than serving another operation	example	unmerged
+oracle.base64.decode.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode accepts exactly strict canonical encodings over seeded valid and malformed strings	property	merged
+oracle.base64.decode_url.reference	U4	library Operations; RFC 4648 §§3.2–3.5/4/5	base64.decode_url accepts exactly strict canonical encodings over seeded valid and malformed strings	property	merged
+oracle.base64.encode.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode agrees with an independent bit-level encoder over seeded byte strings	property	merged
+oracle.base64.encode_url.reference	U4	library Operations; RFC 4648 §§4–5	base64.encode_url agrees with an independent bit-level encoder over seeded byte strings	property	merged
+oracle.base64.round-trip	U4	library Operations; RFC 4648 §3.5	Decode after encode returns every sampled input for both alphabets	property	merged
+oracle.protocol.ident-tags	U4	interface §8; library Shared type	num and alnum identifiers never share an encoding	example	merged
+oracle.protocol.integer-boundaries	U4	interface §8	Large Nat uses a canonical decimal string; in-range strings and noncanonical values are invalid	example	merged
+oracle.protocol.recovery	U4	interface §8	Malformed requests produce invalid and the oracle continues to a valid request	example	merged
+oracle.protocol.scalar-values	U4	interface §8; Decisions Data formats	An escaped lone surrogate is invalid; a nonalphabet Unicode scalar is a decode rejection	example	merged
+oracle.protocol.string-limit	U4	interface §8; Decisions Data formats	The differential codec accepts the 64-KiB string boundary and refuses the next byte	example	merged
+oracle.semver.compare.preorder	U4	library Shared type obligations	Compare is antisymmetric in ordering, transitive, and ignores build metadata	property	merged
+oracle.semver.compare.reference	U4	library Shared type; SemVer 2.0.0 §11	Compare follows the whole-type reference including arbitrary tagged identifiers	property	merged
+oracle.semver.parse.reference	U4	library Shared type; SemVer 2.0.0 §§2/9/10	SemVer parse matches the independent grammar including large numeric components	property	merged
+oracle.unknown-target	U4	interface §§2–3	An absent oracle target exits 2 rather than serving another operation	example	merged
 library.admit-mutated-published	U7	Decisions Retraction; Library layout + identity; library Registry	Admission refuses a byte edit to a published source closure	example	unmerged
 library.admit-read-only	U7	Decisions Automation; library Registry; interface §3 admit	Admission of an already valid library reports results without changing its working tree	example	unmerged
 library.admit-wrong-compat	U7	Decisions Module updates; library Registry (proof registry)	A tagged theorem of True cannot certify the new=old compatibility statement	example	unmerged
@@ -78,7 +78,7 @@ invocation.command-help.index	U8	interface §1	index --help needs no project or 
 invocation.command-help.init	U8	interface §1	init --help needs no project or library	example	unmerged
 invocation.command-help.list	U8	interface §1	list --help needs no project or library	example	unmerged
 invocation.command-help.lock	U8	interface §1	lock --help needs no project or library	example	unmerged
-invocation.command-help.oracle	U8	interface §1	oracle --help needs no project or library	example	unmerged
+invocation.command-help.oracle	U8	interface §1	oracle --help needs no project or library	example	merged
 invocation.command-help.outdated	U8	interface §1	outdated --help needs no project or library	example	unmerged
 invocation.command-help.profile	U8	interface §1	profile --help needs no project or library	example	unmerged
 invocation.command-help.scan	U8	interface §1	scan --help needs no project or library	example	unmerged

@@ -8,13 +8,6 @@ namespace FvdepIO.Toml
 
 open Lean FvdepCore.Manifest FvdepCore.Doc
 
-/-- T1: Lake's first error message (line 1-based, column 0-based as Lake reports it, its text) or
-`ofLake`'s key of another shape. -/
-inductive ParseError where
-  | syntax (line col : Nat) (message : String)
-  | key (name : Name)
-  deriving Repr, BEq
-
 mutual
 /-- T1 + T5: Lake's value as a `Tree`; `.error` = the first key (pre-order) of another shape than
 one string component. -/
@@ -59,26 +52,6 @@ def parseTree (text : String) : IO (Except ParseError Tree) := do
       return .error (.syntax msg.pos.line msg.pos.column (← msg.data.toString))
     | none =>
       return .error (.syntax 0 0 "")
-
-/-- T1: why `fvdep.toml` is refused. -/
-inductive ReadError where
-  | text (e : TextError)
-  | parse (e : ParseError)
-  | schema (e : ManifestError)
-  deriving Repr
-
-/-- The public code: `internal` for `ofLake`'s key, `schema` for every other refusal. -/
-def ReadError.code : ReadError → PublicCode
-  | .parse (.key _) => .internal
-  | _ => .schema
-
-/-- The refusal text (presentation): Lake's position as `line:column` (both 1-based). -/
-def ReadError.detail : ReadError → String
-  | .text e => e.detail
-  | .parse (.syntax line col message) =>
-    "syntax at " ++ toString line ++ ":" ++ toString (col + 1) ++ ": " ++ escapeControls message
-  | .parse (.key n) => "TOML key of an unexpected shape: " ++ escapeControls (toString n)
-  | .schema e => e.detail
 
 /-- T1: bytes → `textStage` → `parseTree` → `validate`. -/
 def readManifest (b : ByteArray) : IO (Except ReadError ManifestFile) := do

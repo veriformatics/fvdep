@@ -1,4 +1,5 @@
 import FvdepCore.Doc
+import FvdepCore.Manifest.Tree
 
 /-! `fvdep.toml` (contract `docs/contracts/U3-codecs.md` T1–T4): the text stage, the TOML tree,
 T3's validation into the typed manifest, the canonical printer. Pure: Lake's parser runs in
@@ -8,23 +9,6 @@ Lake's member order. -/
 namespace FvdepCore.Manifest
 
 open FvdepCore.Json FvdepCore.Ids FvdepCore.Evidence FvdepCore.Status FvdepCore.Doc
-
-/-- T1: a TOML value kind no manifest field takes. -/
-inductive Other where
-  | float
-  | dateTime
-  deriving DecidableEq, Repr, Inhabited
-
-/-- T1: a TOML value, keys as strings (`FvdepIO.Toml.ofLake` builds it from Lake's table; a table's
-members in Lake's order, which T3 never relies on). -/
-inductive Tree where
-  | str (s : String)
-  | int (n : Int)
-  | bool (b : Bool)
-  | arr (xs : List Tree)
-  | tbl (ms : List (String × Tree))
-  | other (k : Other)
-  deriving Repr, Inhabited, BEq
 
 /-- T2: one `[modules."<id>"]` entry: its U2 declaration + its module lists (both empty for a
 differential entry). -/
@@ -501,5 +485,25 @@ def TextError.detail : TextError → String
   | .tooLarge => "too_large (more than " ++ toString maxBytes ++ " bytes)"
   | .bom => "bom at offset 0"
   | .utf8 k => "utf8 at offset " ++ toString k
+
+/-- T1: why `fvdep.toml` is refused. -/
+inductive ReadError where
+  | text (e : TextError)
+  | parse (e : ParseError)
+  | schema (e : ManifestError)
+  deriving Repr
+
+/-- The public code: `internal` for `ofLake`'s key, `schema` for every other refusal. -/
+def ReadError.code : ReadError → PublicCode
+  | .parse (.key _) => .internal
+  | _ => .schema
+
+/-- The refusal text (presentation): Lake's position as `line:column` (both 1-based). -/
+def ReadError.detail : ReadError → String
+  | .text e => e.detail
+  | .parse (.syntax line col message) =>
+    "syntax at " ++ toString line ++ ":" ++ toString (col + 1) ++ ": " ++ escapeControls message
+  | .parse (.key n) => "TOML key of an unexpected shape: " ++ escapeControls (toString n)
+  | .schema e => e.detail
 
 end FvdepCore.Manifest

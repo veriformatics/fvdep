@@ -1,4 +1,5 @@
 import FvdepCore.Index.Command
+import FvdepCore.Library.Limits
 import FvdepCore.Manifest
 import FvdepCore.Step
 
@@ -240,16 +241,6 @@ def rootFiles : List String :=
 def required : List String :=
   ["lakefile.lean", "lean-toolchain", "index.json", "Fvdep.lean", "Fvdep/Registry.lean"]
 
-/-- L4's caps (T): entries, path bytes, depth, cumulative path bytes, file + total blob bytes. -/
-structure Caps where
-  entries : Nat := 10000
-  pathBytes : Nat := 4096
-  depth : Nat := 32
-  pathTotal : Nat := 4194304
-  fileBytes : Nat := 1048576
-  totalBytes : Nat := 67108864
-  deriving DecidableEq, Repr
-
 def modeTree : List UInt8 := [48, 52, 48, 48, 48, 48]
 
 def modeFile : List UInt8 := [49, 48, 48, 54, 52, 52]
@@ -403,26 +394,6 @@ def afterHead (head : HeadState) : Fetch → Selected
   | .received r | .localFault r | .unclassified r => .refuse s!"Fetch failed: {r}."
 
 /-! ## L2–L6 the residue's settings + texts (tested; outside the claims) -/
-
-/-- T's library limits (L2–L4): seconds one git process may run, seconds to wait for the store
-lock, bytes kept per git diagnostic stream, the tree caps (`treeEntries` = `caps.entries`,
-`snapshotBytes` = `caps.totalBytes`). -/
-structure Limits where
-  fetchSeconds : Nat := 300
-  lockSeconds : Nat := 60
-  gitBytes : Nat := 65536
-  caps : Caps := {}
-  deriving DecidableEq, Repr
-
-/-- One `--limit <name>=<n>` of the dev seam (Q3): `none` = no library limit of that name. -/
-def Limits.set (l : Limits) (name : String) (n : Nat) : Option Limits :=
-  match name with
-  | "fetchSeconds" => some { l with fetchSeconds := n }
-  | "lockSeconds" => some { l with lockSeconds := n }
-  | "gitBytes" => some { l with gitBytes := n }
-  | "treeEntries" => some { l with caps := { l.caps with entries := n } }
-  | "snapshotBytes" => some { l with caps := { l.caps with totalBytes := n } }
-  | _ => none
 
 /-- L3's `-c` settings, in order. -/
 def fetchConfig : List String :=

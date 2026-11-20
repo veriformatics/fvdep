@@ -59,7 +59,7 @@ def fetch (args : List String) : IO UInt32 := do
       | .error r =>
         say [r]
         return 2
-  let some cache ← FvdepDev.Cache.root |
+  let some cache ← FvdepIO.Tools.cacheRoot |
     do
       say ["infra io: no cache directory (FVDEP_CACHE, XDG_CACHE_HOME + HOME unset)"]
       return 2

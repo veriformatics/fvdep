@@ -1,4 +1,8 @@
+import FvdepCore.Evidence
 import FvdepCore.Index.Registry
+import FvdepCore.Library.Limits
+import FvdepCore.Manifest.Tree
+import FvdepCore.Project
 
 /-! Effect plans (contract `docs/contracts/U2-core.md` X1): what fvdep does, as data. A command
 builds a `Plan`; `FvdepIO.execute` runs it; theorems quantify over every response an effect may get
@@ -27,6 +31,38 @@ structure Observed where
 
 end FvdepCore.Index
 
+namespace FvdepCore.Oracle
+
+/-- A bounded read (a project's `fvdep.toml`, stdin): its bytes, absent, more than the cap, or the
+failure's reason. -/
+inductive FileRead where
+  | bytes (b : ByteArray)
+  | absent
+  | tooLarge
+  | failed (reason : String)
+
+/-- U5b L: a served snapshot: its commit, published tree, the notice (a head served after a
+transport failure), `lean-toolchain`'s + `index.json`'s bytes. -/
+structure Snap where
+  commit : String
+  tree : String
+  notice : Option String
+  toolchain : ByteArray
+  index : ByteArray
+
+/-- One library module as K's discovery read it (K2): its name, source bytes + direct imports. -/
+structure Src where
+  module : String
+  bytes : ByteArray
+  imports : List String
+
+/-- An infrastructure cause (U5 P5, K): its interface code + detail. -/
+structure Cause where
+  code : FvdepCore.Evidence.Infra
+  detail : String
+
+end FvdepCore.Oracle
+
 namespace FvdepCore
 
 /-- The project files fvdep writes (Decisions `Data formats`; `index` = a library working copy's
@@ -52,6 +88,27 @@ inductive Eff where
   | libraryFacts
   /-- U4 C1 `replay`: the toolchain's `leanchecker` over the built library's modules. -/
   | replay
+  /-- U5b P1: `fvdep.toml` as `lstat` sees it in `--project <dir>`, else in each ancestor of the
+  working directory, nearest first. -/
+  | project (explicit : Option String)
+  /-- U5b P2: the chosen project's `fvdep.toml` (at most 64 KiB + 1 bytes). -/
+  | manifest (dir : String)
+  /-- U3 T1: Lake's parse of `fvdep.toml`'s text, then `ofLake`. -/
+  | parse (text : String)
+  /-- U5b L: the snapshot of `pin` (`none` = the source's head) under the library limits. -/
+  | snapshot (pin : Option String) (lim : FvdepCore.Library.Limits)
+  /-- U5b E2 + K2: the library modules `roots` reach in the served tree (sources + imports). -/
+  | closure (tree : String) (roots : List String)
+  /-- U5b O1 + K: T1's tools, the closure of `roots` filled, one view (its handle back). -/
+  | view (tree : String) (roots : List String)
+  /-- U5b E3–E4 + U5 P4: an export step over the view `view`. -/
+  | leanexport (view : String) (imports roots : List String)
+  /-- U5b V1: stdin to its end, at most `cap` bytes. -/
+  | stdin (cap : Nat)
+  /-- U5b V3: the evaluation step over the view `view` (`driver` + `requests`, `seconds`). -/
+  | evaluate (view : String) (driver : String) (requests : ByteArray) (seconds : Nat)
+  /-- Bytes on stdout (the oracle's replies). -/
+  | outBytes (b : ByteArray)
 
 /-- What an effect answered. -/
 inductive Response where
@@ -63,6 +120,15 @@ inductive Response where
   | facts (r : Except FvdepCore.Index.FactsFailure FvdepCore.Index.Observed)
   /-- `none` = every module replayed; `some (module, kernel line)` = a rejection. -/
   | replay (r : Except String (Option (String × String)))
+  | project (seen : FvdepCore.Project.Seen)
+  | manifest (r : FvdepCore.Oracle.FileRead)
+  | parse (r : Except FvdepCore.Manifest.ParseError FvdepCore.Manifest.Tree)
+  | snapshot (r : Except String FvdepCore.Oracle.Snap)
+  | closure (r : Except String (List FvdepCore.Oracle.Src))
+  | view (r : Except FvdepCore.Oracle.Cause String)
+  | leanexport (r : Except FvdepCore.Oracle.Cause ByteArray)
+  | stdin (r : FvdepCore.Oracle.FileRead)
+  | evaluate (r : Except FvdepCore.Oracle.Cause ByteArray)
 
 /-- The responses an effect may get: `done` for an output write, a read result for a read, a
 replace result for a replace, an observation effect's own kind for it. -/
@@ -73,6 +139,16 @@ def Fits : Eff → Response → Prop
   | .probe, .probe _ => True
   | .libraryFacts, .facts _ => True
   | .replay, .replay _ => True
+  | .project _, .project _ => True
+  | .manifest _, .manifest _ => True
+  | .parse _, .parse _ => True
+  | .snapshot _ _, .snapshot _ => True
+  | .closure _ _, .closure _ => True
+  | .view _ _, .view _ => True
+  | .leanexport _ _ _, .leanexport _ => True
+  | .stdin _, .stdin _ => True
+  | .evaluate _ _ _ _, .evaluate _ => True
+  | .outBytes _, .done => True
   | _, _ => False
 
 /-- A program over `Eff`: a result, or one effect + what to do with its response. -/
@@ -131,6 +207,9 @@ theorem fits_out (s : String) (resp : Response) : Fits (.out s) resp ↔ resp = 
 
 theorem fits_err (s : String) (resp : Response) : Fits (.err s) resp ↔ resp = .done := by
   cases resp <;> simp [Fits]
+
+theorem fits_outBytes (b : ByteArray) (resp : Response) :
+    Fits (.outBytes b) resp ↔ resp = .done := by cases resp <;> simp [Fits]
 
 /-- A completed run of `p >>= f` = a completed run of `p`, then a completed run of `f` on its
 value. -/

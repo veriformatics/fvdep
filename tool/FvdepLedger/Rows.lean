@@ -16,7 +16,9 @@ import FvdepAudit.Library.Proof.Plan
 import FvdepAudit.Manifest.Proof.Denote
 import FvdepAudit.Manifest.Proof.Lake
 import FvdepAudit.Manifest.Proof.Text
+import FvdepAudit.Oracle.Command.Proof.Claims
 import FvdepAudit.Oracle.Proof
+import FvdepAudit.Oracle.Resolve.Proof
 import FvdepAudit.Phase.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
@@ -37,17 +39,19 @@ namespace FvdepLedger.Rows
 
 open FvdepCore
 
-/-- U1 K2: every invocation writes one stream alone. -/
+/-- U1 K2: every invocation writes one stream alone; a failing one gets its usage (`oracle`'s own
+for an `oracle` line). -/
 def cliStreams : Prop :=
   ∀ args : List String,
     (Cli.run args).exit = 0 ∧ (Cli.run args).stderr = "" ∨
-      (Cli.run args).exit = 2 ∧ (Cli.run args).stdout = "" ∧ (Cli.run args).stderr = Cli.usage
+      (Cli.run args).exit = 2 ∧
+        (Cli.run args).stdout = "" ∧ (Cli.run args).stderr = Cli.usageOf args
 
 /-- U2 X5: a completed run of the CLI plan performs exactly the outcome's outputs, then exits with
 its code. -/
 def cliPlanComplete : Prop :=
   ∀ (args : List String),
-    ¬Cli.IndexArgs args →
+    ¬Cli.PlanArgs args →
       ∀ (evs : List (Eff × Response)) (code : UInt32),
         Plan.Runs (Cli.plan args) evs (some code) ↔
           evs = Cli.outputs (Cli.run args) ∧ code = (Cli.run args).exit
@@ -55,9 +59,38 @@ def cliPlanComplete : Prop :=
 /-- U2 X5: an interrupted run performs a prefix of the outcome's outputs. -/
 def cliPlanInterrupted : Prop :=
   ∀ (args : List String),
-    ¬Cli.IndexArgs args →
+    ¬Cli.PlanArgs args →
       ∀ (evs : List (Eff × Response)),
         Plan.Runs (Cli.plan args) evs none → evs <+: Cli.outputs (Cli.run args)
+
+/-- U5b O1's grammar: a well-formed `oracle` line = `oracle <target>`, or with one `--project <dir>`
+on either side of the target (a first `--project` = the option), the target parsing (E1). -/
+def cliOracleArgs : Prop :=
+  ∀ (args : List String) (t : Oracle.Target) (p : Option String),
+    Cli.oracleArgs args = some (t, p) ↔
+      ∃ s,
+        Oracle.Target.parse s = some t ∧
+          (args = ["oracle", s] ∧ p = none ∨
+            ∃ d,
+              p = some d ∧
+                (args = ["oracle", "--project", d, s] ∨
+                  s ≠ "--project" ∧ args = ["oracle", s, "--project", d]))
+
+/-- U5b O1: a well-formed `fvdep oracle` line runs the oracle plan with SHA-256 hex digests + T's
+default limits. -/
+def cliOracle : Prop :=
+  ∀ (args : List String) (t : Oracle.Target) (p : Option String),
+    Cli.oracleArgs args = some (t, p) → Cli.plan args = Oracle.Command.plan Cli.sha {} t p
+
+/-- U5b O1: an `oracle` line outside the grammar (`cliOracleArgs`), `oracle --help` aside = exit 2,
+`oracle`'s usage on stderr, stdout empty (its plan performs that outcome: `cliPlanComplete`). -/
+def cliOracleUsage : Prop :=
+  ∀ rest : List String,
+    rest ≠ ["--help"] →
+      Cli.oracleArgs ("oracle" :: rest) = none →
+      (Cli.run ("oracle" :: rest)).exit = 2 ∧
+        (Cli.run ("oracle" :: rest)).stdout = "" ∧
+        (Cli.run ("oracle" :: rest)).stderr = Oracle.Command.usage
 
 /-- U2 X1: a finished plan performs nothing + yields its value. -/
 def planPure : Prop :=
@@ -1819,6 +1852,112 @@ def wireLink : Prop :=
 
 end FvdepLedger.Rows.OracleClaims
 
+namespace FvdepLedger.Rows.ResolveClaims
+
+open Lean FvdepCore FvdepCore.Ids FvdepCore.Index FvdepCore.Index.Registry FvdepCore.Index.Rules
+open FvdepCore.Index.Assemble FvdepCore.Oracle FvdepAudit.Oracle.Resolve.Spec
+
+/-- E1: an operation target = exactly the printed `<id>@<x.y.z>` (U2 I4's canonical reference). -/
+def targetOp : Prop :=
+  ∀ (s : String) (m : ModuleId) (v : EntryVersion),
+    Target.parse s = some (.op m v) ↔ toString (⟨m, some v⟩ : ModuleRef) = s
+
+/-- E1: a row the stage returns is the target's operation of `index.json`. -/
+def rowListed : Prop :=
+  ∀ (i : IndexFile) (m : ModuleId) (v : EntryVersion) (o : Operation),
+    rowOf i m v = some o → Listed i m v o
+
+/-- E1: no row exactly when `index.json` lists no operation with the target's id + version. -/
+def rowAbsent : Prop :=
+  ∀ (i : IndexFile) (m : ModuleId) (v : EntryVersion), rowOf i m v = none ↔ ∀ o, ¬Listed i m v o
+
+/-- E2: the stage finds no failure exactly when the snapshot is coherent for the row: every module
+of the entry module's C4 closure discovered with its source, `index.json`'s toolchain = the tree's
+trimmed, the row's digest = `h` of C4's entry frame over that closure. -/
+def coherenceExact : Prop :=
+  ∀ (h : ByteArray → String) (tc : String) (i : IndexFile) (o : Operation) (M : Name)
+    (srcs : List Src), coherence h tc i o M srcs = none ↔ Coherent h tc i o M srcs
+
+/-- E5: the countdown = the spec's expanded size against the budget: the budget left, or `none` past
+it. -/
+def withinExact : Prop :=
+  ∀ (k : Nat) (e : Expr) (env : List Expr),
+    within k e env = if size e env ≤ k then some (k - size e env) else none
+
+/-- E3 + E5: the entry stage yields `spec` exactly when `<M>.entry` is a definition with a value
+within the budget that C2 reads (no read-through facts) as a record naming the target's id + version
++ `S.<fn>`, `S` in `M`'s closure. -/
+def entryExact : Prop :=
+  ∀ (budget : Nat) (m : ModuleId) (v : EntryVersion) (mods : List Name) (ds : List Export.Decl)
+    (spec : Name), entrySpec budget m v mods ds = .ok spec ↔ EntryOk budget m v mods ds spec
+
+/-- E5: the entry stage's budget refusal exactly when `<M>.entry` is a definition with a value whose
+expanded size passes the budget. -/
+def entryBudget : Prop :=
+  ∀ (budget : Nat) (m : ModuleId) (v : EntryVersion) (mods : List Name) (ds : List Export.Decl),
+    entrySpec budget m v mods ds = .error .budget ↔ EntryOver budget m v ds
+
+/-- E4: the signature stage yields `sig` exactly when the spec is a definition whose type `sigOf`
+reads as `sig`'s arguments + result, `sig.op` = the spec's last component. -/
+def sigExact : Prop :=
+  ∀ (spec : Name) (ds : List Export.Decl) (sig : Protocol.Sig),
+    specSig spec ds = .ok sig ↔ SigOk spec ds sig
+
+/-- E4: the type refusal exactly when the spec is a definition whose type `sigOf` refuses. -/
+def sigRefused : Prop :=
+  ∀ (spec : Name) (ds : List Export.Decl),
+    specSig spec ds = .error .cannotCarry ↔ SigRefused spec ds
+
+end FvdepLedger.Rows.ResolveClaims
+
+namespace FvdepLedger.Rows.OracleRunClaims
+
+open Lean FvdepCore FvdepCore.Ids FvdepCore.Index FvdepCore.Protocol FvdepCore.Oracle
+open FvdepCore.Oracle.Command FvdepAudit.Oracle.Command.Spec
+
+/-- U5b O3 `oracleExact`: a completed run of `fvdep oracle` = exactly a run written apart
+(`OracleRun`): every stage's effect + parameters in E1's order, each refusal = its line on stderr +
+exit 2 with no effect after it, the replies in one stdout write after every check. -/
+def oracleExact : Prop :=
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (Eff × Response)) (code : UInt32),
+    Plan.Runs (FvdepCore.Oracle.Command.plan h lim t explicit) evs (some code) ↔
+      OracleRun h lim t explicit evs code
+
+/-- U2 X5 for `fvdep oracle`: an interrupted run performed a prefix of a completed run written
+apart. -/
+def oraclePrefix : Prop :=
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (Eff × Response)),
+    Plan.Runs (FvdepCore.Oracle.Command.plan h lim t explicit) evs none →
+      ∃ rest code, OracleRun h lim t explicit (evs ++ rest) code
+
+/-- U5b O1: no run of `fvdep oracle`, completed or interrupted, writes a project file or reads one
+through the generic project-file effects (the selected project's `fvdep.toml` arrives through P2's
+`manifest` effect alone: `oracleExact`). -/
+def oracleFiles : Prop :=
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (Eff × Response)) (r : Option UInt32),
+    Plan.Runs (FvdepCore.Oracle.Command.plan h lim t explicit) evs r →
+      ∀ x ∈ evs, (∀ f, x.1 ≠ .read f) ∧ ∀ f b, x.1 ≠ .replace f b
+
+/-- Interface §1's line rule for `fvdep oracle`, structurally: every text write of every run = one
+or more lines, each ending in LF, with no Unicode `Cc` character inside a line (the escaping's
+spelling = `escapeControls`, tested presentation, bound to each message by `oracleExact`). -/
+def oracleLines : Prop :=
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (Eff × Response)) (r : Option UInt32),
+    Plan.Runs (FvdepCore.Oracle.Command.plan h lim t explicit) evs r →
+      ∀ x ∈ evs,
+        ∀ s,
+          (x.1 = .out s ∨ x.1 = .err s) →
+            ∃ ls : List String,
+              ls ≠ [] ∧
+                s = String.join (ls.map (· ++ "\n")) ∧
+                ∀ l ∈ ls, ∀ c ∈ l.toList, ¬(c.toNat < 32 ∨ 127 ≤ c.toNat ∧ c.toNat ≤ 159)
+
+end FvdepLedger.Rows.OracleRunClaims
+
 namespace FvdepLedger.Rows.CommandClaims
 
 open FvdepCore FvdepAudit.Index.Command.Spec
@@ -2113,16 +2252,34 @@ def residue : List Residue :=
           "rebuilt, damaged records, the lock's timeout, a pin's warm serve) + tester-7's L + P " ++
           "cases (U5b-O)"
       ruling := "`library-store` (filesystem effects)"
+      boundary := [] },
+    { id := "oracle-driver"
+      what :=
+        "the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` " ++
+          "read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, " ++
+          "type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the " ++
+          "spec's argument + result types, the toolchain elaborating + interpreting the text " ++
+          "(`lean --run`) inside a U5 step over the snapshot's view"
+      reason :=
+        "the step runs the snapshot's code under the toolchain, + fvdep owns no proof of Lean's " ++
+          "elaborator or interpreter; the conversions it runs are W's proved functions, shipped " ++
+          "as their source (`include_str` + `lake test`'s Q4 byte check); tested by tester-7's " ++
+          "W cases (one fixture entry per served representation, a 3-argument implicit-binder " ++
+          "one, generated values vs independent references) + tester-1's `oracle.*` cases"
+      ruling := "`oracle-driver` (the toolchain elaborating + interpreting the driver text)"
       boundary := [] }]
 
 def cliRow : Row :=
   { component := `FvdepCore.Cli
     contract := "U1 K2; docs/interface.md §1–§2; U2 X5"
     claim :=
-      "Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`), every invocation " ++
-        "writes one stream alone: exit 0 with stderr empty, or exit 2 with the usage on stderr " ++
-        "+ stdout empty. The plan performs exactly the outcome's outputs (stdout, then " ++
-        "stderr), an interrupted run a prefix of them; it never reads or replaces a file."
+      "Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`) + a well-formed " ++
+        "`fvdep oracle` (row `FvdepCore.Oracle.Command`, run with SHA-256 + T's default " ++
+        "limits), every invocation writes one stream alone: exit 0 with stderr empty, or exit " ++
+        "2 with its usage on stderr (`usageOf`: `oracle`'s own for an `oracle` line) + stdout " ++
+        "empty. The " ++
+        "plan performs exactly the outcome's outputs (stdout, then stderr), an interrupted run " ++
+        "a prefix of them; it never reads or replaces a file."
     claims :=
       [(``cliStreams, ``Cli.run_streams), (``cliPlanComplete, ``Cli.plan_complete),
         (``cliPlanInterrupted, ``Cli.plan_interrupted)]
@@ -2314,7 +2471,7 @@ def jsonValueRow : Row :=
         (``JsonClaims.asLaws, ``FvdepAudit.Json.Proof.as_laws)]
     subject := ``FvdepCore.Json.Value.get?
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2331,7 +2488,7 @@ def jsonDecodeRow : Row :=
         (``JsonClaims.textUnique, ``FvdepAudit.Json.Proof.text_unique)]
     subject := ``FvdepCore.Json.decode
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2491,7 +2648,7 @@ def sha256StreamRow : Row :=
     claims := [(``HashClaims.saturateLaw, ``FvdepAudit.Hash.Proof.saturate_toNat)]
     subject := ``FvdepIO.Hash.Sha256.saturate
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := ["hacl-sha256"] }
 
@@ -2508,7 +2665,7 @@ def manifestTextRow : Row :=
         (``ManifestClaims.textStageExact, ``FvdepAudit.Manifest.Proof.textStage_spec)]
     subject := ``FvdepCore.Manifest.textStage
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -2529,7 +2686,7 @@ def manifestValidateRow : Row :=
         (``ManifestClaims.treeRoundTrip, ``FvdepAudit.Manifest.Proof.tree_roundtrip)]
     subject := ``FvdepCore.Manifest.validate
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -2565,7 +2722,7 @@ def tomlReadRow : Row :=
     claims := [(``ManifestClaims.ofLakeExact, ``FvdepAudit.Manifest.Proof.ofLake_exact)]
     subject := ``FvdepIO.Toml.ofLake
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := ["toml-parse"] }
 
@@ -2599,7 +2756,7 @@ def sysCreateRow : Row :=
         (``SysClaims.retryBounded, ``FvdepAudit.Sys.Proof.retry_bounded)]
     subject := ``FvdepIO.Sys.Policy.create
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -2619,7 +2776,7 @@ def sysWriterRow : Row :=
         (``SysClaims.closeOnceActions, ``FvdepAudit.Sys.Proof.close_once_actions)]
     subject := ``FvdepIO.Sys.Policy.writer
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -2737,7 +2894,7 @@ def protocolRow : Row :=
         (``ProtocolClaims.linesExact, ``FvdepAudit.Protocol.Proof.lines_exact)]
     subject := ``FvdepCore.Protocol.decodeRequest
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -2777,7 +2934,7 @@ def indexDecodeRow : Row :=
         (``IndexClaims.indexBytesText, ``FvdepAudit.Index.Proof.index_bytes_text)]
     subject := ``FvdepCore.Index.decodeIndex
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3028,7 +3185,7 @@ def sandboxArgsRow : Row :=
         (``SandboxClaims.destInLayout, ``FvdepAudit.Sandbox.Proof.ops_dest)]
     subject := ``FvdepCore.Sandbox.bwrapArgs
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["bwrap"]
     unproven := [] }
 
@@ -3043,7 +3200,7 @@ def sandboxOutcomeRow : Row :=
     claims := [(``SandboxClaims.outcomeExact, ``FvdepAudit.Sandbox.Proof.classify_exact)]
     subject := ``FvdepCore.Sandbox.classify
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["bwrap"]
     unproven := [] }
 
@@ -3064,7 +3221,7 @@ def buildPlanRow : Row :=
         (``BuildClaims.planRefuses, ``FvdepAudit.Build.Proof.plan_refuses)]
     subject := ``FvdepCore.Build.plan
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3081,7 +3238,7 @@ def buildKeyRow : Row :=
     claims := [(``BuildClaims.preimageInjective, ``FvdepAudit.Build.Proof.preimage_injective)]
     subject := ``FvdepCore.Build.preimage
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3096,7 +3253,7 @@ def buildEvictRow : Row :=
     claims := [(``BuildClaims.evictExact, ``FvdepAudit.Build.Proof.evict_exact)]
     subject := ``FvdepCore.Build.evictPlan
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["cache-fs"]
     unproven := [] }
 
@@ -3112,7 +3269,7 @@ def buildValidateRow : Row :=
     claims := [(``BuildClaims.validateExact, ``FvdepAudit.Build.Proof.validate_exact)]
     subject := ``FvdepCore.Build.validate
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["cache-fs"]
     unproven := [] }
 
@@ -3131,7 +3288,7 @@ def phaseVerdictRow : Row :=
         (``PhaseClaims.verdictFailed, ``FvdepAudit.Phase.Proof.verdict_failed)]
     subject := ``FvdepCore.Phase.stepVerdict
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["lean-toolchain"]
     unproven := [] }
 
@@ -3246,7 +3403,7 @@ def phaseStemRow : Row :=
         (``PhaseClaims.sourceFilesExact, ``FvdepAudit.Phase.Proof.source_files_exact)]
     subject := ``FvdepCore.Phase.stem
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3265,7 +3422,7 @@ def phaseArgvRow : Row :=
         (``PhaseClaims.recipesExact, ``FvdepAudit.Phase.Proof.recipes_exact)]
     subject := ``FvdepCore.Phase.compileArgv
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3283,7 +3440,7 @@ def exportReadRow : Row :=
         (``ExportClaims.readFirst, ``FvdepAudit.Export.Proof.read_first)]
     subject := ``FvdepCore.Export.read
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3297,7 +3454,7 @@ def projectSelectRow : Row :=
     claims := [(``LibraryClaims.selectProjectExact, ``FvdepAudit.Library.Proof.selectProject_exact)]
     subject := ``FvdepCore.Project.selectProject
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3309,7 +3466,7 @@ def librarySourceRow : Row :=
     claims := [(``LibraryClaims.sourceKeyExact, ``FvdepAudit.Library.Proof.sourceKey_exact)]
     subject := ``FvdepCore.Library.sourceKey
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3321,7 +3478,7 @@ def libraryTreeRow : Row :=
     claims := [(``LibraryClaims.treeExact, ``FvdepAudit.Library.Proof.parseTree_exact)]
     subject := ``FvdepCore.Library.parseTree
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3333,7 +3490,7 @@ def libraryPlanRow : Row :=
     claims := [(``LibraryClaims.planTreeExact, ``FvdepAudit.Library.Proof.planTree_exact)]
     subject := ``FvdepCore.Library.planTree
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3345,7 +3502,7 @@ def libraryBatchRow : Row :=
     claims := [(``LibraryClaims.batchExact, ``FvdepAudit.Library.Proof.parseBatch_exact)]
     subject := ``FvdepCore.Library.parseBatch
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3357,7 +3514,7 @@ def libraryHeadRow : Row :=
     claims := [(``LibraryClaims.headExact, ``FvdepAudit.Library.Proof.head_exact)]
     subject := ``FvdepCore.Library.headOf
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3369,7 +3526,7 @@ def libraryStartRow : Row :=
     claims := [(``LibraryClaims.startExact, ``FvdepAudit.Library.Proof.start_exact)]
     subject := ``FvdepCore.Library.start
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3380,7 +3537,7 @@ def libraryPinRow : Row :=
     claims := [(``LibraryClaims.pinExact, ``FvdepAudit.Library.Proof.afterPin_exact)]
     subject := ``FvdepCore.Library.afterPin
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3393,7 +3550,7 @@ def libraryHeadSelectRow : Row :=
     claims := [(``LibraryClaims.headSelectExact, ``FvdepAudit.Library.Proof.afterHead_exact)]
     subject := ``FvdepCore.Library.afterHead
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3405,7 +3562,7 @@ def libraryToolchainRow : Row :=
     claims := [(``LibraryClaims.toolchainExact, ``FvdepAudit.Library.Proof.toolchain_exact)]
     subject := ``FvdepCore.Library.toolchainRefusal
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3417,7 +3574,7 @@ def protocolTypesRow : Row :=
     claims := [(``WireClaims.nativeTys, ``FvdepAudit.Oracle.Wire.Proof.native_tys)]
     subject := ``FvdepCore.Protocol.Val.ty
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3450,7 +3607,7 @@ def wireResultRow : Row :=
         (``WireClaims.printNoneLayout, ``FvdepAudit.Oracle.Wire.Proof.printNone_eq)]
     subject := ``FvdepCore.Oracle.Wire.parseResult
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -3490,7 +3647,7 @@ def oracleMergeRow : Row :=
         (``OracleClaims.wireLink, ``FvdepAudit.Oracle.Proof.wire_link)]
     subject := ``FvdepCore.Oracle.merge
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["runtime"]
     unproven := [] }
 
@@ -3505,7 +3662,7 @@ def gitRunRow : Row :=
     claims := []
     subject := ``FvdepIO.Git.run
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["sandbox-spawn", "sys-shim", "os", "runtime"]
     unproven := ["git"] }
 
@@ -3523,7 +3680,7 @@ def librarySnapshotRow : Row :=
     claims := []
     subject := ``FvdepIO.Library.snapshot
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["sandbox-spawn", "sys-shim", "hacl-sha256", "os", "runtime"]
     unproven := ["library-store", "git"] }
 
@@ -3533,13 +3690,14 @@ def projectReadRow : Row :=
   { component := `FvdepIO.Project
     contract := "U5b P1–P2"
     claim :=
-      "`fvdep.toml` candidates observed by `lstat` (never followed, never opened); the chosen " ++
-        "manifest read (at most 64 KiB + 1 bytes) through U3's reader → its pin, or U3's " ++
-        "refusal naming the file."
+      "`fvdep.toml` candidates observed by `lstat` (never followed, never opened); `pin` = the " ++
+        "chosen manifest (at most 64 KiB + 1 bytes) through U3's reader → its pin, or U3's " ++
+        "refusal naming the file (the dev seam + `lake test`; `fvdep oracle` runs the same " ++
+        "stages as plan effects: `manifest`, `parse`)."
     claims := []
-    subject := ``FvdepIO.Project.pin
+    subject := ``FvdepIO.Project.observe
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["sys-shim", "toml-parse", "os", "runtime"]
     unproven := ["library-store"] }
 
@@ -3560,7 +3718,7 @@ def stepFrameRow : Row :=
         (``StepClaims.frameExact, ``FvdepAudit.Step.Proof.frame_exact)]
     subject := ``FvdepCore.Step.read
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -3634,7 +3792,7 @@ def runnerRow : Row :=
     claims := []
     subject := ``FvdepIO.Sandbox.run
     path := []
-    noCaller := "U8"
+    noCaller := "support"
     residue := ["bwrap", "os", "runtime"]
     unproven := ["sandbox-spawn"] }
 
@@ -3652,7 +3810,7 @@ def cacheRow : Row :=
     claims := []
     subject := ``FvdepIO.Cache.build
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["bwrap", "lean-toolchain", "hacl-sha256", "sys-shim", "os", "runtime"]
     unproven := ["cache-fs", "sandbox-spawn"] }
 
@@ -3667,7 +3825,7 @@ def headerRow : Row :=
     claims := []
     subject := ``FvdepIO.Header.observe
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["os", "runtime"]
     unproven := ["lean-toolchain"] }
 
@@ -3682,7 +3840,7 @@ def toolchainRow : Row :=
     claims := []
     subject := ``FvdepIO.Toolchain.fingerprint
     path := []
-    noCaller := "U5b"
+    noCaller := "support"
     residue := ["hacl-sha256", "sys-shim", "os", "runtime"]
     unproven := ["cache-fs"] }
 
@@ -3752,6 +3910,215 @@ def bundleWriteRow : Row :=
     residue := ["hacl-sha256", "os", "runtime"]
     unproven := ["failure-bundle"] }
 
+/-- U5b E1: the target grammar's operations. -/
+def oracleTargetRow : Row :=
+  { component := `FvdepCore.Oracle.Resolve
+    contract := "U5b E1"
+    claim :=
+      "An operation target reads exactly when the text is the printed `<id>@<x.y.z>` (U2 " ++
+        "I4); a profile target `<eco>:<pkg>@<ver>` = tested presentation until U10 (index " ++
+        "schema 1 lists none: absent)."
+    claims := [(``ResolveClaims.targetOp, ``FvdepAudit.Oracle.Resolve.Proof.target_op)]
+    subject := ``FvdepCore.Oracle.Target.parse
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5b E1: the target's `index.json` row. -/
+def oracleIndexRow : Row :=
+  { component := `FvdepCore.Oracle.Resolve
+    contract := "U5b E1"
+    claim :=
+      "The target's row = an operation of `index.json` with its id + version; none exactly " ++
+        "when the index lists none (a removed record + a notice never make or erase a row)."
+    claims :=
+      [(``ResolveClaims.rowListed, ``FvdepAudit.Oracle.Resolve.Proof.rowOf_listed),
+        (``ResolveClaims.rowAbsent, ``FvdepAudit.Oracle.Resolve.Proof.rowOf_none)]
+    subject := ``FvdepCore.Oracle.rowOf
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5b E2: the snapshot's coherence over K's discovery. -/
+def oracleCoherenceRow : Row :=
+  { component := `FvdepCore.Oracle.Resolve
+    contract := "U5b E2"
+    claim :=
+      "Coherent exactly when every module of the entry module's C4 closure (the entry module " ++
+        "+ the modules its header graph reaches) was discovered with its source, " ++
+        "`index.json`'s toolchain = the tree's `lean-toolchain` trimmed + the row's digest = " ++
+        "`h` of C4's entry frame over that closure (no other root enters it)."
+    claims := [(``ResolveClaims.coherenceExact, ``FvdepAudit.Oracle.Resolve.Proof.coherence_none)]
+    subject := ``FvdepCore.Oracle.coherence
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5b E3 + E5: the entry stage + its work bound. -/
+def oracleEntryRow : Row :=
+  { component := `FvdepCore.Oracle.Resolve
+    contract := "U5b E3, E5"
+    claim :=
+      "The countdown = the expanded size C2's decoder may visit against the budget; the entry " ++
+        "stage yields `S.<fn>` exactly when `<M>.entry` is a definition with a value within the " ++
+        "budget that C2 reads (no read-through facts) as a record naming the target's id + " ++
+        "version + `S.<fn>`, `S` in `M`'s closure; its budget refusal exactly past the budget."
+    claims :=
+      [(``ResolveClaims.withinExact, ``FvdepAudit.Oracle.Resolve.Proof.within_eq),
+        (``ResolveClaims.entryExact, ``FvdepAudit.Oracle.Resolve.Proof.entry_exact),
+        (``ResolveClaims.entryBudget, ``FvdepAudit.Oracle.Resolve.Proof.entry_budget)]
+    subject := ``FvdepCore.Oracle.entrySpec
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5b E4: the signature stage. -/
+def oracleSigRow : Row :=
+  { component := `FvdepCore.Oracle.Resolve
+    contract := "U5b E4"
+    claim :=
+      "The signature = the spec definition's type read by `sigOf`, `op` = the spec's last " ++
+        "component; the type refusal exactly when `sigOf` refuses a definition's type."
+    claims :=
+      [(``ResolveClaims.sigExact, ``FvdepAudit.Oracle.Resolve.Proof.sig_exact),
+        (``ResolveClaims.sigRefused, ``FvdepAudit.Oracle.Resolve.Proof.sig_refused)]
+    subject := ``FvdepCore.Oracle.specSig
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U5b O1–O3: `fvdep oracle` as a plan. -/
+def oracleCommandRow : Row :=
+  { component := `FvdepCore.Oracle.Command
+    contract := "U5b E1–E5, V1–V5, O1–O3"
+    claim :=
+      "A completed run of `fvdep oracle` = exactly the run written apart (`OracleRun`): the " ++
+        "project, its manifest's pin or the head, the snapshot (its notice), the toolchain, " ++
+        "`index.json`, the target's row, K's discovery + E2, the view, export 1 + the entry, " ++
+        "export 2 + the signature, stdin, V2's staging + budgets over `Protocol.lines`, the one " ++
+        "evaluation (none for no valid request), the merge, the batch budget, then the replies " ++
+        "in one stdout write; each refusal = its line on stderr + exit 2, no effect after it; " ++
+        "an interrupted run = a prefix of one; no project file written, none read through the " ++
+        "generic project-file effects (the selected `fvdep.toml` = P2's `manifest` effect); " ++
+        "every text write = LF-ended lines with no `Cc` inside (§1's line rule, structurally); " ++
+        "the `oracle` grammar exact (`cliOracleArgs`) + routed to this plan with SHA-256 + T's " ++
+        "default limits (`cliOracle`); a line outside it, `oracle --help` aside = exit 2 + " ++
+        "`oracle`'s usage alone (`cliOracleUsage`)."
+    claims :=
+      [(``OracleRunClaims.oracleExact, ``FvdepAudit.Oracle.Command.Proof.oracle_exact),
+        (``OracleRunClaims.oraclePrefix, ``FvdepAudit.Oracle.Command.Proof.oracle_prefix),
+        (``OracleRunClaims.oracleFiles, ``FvdepAudit.Oracle.Command.Proof.oracle_files),
+        (``OracleRunClaims.oracleLines, ``FvdepAudit.Oracle.Command.Proof.oracle_lines),
+        (``cliOracle, ``Cli.plan_oracle), (``cliOracleArgs, ``Cli.oracleArgs_eq),
+        (``cliOracleUsage, ``Cli.run_oracle_malformed)]
+    subject := ``FvdepCore.Oracle.Command.plan
+    path := [``main, ``Cli.plan, ``FvdepCore.Oracle.Command.plan]
+    noCaller := ""
+    residue :=
+      ["interpreter", "library-store", "git", "cache-fs", "sandbox-spawn", "step-helper", "bwrap",
+        "lean-toolchain", "oracle-driver", "hacl-sha256", "toml-parse", "runtime", "os"]
+    unproven := [] }
+
+/-- U5b W0 + W5 + V3: the evaluation step's source (residue `oracle-driver`). -/
+def oracleDriverRow : Row :=
+  { component := `FvdepCore.Oracle.Driver
+    contract := "U5b W0, W5, V3, Q4"
+    claim :=
+      "The driver = the entry module + version imports, `Protocol/Types.lean` + " ++
+        "`Oracle/Wire.lean` after their import lines as fvdep was built (embedded; `lake " ++
+        "test` checks the bytes), then a `main` answering each `requests.txt` line by " ++
+        "`answer (@S.fn)` into `/fvdep/work/out/replies.txt`."
+    claims := []
+    subject := ``FvdepCore.Oracle.Driver.driverText
+    path := []
+    noCaller := "support"
+    residue := ["runtime"]
+    unproven := ["oracle-driver"] }
+
+/-- U5b O2: the oracle's observation effects (tested residues). -/
+def oracleEffectsRow : Row :=
+  { component := `FvdepIO.Oracle
+    contract := "U5b O2"
+    claim :=
+      "Each oracle effect → its raw observation: the project candidates by `lstat`, the " ++
+        "manifest's bytes, Lake's parse, the snapshot + its two files, K's discovery (kept for " ++
+        "the build), T1's tools + the fills from that discovery + one view, the export + " ++
+        "evaluation steps over that view (P5's verdict, typed causes), stdin to its cap; the " ++
+        "run " ++
+        "directory + the cache's pins released at the end."
+    claims := []
+    subject := ``FvdepIO.Oracle.view
+    path := []
+    noCaller := "support"
+    residue := ["hacl-sha256", "toml-parse", "sys-shim", "os", "runtime"]
+    unproven :=
+      ["library-store", "git", "cache-fs", "sandbox-spawn", "step-helper", "bwrap",
+        "lean-toolchain", "oracle-driver"] }
+
+/-- U5 T1: a command's sandbox tools (tested residues). -/
+def toolsRow : Row :=
+  { component := `FvdepIO.Tools
+    contract := "U5 T1"
+    claim :=
+      "The cache root (`FVDEP_CACHE`, else XDG, else `~/.cache`), the first `bwrap` on `PATH` " ++
+        "at least 0.8.0, fvdep's own toolchain (elan's `lean --print-prefix`, `lean` + " ++
+        "`leanexport` present), the step helper copied beside the run, T1's fingerprint."
+    claims := []
+    subject := ``FvdepIO.Tools.tools
+    path := []
+    noCaller := "support"
+    residue := ["os", "runtime"]
+    unproven := ["bwrap", "lean-toolchain", "step-helper"] }
+
+/-- U3 T1: the TOML tree + Lake's parse failure (data shapes; the `parse` effect's answer). -/
+def manifestTreeRow : Row :=
+  { component := `FvdepCore.Manifest.Tree
+    contract := "U3 T1"
+    claim :=
+      "`Tree` (Lake's table, keys as strings) + `ParseError` (Lake's first error or `ofLake`'s " ++
+        "key): data shapes + their derived instances (the toolchain's deriving handlers; each " ++
+        "compiled body = its kernel definition; `lake test` + the manifest suite compare with " ++
+        "them, U8's workflow reads manifests)."
+    claims := []
+    subject := ``FvdepCore.Manifest.instBEqParseError
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := ["runtime"] }
+
+/-- U5b L2–L4: the library snapshots' limits (data shapes; the `snapshot` effect's parameter). -/
+def libraryLimitsRow : Row :=
+  { component := `FvdepCore.Library.Limits
+    contract := "U5b L2–L4, T"
+    claim :=
+      "`Caps` + `Limits`: L4's tree caps + the fetch, lock + diagnostic limits with T's " ++
+        "defaults; derived instances (the toolchain's deriving handlers)."
+    claims := []
+    subject := ``FvdepCore.Library.Limits.fetchSeconds
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := ["runtime"] }
+
+/-- U4 A: the shared SemVer version type the protocol codec + W carry (library code). -/
+def versionTypeRow : Row :=
+  { component := `Fvdep.Semver.Version.V1_0_0
+    contract := "U4 A; U5b W1"
+    claim :=
+      "`Version` + `Ident` (the library's shared type, admitted with the semver entries) + " ++
+        "their derived instances (the toolchain's deriving handlers)."
+    claims := []
+    subject := ``Fvdep.Semver.Version.V1_0_0.Version.major
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := ["runtime"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -3773,7 +4140,9 @@ def ledger : Ledger :=
         libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
         oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
         stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
-        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow]
+        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
+        oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
+        oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

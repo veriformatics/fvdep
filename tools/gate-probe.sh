@@ -611,6 +611,14 @@ plant_sandbox_case() {
 probe sandbox-suite plant_sandbox_case "FAIL R.signal" \
     env FVDEP_SANDBOX_CASE=R.signal bash -c 'source tools/gate.sh; sandbox_suite'
 
+# oracle-suite: a help case expecting another exit code fails, named (one case, no fixture build).
+plant_oracle_case() {
+    sed -i 's/result = c.unread_input(\[str(BIN), \*spell\]).code(0)/result = c.unread_input([str(BIN), *spell]).code(1)/' \
+        tests/oracle/protocol_cases.py
+}
+probe oracle-suite plant_oracle_case "FAIL O.help" \
+    env FVDEP_ORACLE_CASE=O.help bash -c 'source tools/gate.sh; oracle_suite'
+
 # isolation: a case expecting another environment inside the step fails, named (one case).
 plant_isolation_case() { sed -i 's/"HOME,LC_ALL,PATH,PWD,TMPDIR"/"HOME,LC_ALL,PATH,TMPDIR"/' tests/isolation/run.py; }
 probe isolation plant_isolation_case "FAIL G1.env" \

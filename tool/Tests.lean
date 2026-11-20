@@ -51,7 +51,7 @@ def splitmix (s : UInt64) : UInt64 × UInt64 :=
 /-- Tokens near the grammar's edges: real names, case + spacing variants, options, empties. -/
 def tokens : Array String :=
   #["help", "--help", "--version", "-h", "-v", "version", "check", "--json", "", " ", "HELP",
-    "help ", "--", "-", "fvdep", "--version=1", "--Help", "x"]
+    "help ", "--", "-", "fvdep", "--version=1", "--Help", "x", "oracle"]
 
 /-- `count` argument lists of 0–3 tokens from `seed`. -/
 def argLists (seed : UInt64) (count : Nat) : List (List String) :=
@@ -75,7 +75,12 @@ def expected (args : List String) : Outcome :=
   else
     if [["--help"], ["help"], ["help", "help"], ["help", "--help"]].contains args then
       ⟨usage, "", 0⟩
-    else ⟨"", usage, 2⟩
+    else
+      if [["oracle", "--help"], ["help", "oracle"]].contains args then
+        ⟨FvdepCore.Oracle.Command.usage, "", 0⟩
+      else
+        if args.head? == some "oracle" then ⟨"", FvdepCore.Oracle.Command.usage, 2⟩
+        else ⟨"", usage, 2⟩
 
 /-! Core regressions (contract U2 E3, E5, P7, P9): named cases from reviewer-2's counterexamples. -/
 
@@ -2712,6 +2717,223 @@ def cases (seed : UInt64) : List (String × (Unit → Bool)) :=
 
 end WireT
 
+/-! ## U5b E + V + O: entry resolution, staging, the driver text, the oracle plan -/
+
+namespace OracleT
+
+open Lean FvdepCore FvdepCore.Ids FvdepCore.Protocol FvdepCore.Oracle FvdepCore.Index
+
+def op (s : String) : Option (ModuleId × EntryVersion) :=
+  match Target.parse s with
+  | some (.op m v) => some (m, v)
+  | _ => none
+
+def trialM : ModuleId × EntryVersion := (op "trial.weight_mix@1.0.0").getD (Core.modId, ⟨0, 0, 0⟩)
+
+def specName : Name := `Fvdep.Trial.WeightMix.V1_0_0.foldPulse
+
+/-- An entry value as Lean elaborates it (`Module.mk id version spec [] none none`). -/
+def entryVal (id ver : String) (spec : Name) : Expr :=
+  mkAppN (.const ``Fvdep.Registry.Types.V1.Module.mk [])
+    #[toExpr id, toExpr ver, toExpr spec, toExpr ([] : List Name), toExpr (none : Option Name),
+      toExpr (none : Option String)]
+
+def entryDecl (v : Expr) (kind : Export.Kind := .defn) : Export.Decl :=
+  ⟨`Fvdep.Registry.Trial.WeightMix.V1_0_0.entry, kind, [], .sort .zero, some v⟩
+
+def mods : List Name := [`Fvdep.Registry.Trial.WeightMix.V1_0_0, `Fvdep.Trial.WeightMix.V1_0_0]
+
+def entryOk (r : Except Why Name) (n : Name) : Bool :=
+  match r with
+  | .ok x => x == n
+  | .error _ => false
+
+def entryWhy (r : Except Why Name) :
+    Option Why := match r with
+  | .ok _ => none
+  | .error w => some w
+
+def isIncons : Option Why → Bool
+  | some (.inconsistent _) => true
+  | _ => false
+
+/-- The effect kinds of a plan run whose effects get `answer` (fuel-bounded) + its result. -/
+def trace (answer : Eff → Response) : Nat → Plan UInt32 → List String × Option UInt32
+  | 0, _ => ([], none)
+  | _ + 1, .pure a => ([], some a)
+  | n + 1, .step e k =>
+    let name :=
+      match e with
+      | .project _ => "project"
+      | .manifest _ => "manifest"
+      | .parse _ => "parse"
+      | .snapshot _ _ => "snapshot"
+      | .closure _ _ => "closure"
+      | .view _ _ => "view"
+      | .leanexport _ _ _ => "export"
+      | .stdin _ => "stdin"
+      | .evaluate _ _ _ _ => "evaluate"
+      | .outBytes _ => "out"
+      | .err _ => "err"
+      | .out _ => "stdout"
+      | _ => "other"
+    let (es, r) := trace answer n (k (answer e))
+    (name :: es, r)
+
+def tc : ByteArray := (FvdepCore.Index.Command.toolchain ++ "\n").toUTF8
+
+def snap (index : ByteArray) (notice : Option String := none) : Snap :=
+  ⟨"0123456789abcdef0123456789abcdef01234567", "/t", notice, tc, index⟩
+
+def emptyIndex : ByteArray :=
+  ("{\"notices\":[],\"operations\":[],\"removed\":[],\"schema\":1,\"toolchain\":\"" ++
+      FvdepCore.Index.Command.toolchain ++
+      "\"}\n").toUTF8
+
+def answering (s : Snap) (seen : FvdepCore.Project.Seen := .ancestors []) : Eff → Response
+  | .project _ => .project seen
+  | .snapshot _ _ => .snapshot (.ok s)
+  | .err _ => .done
+  | _ => .done
+
+def runOracle (t : String) (answer : Eff → Response) : List String × Option UInt32 :=
+  match Target.parse t with
+  | some tgt => trace answer 50 (FvdepCore.Oracle.Command.plan (fun _ => "") {} tgt none)
+  | none => ([], none)
+
+def cases : List (String × (Unit → Bool)) :=
+  [("oracle: target grammar — an operation needs its version; a profile is <eco>:<pkg>@<ver>",
+      fun _ =>
+      ["trial.weight_mix@1.0.0", "base64.decode_url@12.0.3"].all (fun t => (op t).isSome) &&
+        ["trial.weight_mix", "TRIAL.weight_mix@1.0.0", "trial.weight__mix@1.0.0",
+              "trial.0mix@1.0.0", "trial.weight_0mix@1.0.0", "trial.weight_mix@01.0.0",
+              "trial.weight_mix@1.0.0-rc.1", "trial.weight_mix@1.0.0@2.0.0", "@1.0.0", "",
+              "npm:@1.0", "npm:pkg@", ":pkg@1", "NPM:x@1", "npm:a b@1"].all
+          (fun t => (Target.parse t).isNone) &&
+        ["npm:base64-js@1.5.1", "npm:@scope/name@2.0.0", "crates:base64@0.22.1"].all fun t =>
+          Target.parse t == some (.profile t)),
+    ("oracle: E5 — the expanded size counts each let value at every use, stops past the budget",
+      fun _ =>
+      let leaf : Expr := .lit (.natVal 1)
+      let app := Expr.app leaf leaf
+      let twice : Expr := .letE `x (.sort .zero) app (.app (.bvar 0) (.bvar 0)) false
+      FvdepCore.Oracle.within 3 app [] == some 0 && FvdepCore.Oracle.within 2 app [] == none &&
+        FvdepCore.Oracle.within 10 twice [] == some 0 &&
+        FvdepCore.Oracle.within 9 twice [] == none &&
+        FvdepCore.Oracle.within 1 (.bvar 7) [] == some 0),
+    ("oracle: E3 — the entry's record names the target + S.<fn> inside M's closure", fun _ =>
+      let (m, v) := trialM
+      entryOk (entrySpec 1000 m v mods [entryDecl (entryVal "trial.weight_mix" "1.0.0" specName)])
+          specName &&
+        entryWhy
+            (entrySpec 3 m v mods [entryDecl (entryVal "trial.weight_mix" "1.0.0" specName)]) ==
+          some .budget &&
+        isIncons
+          (entryWhy
+            (entrySpec 1000 m v mods [entryDecl (entryVal "trial.other" "1.0.0" specName)])) &&
+        isIncons
+          (entryWhy
+            (entrySpec 1000 m v mods [entryDecl (entryVal "trial.weight_mix" "4.0.0" specName)])) &&
+        isIncons
+          (entryWhy
+            (entrySpec 1000 m v mods
+              [entryDecl (entryVal "trial.weight_mix" "1.0.0" `Fvdep.Trial.Other.V1_0_0.f)])) &&
+        isIncons
+          (entryWhy
+            (entrySpec 1000 m v mods
+              [entryDecl (entryVal "trial.weight_mix" "1.0.0" specName) .«opaque»])) &&
+        isIncons
+          (entryWhy
+            (entrySpec 1000 m v [`Fvdep.Registry.Trial.WeightMix.V1_0_0]
+              [entryDecl (entryVal "trial.weight_mix" "1.0.0" specName)])) &&
+        isIncons (entryWhy (entrySpec 1000 m v mods []))),
+    ("oracle: E4 — the spec's type through sigOf; a non-definition or another type refused",
+      fun _ =>
+      let int : Expr := .const ``Int []
+      let ty : Expr :=
+        .forallE `a int (.forallE `b int (.app (.const ``Option [.zero]) int) .default) .implicit
+      let d (k : Export.Kind) (t : Expr) : Export.Decl := ⟨specName, k, [], t, none⟩
+      (match specSig specName [d .defn ty] with
+        | .ok sig => sig == ⟨"foldPulse", [.int, .int], .option .int⟩
+        | .error _ => false) &&
+        (match specSig specName [d .defn (.const ``Bool [])] with
+        | .error .cannotCarry => true
+        | _ => false) &&
+        (match specSig specName [d .thm ty] with
+        | .error (.inconsistent _) => true
+        | _ => false)),
+    ("oracle: E2 — a closure module without its source is inconsistent, even under a digest " ++
+        "of the rest",
+      fun _ =>
+      let h (b : ByteArray) : String := toString b.size
+      let i : IndexFile := ⟨FvdepCore.Index.Command.toolchain, [], [], []⟩
+      let M : Name := `Fvdep.Registry.Trial.WeightMix.V1_0_0
+      let srcM : Src :=
+        ⟨"Fvdep.Registry.Trial.WeightMix.V1_0_0", "x".toUTF8, ["Fvdep.Trial.Missing"]⟩
+      let srcN : Src := ⟨"Fvdep.Trial.Missing", "y".toUTF8, []⟩
+      let part : String := h (FvdepCore.Index.Assemble.entryFrame (factsOf [srcM]) M)
+      let whole : String := h (FvdepCore.Index.Assemble.entryFrame (factsOf [srcM, srcN]) M)
+      let o (d : String) : Operation :=
+        ⟨(op "trial.weight_mix@1.0.0").map (·.1) |>.getD Core.modId, ⟨1, 0, 0⟩, d, [], none⟩
+      (coherence h FvdepCore.Index.Command.toolchain i (o part) M [srcM]).isSome &&
+        coherence h FvdepCore.Index.Command.toolchain i (o whole) M [srcM, srcN] == none &&
+        (coherence h FvdepCore.Index.Command.toolchain i (o whole) M [srcN]).isSome),
+    ("oracle: V2 — lines by offsets (CRLF kept, a final fragment counts), staging + budgets",
+      fun _ =>
+      let sig : Sig := ⟨"f", [.nat], .plain .nat⟩
+      let b := "{\"op\":\"f\",\"args\":[1]}\r\n\nx\n{\"op\":\"f\",\"args\":[2]}".toUTF8
+      (match FvdepCore.Oracle.Command.stageFrom {} sig b 0 {} with
+        | .ok st =>
+          st.reqs.reverse.map (· == .valid) == [true, false, false, true] &&
+            st.staged == "n:1\nn:2\n" &&
+            st.stagedBytes == 8
+        | .error _ => false) &&
+        (match FvdepCore.Oracle.Command.stageFrom { stagingBytes := 7 } sig b 0 {} with
+        | .error .staging => true
+        | _ => false) &&
+        (match FvdepCore.Oracle.Command.stageFrom { batchBytes := 20 } sig b 0 {} with
+        | .error .batch => true
+        | _ => false)),
+    ("oracle: the driver = its imports + W's two texts after their import lines + main", fun _ =>
+      let d := FvdepCore.Oracle.Driver.driverText `Fvdep.Registry.Trial.WeightMix.V1_0_0 specName
+      d.startsWith
+          ("import «Fvdep».«Registry».«Trial».«WeightMix».«V1_0_0»\n" ++
+            "import Fvdep.Semver.Version.V1_0_0\n") &&
+        (d.splitOn "\nimport ").length == 2 &&
+        (d.splitOn "namespace FvdepCore.Oracle.Wire").length == 2 &&
+        (d.splitOn "(@«Fvdep».«Trial».«WeightMix».«V1_0_0».«foldPulse»)").length == 2),
+    ("oracle: an unknown target, a profile, a bad index → one stderr line, exit 2, stdin unread",
+      fun _ =>
+      let s := snap emptyIndex
+      runOracle "trial.weight_mix@1.0.0" (answering s) ==
+          (["project", "snapshot", "err"], some 2) &&
+        runOracle "npm:x@1" (answering s) == (["project", "snapshot", "err"], some 2) &&
+        runOracle "trial.weight_mix@1.0.0" (answering (snap "{bad".toUTF8)) ==
+          (["project", "snapshot", "err"], some 2)),
+    ("oracle: a served head's notice goes first; another toolchain is refused before index.json",
+      fun _ =>
+      runOracle "a.b@1.0.0" (answering (snap emptyIndex (some "Fetch failed: x."))) ==
+          (["project", "snapshot", "err", "err"], some 2) &&
+        runOracle "a.b@1.0.0" (answering { snap emptyIndex with toolchain := "x".toUTF8 }) ==
+          (["project", "snapshot", "err"], some 2)),
+    ("oracle: a project's manifest is read + parsed before the snapshot; a refusal stops there",
+      fun _ =>
+      let ans : Eff → Response
+        | .project _ => .project (.ancestors [("/p", .file)])
+        | .manifest _ => .manifest (.bytes "schema = [\n".toUTF8)
+        | .parse _ => .parse (.error (.syntax 1 9 "x"))
+        | _ => .done
+      runOracle "a.b@1.0.0" ans == (["project", "manifest", "parse", "err"], some 2))]
+
+/-- Q4: the embedded texts = the files' bytes as built (a stale embedding fails). -/
+def ioCases : List (String × IO Bool) :=
+  [("oracle: Q4 — the driver embeds Protocol/Types.lean + Oracle/Wire.lean exactly", do
+      return FvdepCore.Oracle.Driver.typesText ==
+            (← IO.FS.readFile "FvdepCore/Protocol/Types.lean") &&
+          FvdepCore.Oracle.Driver.wireText == (← IO.FS.readFile "FvdepCore/Oracle/Wire.lean"))]
+
+end OracleT
+
 /-! ## U5b L2: the library store + git (residues `git`, `library-store`) -/
 
 namespace LibraryR
@@ -3341,14 +3563,16 @@ def main : IO UInt32 := do
                   ExportR.cases ++
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
-                  WireT.cases seed).map
+                  WireT.cases seed ++
+                  OracleT.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
     (Manifest.ioCases ++ Sys.ioCases ++ Spawn.ioCases ++ Cache.ioCases ++ Snapshot.ioCases ++
             PhaseIO.ioCases ++
             LibraryT.ioCases ++
-            LibraryR.ioCases).mapM
+            LibraryR.ioCases ++
+            OracleT.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩

@@ -319,6 +319,16 @@ theorem fits_any (e : Eff) : ∃ r, Fits e r := by
   | probe => exact ⟨.probe (.ok none), trivial⟩
   | libraryFacts => exact ⟨.facts (.error (.build "")), trivial⟩
   | replay => exact ⟨.replay (.ok none), trivial⟩
+  | project => exact ⟨.project (.ancestors []), trivial⟩
+  | manifest => exact ⟨.manifest .absent, trivial⟩
+  | parse => exact ⟨.parse (.error (.key .anonymous)), trivial⟩
+  | snapshot => exact ⟨.snapshot (.error ""), trivial⟩
+  | closure => exact ⟨.closure (.error ""), trivial⟩
+  | view => exact ⟨.view (.error ⟨.io, ""⟩), trivial⟩
+  | leanexport => exact ⟨.leanexport (.error ⟨.io, ""⟩), trivial⟩
+  | stdin => exact ⟨.stdin .absent, trivial⟩
+  | evaluate => exact ⟨.evaluate (.error ⟨.io, ""⟩), trivial⟩
+  | outBytes => exact ⟨.done, trivial⟩
 
 theorem runs_completes {α : Type} (p : Plan α) : ∃ evs a, Plan.Runs p evs (some a) := by
   induction p with

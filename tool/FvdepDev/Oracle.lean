@@ -2,11 +2,16 @@ import Fvdep.Base64.Decode.V1_0_0
 import Fvdep.Base64.DecodeUrl.V1_0_0
 import Fvdep.Semver.Compare.V1_0_0
 import Fvdep.Semver.Parse.V1_0_0
+import FvdepCore.Cli
 import FvdepCore.Protocol
+import FvdepIO.Run
 
-/-! `fvdep-dev oracle <id>@<ver>` (contract U4 B5): adapter protocol v1 over the six launch specs
-compiled in — the spec evidence's driver (tester-1's oracle cases + spec mutants); never shipped.
-The shipped `fvdep oracle` (U5b) evaluates a snapshot's spec instead of a compiled-in one. -/
+/-! Never shipped. `fvdep-dev spec <id>@<ver>` (contract U4 B5): adapter protocol v1 over the six
+launch specs compiled in — the spec evidence's driver (tester-5's library suite + spec mutants).
+`fvdep-dev oracle <target> [--project <dir>] [--limit <name>=<n>]… [--replies <file>]` (contract
+U5b Q3): the shipped `fvdep oracle` plan + interpreter under T overrides; `--replies` = the evaluate
+effect answers the file's bytes (the evaluation step is not run), so malformed, missing, extra +
+mistyped driver lines reach the merge through the command path. -/
 
 namespace FvdepDev.Oracle
 
@@ -53,18 +58,21 @@ def table : List (String × Served) :=
           some (.ok (.ordering (Fvdep.Semver.Compare.V1_0_0.compare a b)))
         | _ => none⟩)]
 
-def usage : String := "usage: fvdep-dev oracle <id>@<version>\n"
+def usage : String :=
+  "usage: fvdep-dev spec <id>@<version>\n" ++
+    "       fvdep-dev oracle <target> [--project <dir>] [--limit <name>=<n>]... " ++
+    "[--replies <file>]\n"
 
 def serve (s : Served) (line : ByteArray) : Reply :=
   match decodeRequest s.sig line with
   | .error reason => .invalid reason
   | .ok args => (s.eval args).getD (.invalid "arguments outside the signature")
 
-def run : List String → IO UInt32
+def runSpec : List String → IO UInt32
   | [target] => do
     match table.lookup target with
     | none =>
-      IO.eprintln s!"fvdep-dev oracle: unknown target {target}"
+      IO.eprintln s!"fvdep-dev spec: unknown target {target}"
       return 2
     | some s =>
       let input ← (← IO.getStdin).readBinToEnd
@@ -76,5 +84,46 @@ def run : List String → IO UInt32
   | _ => do
     IO.eprint usage
     return 2
+
+/-- The oracle seam's options. -/
+structure Opts where
+  target : Option String := none
+  project : Option String := none
+  limits : FvdepCore.Oracle.Command.Limits := {}
+  replies : Option String := none
+
+def parse (o : Opts) : List String → Option Opts
+  | [] => some o
+  | "--project" :: d :: rest =>
+    if o.project.isNone then parse { o with project := some d } rest else none
+  | "--limit" :: kv :: rest =>
+    match kv.splitOn "=" with
+    | [k, v] => (v.toNat?.bind (o.limits.set k)).bind fun l => parse { o with limits := l } rest
+    | _ => none
+  | "--replies" :: f :: rest =>
+    if o.replies.isNone then parse { o with replies := some f } rest else none
+  | t :: rest =>
+    if !t.startsWith "-" && o.target.isNone then parse { o with target := some t } rest else none
+
+/-- `fvdep-dev oracle …` (Q3). -/
+def run (args : List String) : IO UInt32 := do
+  let fail : IO UInt32 := do
+    IO.eprint usage
+    return 2
+  match parse {} args with
+  | some { target := some t, project, limits, replies } =>
+    match FvdepCore.Oracle.Target.parse t with
+    | none =>
+      fail
+    | some tgt =>
+      let r ←
+        match replies with
+        | some f =>
+          some <$> IO.FS.readBinFile f
+        | none =>
+          pure none
+      FvdepIO.executeWith r (FvdepCore.Oracle.Command.plan FvdepCore.Cli.sha limits tgt project)
+  | _ =>
+    fail
 
 end FvdepDev.Oracle

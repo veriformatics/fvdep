@@ -1,0 +1,77 @@
+id	part	clause	expected
+W.weighted-property	W	W1–W5, Q2; E4	seeded weighted Int×Int×Int -> Option Int, order, implicit binder, actual fn name
+W.bytearray-property	W	W3–W5; §8	ByteArray both ways: empty/all bytes/seeded reversals, malformed encodings refused
+W.utf16-property	W	W3–W5; §8	UTF-16 code units retain lone surrogates, all edge values and order
+W.text-property	W	W1–W5; V1; U3 J1–J4	UTF-8 scalar and escaping round trips, inclusive 65,536-byte string bound
+W.nat-int-property	W	W1–W5; U4 B2	Nat and Int encode magnitude boundaries and canonical decimal strings both ways
+W.ordering	W	W1–W5; §8	Ordering arg/result accepts exactly lt/eq/gt
+W.version-property	W	W1–W5; U4 B2	Version fields and tagged empty/non-ASCII/punctuated identifiers preserved exactly
+W.rfc-standard	W	W3–W5; Q2; library Operations	List UInt8 and text via independent RFC 4648 standard encoder/strict decoder
+W.rfc-url	W	W3–W5; Q2; library Operations	List UInt8 and text via independent RFC 4648 URL encoder/strict decoder
+W.large-reply	W	V4; §8; U4 B3	a 65,536-character Base64 input returns the entire 98,304-character hex string
+W.semver-parse	W	W3–W5; library Operations	SemVer strict grammar, large numbers, prerelease/build distinctions
+W.semver-compare	W	W3–W5; library Operations	real ordering is the whole-type reference, ignoring build across generated pairs
+V.empty	V	V1, V3–V4	zero-byte input produces zero bytes and no evaluation
+V.mixed-lines	V	V1–V5; U4 B3	blank/invalid interleaving, CRLF, final unterminated line, one eval for all valid rows
+V.all-invalid	V	V2–V3; I2	all-invalid batch replies in order without running an evaluation step
+V.request-budget	V	V1; I5; Q3	exact request byte cap accepts CRLF batch, one more byte refuses with zero stdout
+V.staging-budget	V	V2; W1; I5; Q3	exact W1 staged-byte cap accepts, one fewer rejects after a valid first request
+V.output-budget	V	V4; U4 B3; I5; Q3	exact canonical reply-byte cap accepts; a late overflow returns no prefix
+V.invalid-budget	V	V2, V4; I5	invalid reply charged before a later valid request reaches the evaluation step
+V.reply-substitute	V	V3–V5; Q3	use typed substituted driver lines at valid ranks, not driver stdout or public order
+V.reply-missing-extra	V	V3–V5; Q3	missing line, missing LF, extra result, and extra blank line refuse before stdout
+V.reply-spelling	V	W2, W4; V4; Q3	reject noncanonical result syntaxes, decimal variants and raw invalid bytes
+V.reply-type-and-rank	V	W2, W4; V4–V5; Q3	typed reply checks and malformed line index counts valid requests only
+V.evaluate-deadline	V	V3; U5 R4/P5; Q3	real bounded-time evaluation ends on the deadline, with typed exit 2 and no replies
+O.help	O	O1; §1	both command help spellings ignore poison manifest/source, cache and stdin
+O.usage	O	O1, O3; §1–2	specific help exists; wrong arity/option refuses before any source effect
+O.resolution-unread	O	O1, O3; E1	unknown target exits with an open stdin writer and leaves prequeued bytes unread
+O.batch-eof	O	O1, O3; V1–V4; §8	prequeued valid request yields no evaluation/output while its producer remains open
+O.output-failure	O	I5; O1; §2	stdout I/O errors and broken pipe exit 2 instead of success/signal
+O.steps	O	I1–I2; E3–E4; V3; O3	two ordered export roots and one evaluation in real sandbox, using one library view
+P.nearest	P	P1–P3; O3	nearest ancestor's old pin wins over outer project and newer main
+P.explicit	P	P1–P3; §2	explicit project overrides a nearer pin; no project writes
+P.explicit-missing	P	P1; O3	an explicit directory without a manifest refuses instead of consulting ancestors
+P.manifest-link	P	P1; O3	nearest manifest symlink: io refusal, no fallback
+P.explicit-link	P	P1; O3	explicit manifest symlink: io refusal, not followed
+P.manifest-fifo	P	P1; O3	nearest manifest FIFO: io refusal without a reader wait
+P.manifest-invalid	P	P2; §7; U3 T1/T3	invalid TOML, schema, key, pin and byte encoding refuse without head selection
+P.manifest-size	P	P2; §7	65,536-byte valid manifest accepted; 65,537 bytes refused
+L.anchor-relative	L	L1, L5–L6	same relative source spelling gets distinct keys, trees and offline head records
+L.redact-url	L	L1, L3	synthetic URL userinfo never reaches diagnostics or a successful head record
+L.publish-blobs	L	L2, L4–L5; I3	publish allowed raw blobs (no checkout filters; 100755 becomes 0644)
+L.rebuild-incomplete	L	L2, L5–L6	replace a pre-existing tree without .complete, never read its bytes
+L.damaged-head	L	L5–L6	corrupt/noncanonical record, missing tree, or incomplete tree are store faults
+L.head-then-pin	L	L2–L6; P2	distinct shallow direct refspecs, private fetch repos, pin never rewrites last head
+L.pin-offline	L	L6; P2	warm pin serves without fetch; uncached pin never reuses the stored head
+L.offline-head	L	L5–L6	local transport loss serves last fetched head + its exact stored UTC time
+L.never-fetched	L	L6; §3	unreachable local source with no head says never, exit 2
+L.required	L	L4, L6	each required library file missing is a received-but-failing candidate, not fallback
+L.link	L	L4, L6	a link under a library path is named verbatim and does not replace last head
+L.gitlink	L	L4	submodule-mode entry under a library path refuses; no checkout or recursion
+L.fsck-mode	L	L3–L4, L6	a bad raw tree mode refuses during fsck or tree policy, never fallback
+L.invalid-paths	L	L4; I3	reject leading-dot components and invalid UTF-8 filename bytes
+L.path-depth	L	L4	32 relative components accepted; 33 refused
+L.path-bytes	L	L4; I3	4,096-byte relative path reaches blob transfer; 4,097-byte path is refused first
+L.path-sum	L	L4; I3	4 MiB cumulative listed path bytes accepted at policy, one more byte refused before blob query
+L.odd-mode	L	L4	an observable unknown tree-listing mode is refused with commit, mode and path
+L.file-size	L	L4	regular blob at 1 MiB accepted; 1 MiB + one refused before blob transfer
+L.tree-count	L	L4; Q3	count root/tree/blob records, limit exact accepts and one fewer refuses
+L.snapshot-size	L	L4; Q3	sum listed blob sizes, exact limit accepts and one fewer refuses
+L.diagnostics	L	L3; §1	Git capture at/over cap preserves first-line text and escapes Cc
+L.fetch-timeout	L	L3, L6; Q3	timed-out local fetch group stops, child is reaped and no snapshot is published
+L.lock-timeout	L	L2; Q3	an externally held source flock times out before any fetch
+L.concurrent	L	L2, L5–L6	two parallel callers succeed, one complete tree, no staging residue
+L.toolchain	L	L5–L7; E1	incompatible complete head recorded, exact refusal precedes index read; no rollback
+E.target-grammar	E	E1; O1, O3; library Naming	malformed operation targets refuse as usage before touching the source
+E.absent	E	E1; L5	canonical absent id/version and profile target refused, but head is recorded
+E.removed	E	E1; U4 C6	removed row does not serve even if its source files still exist
+E.retracted	E	E1; O1; §8	listed retraction neither hides the spec nor makes a delivery claim
+E.bad-index	E	E1; U4 C6	malformed, duplicate and schema-invalid index refuse before absent target
+E.inconsistent	E	E2	listed entry with a source/digest mismatch, wrong toolchain or missing entry file refuses
+E.entry-fields	E	E2–E3; U4 C2	coherent bytes with wrong entry id/version or non-def entry are inconsistent
+E.spec-type	E	E4; U4 B1	unsupported type is not misclassified as missing target or parse failure
+E.decode-budget	E	E5; Q3	registry decoding exceeding a lowered node budget refuses, then default serves
+E.selected-only	E	E1–E4; I1; §8	unrelated library root/entry damage does not force full index rebuild or admission
+X.profile-text	X	X1, X5; E4	real pinned exporter can emit a literal outside the reader's JSON profile
+Q.history-and-reuse	Q	Q2; E2; U5 K7	new head adds a different version, old closure compiles zero; warm old pin still serves

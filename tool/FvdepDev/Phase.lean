@@ -9,7 +9,7 @@ bundle on a failure — reported line by line (interface §1's line rule). -/
 
 namespace FvdepDev.Phase
 
-open FvdepCore.Build FvdepCore.Sandbox FvdepCore.Evidence FvdepDev.Sandbox
+open FvdepCore.Build FvdepCore.Sandbox FvdepCore.Evidence FvdepDev.Sandbox FvdepIO.Tools
 
 def usage : String :=
   "usage: fvdep-dev phase check <project dir> <id> --library <library dir> --spec-module <M> " ++
@@ -116,7 +116,7 @@ def check (o : Options) : IO UInt32 := do
     return ← usageError "--abi-module and --abi go together"
   if let some why := o.limits.check then
     return ← usageError why
-  let some r ← FvdepDev.Cache.root |
+  let some r ← FvdepIO.Tools.cacheRoot |
     do
       say ["infra io: no cache directory (FVDEP_CACHE, XDG_CACHE_HOME + HOME unset)"]
       return 2
@@ -169,13 +169,13 @@ def check (o : Options) : IO UInt32 := do
   let run ← FvdepIO.Phase.runDir r
   try
     let (sys, fp) ←
-      match ← FvdepDev.Cache.tools r run with
+      match ← FvdepIO.Tools.tools r run with
       | .ok x =>
         pure x
       | .error e =>
         say [s!"infra tool_missing: {e}"]
         return 2
-    let e ← FvdepDev.Cache.envOf r run { cacheBytes := t } bwrap sys (run / "step") fp
+    let e ← FvdepIO.Tools.env r run { cacheBytes := t } bwrap sys (run / "step") fp
     let abi :=
       match o.abiModule, o.abi with
       | some m, some c => some (m, c)
@@ -280,7 +280,7 @@ def rerun (dir : String) : IO UInt32 := do
     unless same do
       say [s!"infra io: the bundle's copy {i.role}/{i.path} differs from its record"]
       return 2
-  let some r ← FvdepDev.Cache.root |
+  let some r ← FvdepIO.Tools.cacheRoot |
     do
       say ["infra io: no cache directory (FVDEP_CACHE, XDG_CACHE_HOME + HOME unset)"]
       return 2
@@ -294,7 +294,7 @@ def rerun (dir : String) : IO UInt32 := do
   let run ← IO.FS.createTempDir
   try
     let (sys, fp) ←
-      match ← FvdepDev.Cache.tools r run with
+      match ← FvdepIO.Tools.tools r run with
       | .ok x =>
         pure x
       | .error e =>
@@ -312,7 +312,7 @@ def rerun (dir : String) : IO UInt32 := do
       IO.FS.createDirAll (run / ("empty-" ++ x))
       return run / ("empty-" ++ x)
     let (src, view, prior) := (← role "src", ← role "lib", ← role "prior")
-    let e ← FvdepDev.Cache.envOf r run {} bwrap sys (run / "step") fp
+    let e ← FvdepIO.Tools.env r run {} bwrap sys (run / "step") fp
     let setup : FvdepIO.Phase.Setup :=
       { cache := e
         recipe := rc.recipe

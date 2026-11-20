@@ -41,7 +41,7 @@ def observe (explicit : Option String) : IO Seen := do
     return .ancestors (← (ancestors (← IO.currentDir)).mapM fun d => return (d.toString, ← found d))
 
 /-- A manifest refusal: U3's public code + detail, naming the file. -/
-def refusal (file : String) (e : FvdepIO.Toml.ReadError) : String :=
+def refusal (file : String) (e : FvdepCore.Manifest.ReadError) : String :=
   s!"infra {e.code.spelling}: {file}: {e.detail}"
 
 /-- P2: the chosen project's pin: its `fvdep.toml` read (at most `maxBytes` + 1 bytes: a larger one

@@ -1,5 +1,6 @@
 import FvdepIO.Sandbox
 import FvdepIO.Sha256
+import FvdepIO.Tools
 
 /-! `fvdep-dev sandbox run` (contract `docs/contracts/U5-sandbox.md` D2; never shipped): one step in
 R's layout; prints its outcome, streams, frame + framed files, each line through interface §1's
@@ -7,7 +8,7 @@ line rule. -/
 
 namespace FvdepDev.Sandbox
 
-open FvdepCore.Sandbox FvdepIO.Sandbox
+open FvdepCore.Sandbox FvdepIO.Sandbox FvdepIO.Tools
 
 def usage : String :=
   "usage: fvdep-dev sandbox run [--src <dir>] [--deadline <s>] [--work-bytes <n>] " ++
@@ -61,60 +62,6 @@ def parse (o : Options) : List String → Except String Options
   | "--" :: a :: rest => .ok { o with argv := a :: rest }
   | _ => .error "missing or unknown arguments"
 
-/-- `bubblewrap X.Y.Z` (the first line) → its version. -/
-def bwrapVersion (out : String) : Option (Nat × Nat × Nat) :=
-  let line := (out.splitOn "\n").headD ""
-  if line.startsWith "bubblewrap " then
-    match (String.ofList (line.toList.drop 11)).splitOn "." with
-    | [a, b, c] => do
-      pure (← a.toNat?, ← b.toNat?, ← c.toNat?)
-    | _ => none
-  else none
-
-def atLeast (v w : Nat × Nat × Nat) : Bool :=
-  w.1 < v.1 || w.1 == v.1 && (w.2.1 < v.2.1 || w.2.1 == v.2.1 && w.2.2 ≤ v.2.2)
-
-/-- T1: the first `bwrap` on `PATH`, at least 0.8.0 (`--disable-userns`). -/
-def preflightBwrap : IO (Except String String) := do
-  let dirs := ((← IO.getEnv "PATH").getD "").splitOn ":"
-  let mut found := none
-  for d in dirs do
-    if found.isNone && !d.isEmpty then
-      let p := System.FilePath.mk d / "bwrap"
-      if ← p.pathExists then
-        found := some p
-  let some p := found | return .error "bwrap is not on PATH"
-  let out ←
-    try
-      IO.Process.output { cmd := p.toString, args := #["--version"] }
-    catch e =>
-      return .error s!"bwrap at {p} did not run: {e}"
-  match bwrapVersion out.stdout with
-  | some v =>
-    if atLeast v (0, 8, 0) then
-      return .ok p.toString
-    else
-      return .error s!"bwrap {v.1}.{v.2.1}.{v.2.2} at {p} is older than 0.8.0"
-  | none =>
-    return .error s!"bwrap at {p} reported no version"
-
-/-- I1 + T1: fvdep's own toolchain (elan resolves the release fvdep was built with), holding
-`bin/lean` + `bin/leanexport`. -/
-def preflightSysroot (run : System.FilePath) : IO (Except String System.FilePath) := do
-  IO.FS.writeFile (run / "lean-toolchain") (FvdepCore.Index.Command.toolchain ++ "\n")
-  let out ←
-    try
-      IO.Process.output { cmd := "lean", args := #["--print-prefix"], cwd := run }
-    catch e =>
-      return .error s!"lean did not run: {e}"
-  if out.exitCode != 0 then
-    return .error s!"lean --print-prefix exited with code {out.exitCode}"
-  let sys : System.FilePath := (out.stdout.splitOn "\n").headD ""
-  for tool in ["lean", "leanexport"] do
-    unless ← (sys / "bin" / tool).pathExists do
-      return .error s!"{tool} is missing from the toolchain at {sys}"
-  return .ok sys
-
 /-- A copy of `src` (directories + regular files; anything else named + skipped). -/
 partial def copyTree (src dst : System.FilePath) : IO Unit := do
   IO.FS.createDirAll dst
@@ -127,20 +74,6 @@ partial def copyTree (src dst : System.FilePath) : IO Unit := do
       IO.FS.writeBinFile (dst / e.fileName) (← IO.FS.readBinFile e.path)
     | _ =>
       IO.eprintln s!"fvdep-dev: --src: skipped {e.path} (a link or special file)"
-
-/-- R8: a copy of the step helper beside the running executable, at `<run>/step/fvdep-step` (the
-directory bound at `/fvdep/step`). -/
-def installHelper (run : System.FilePath) : IO (Except String Unit) := do
-  let helper := ((← IO.appPath).parent.getD ".") / "fvdep-step"
-  unless ← helper.pathExists do
-    return .error s!"fvdep-step is missing beside fvdep-dev ({helper})"
-  IO.FS.createDirAll (run / "step")
-  IO.FS.writeBinFile (run / "step" / "fvdep-step") (← IO.FS.readBinFile helper)
-  IO.setAccessRights (run / "step" / "fvdep-step")
-      { user := { read := true, write := true, execution := true }
-        group := { read := true, execution := true }
-        other := { read := true, execution := true } }
-  return .ok ()
 
 def outcomeLine : Outcome → String
   | .exited n => s!"outcome exited {n}"

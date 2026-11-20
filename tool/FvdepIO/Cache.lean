@@ -471,16 +471,10 @@ structure Resolved where
   use : Use
   manifest : Manifest
 
-/-- K: the closure of `roots` in the library at `lib`, each module's entry valid + pinned (in plan
-order: module, key, how it was had, its manifest). -/
-def build (e : Env) (lib : System.FilePath) (roots : List String) :
+/-- K over discovered `sources`: the closure of `roots`, each module's entry valid + pinned (in plan
+order: module, key, how it was had, its manifest), compiled from exactly those bytes. -/
+def buildFrom (e : Env) (sources : Array Source) (roots : List String) :
     IO (Except Failure (List Resolved)) := do
-  let sources ←
-    match ← discover lib roots with
-    | .ok s =>
-      pure s
-    | .error f =>
-      return .error f
   let nodes : List Node :=
     sources.toList.map fun s =>
       { name := s.module, imports := (s.header.imports.map (·.module)).filter (!toolchainModule ·) }
@@ -522,6 +516,15 @@ def build (e : Env) (lib : System.FilePath) (roots : List String) :
   return .ok
       (done.toList.map fun x =>
         { module := x.1, key := x.2.1, use := x.2.2.1, manifest := x.2.2.2 })
+
+/-- K: the closure of `roots` in the library at `lib` (K2's discovery, then `buildFrom`). -/
+def build (e : Env) (lib : System.FilePath) (roots : List String) :
+    IO (Except Failure (List Resolved)) := do
+  match ← discover lib roots with
+  | .ok s =>
+    buildFrom e s roots
+  | .error f =>
+    return .error f
 
 /-- `cache list`: every valid entry (key, charge = its artifacts + manifest, module), by key. -/
 def list (e : Env) : IO (List (String × Nat × String)) := do

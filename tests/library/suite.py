@@ -111,7 +111,7 @@ class Suite:
         self.add(name, clause, domain, check)
 
     def oracle_run(self, target: str, data: bytes) -> subprocess.CompletedProcess[bytes]:
-        return subprocess.run([self.oracle, "oracle", target], input=data, capture_output=True,
+        return subprocess.run([self.oracle, "spec", target], input=data, capture_output=True,
                               timeout=120, check=False)
 
     def cli_exact(self, name: str, target: str, data: bytes, want: bytes,
@@ -655,7 +655,7 @@ class Suite:
         for i, args in enumerate(([], ["base64.encode@1.0.0", "extra"], ["--unknown"],
                                    ["base64.encode"], ["base64.encode@1"], ["@1.0.0"])):
             def usage(args: list[str] = args) -> None:
-                proc = subprocess.run([self.oracle, "oracle", *args], input=b"", capture_output=True,
+                proc = subprocess.run([self.oracle, "spec", *args], input=b"", capture_output=True,
                                       timeout=10, check=False)
                 equal(proc.returncode, 2, "usage exit")
                 equal(proc.stdout, b"", "usage stdout")
@@ -667,7 +667,7 @@ class Suite:
             marker = b"THIS INPUT MUST STAY UNREAD\n"
             os.write(write_fd, marker)
             os.close(write_fd)
-            proc = subprocess.Popen([self.oracle, "oracle", "missing.operation@9.8.7"],
+            proc = subprocess.Popen([self.oracle, "spec", "missing.operation@9.8.7"],
                                     stdin=read_fd, stdout=subprocess.PIPE, stderr=subprocess.PIPE)
             try:
                 stdout, stderr = proc.communicate(timeout=10)

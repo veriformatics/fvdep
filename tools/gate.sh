@@ -103,6 +103,7 @@ fuzz-replay lean
 sys-suite   lean
 sandbox-suite lean
 isolation   lean
+oracle-suite lean
 acceptance  lean
 index       lean
 index-history lean
@@ -127,12 +128,12 @@ tree-clean  lean checks
 # Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
 # registry order; a stage's weight = its peak memory alone (GiB, anon + tmpfs, rounded up; unlisted
 # = 1). Both from `tools/vflab-run bash tools/gate-measure.sh [STAGE…]` (vflab, no other fvdep job).
-GATE_FIRST='index-suite sandbox-suite acceptance sys-suite coverage'
-GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 ledger-suite=3 sys-suite=3'
+GATE_FIRST='index-suite acceptance sandbox-suite oracle-suite sys-suite coverage'
+GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle-suite=4 ledger-suite=3 sys-suite=3'
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation acceptance index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite acceptance index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -280,7 +281,7 @@ manifest_suite() {
 }
 
 # The blind library suite (tester-5; U4 A + B): the launch specs + the protocol codec through its
-# Lean driver, `fvdep-dev oracle` through its CLI.
+# Lean driver, `fvdep-dev spec` through its CLI.
 library_suite() {
     local key
     key="$(shipped_closure tests/library tool/FvdepDev tool/FvdepDev.lean tool/DevMain.lean)"
@@ -336,6 +337,15 @@ sandbox_suite() {
 isolation() {
     suite isolation "$(sandbox_closure tests/isolation)" "${FVDEP_ISOLATION_CASE:-}" \
         bash tests/isolation/run.sh ${FVDEP_ISOLATION_CASE:+--case "$FVDEP_ISOLATION_CASE"}
+}
+
+# The blind oracle suite (tester-7; U5b P, L, E, W, V, O, Q): `fvdep oracle` + `fvdep-dev oracle`
+# over local git sources + the fixture library (tests/oracle/fixtures), each case on its own
+# FVDEP_CACHE (a toolchain record seeded once per run). Its steps run fvdep-step ⇒
+# tests/oracle/run.sh refuses outside a PID namespace of the job's own.
+oracle_suite() {
+    suite oracle-suite "$(sandbox_closure tests/oracle tool/Main.lean)" "${FVDEP_ORACLE_CASE:-}" \
+        bash tests/oracle/run.sh ${FVDEP_ORACLE_CASE:+--case "$FVDEP_ORACLE_CASE"}
 }
 
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the

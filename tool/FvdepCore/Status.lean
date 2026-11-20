@@ -771,7 +771,16 @@ theorem commitFiles_prefix (fs : List (ProjectFile × ByteArray)) (evs : List (E
       | read _
       | probe _
       | facts _
-      | replay _ => simp [Fits] at hf
+      | replay _
+      | project _
+      | manifest _
+      | parse _
+      | snapshot _
+      | closure _
+      | view _
+      | leanexport _
+      | stdin _
+      | evaluate _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u => exact ih tail hr
@@ -797,7 +806,16 @@ theorem commitFiles_ok (fs : List (ProjectFile × ByteArray)) (evs : List (Eff �
       | read _
       | probe _
       | facts _
-      | replay _ => simp [Fits] at hf
+      | replay _
+      | project _
+      | manifest _
+      | parse _
+      | snapshot _
+      | closure _
+      | view _
+      | leanexport _
+      | stdin _
+      | evaluate _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u => simp [ih tail hr]
@@ -821,7 +839,16 @@ theorem commitFiles_failed (fs : List (ProjectFile × ByteArray)) (evs : List (E
       | read _
       | probe _
       | facts _
-      | replay _ => simp [Fits] at hf
+      | replay _
+      | project _
+      | manifest _
+      | parse _
+      | snapshot _
+      | closure _
+      | view _
+      | leanexport _
+      | stdin _
+      | evaluate _ => simp [Fits] at hf
       | replace x =>
         cases x with
         | ok u =>

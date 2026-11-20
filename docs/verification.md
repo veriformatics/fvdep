@@ -8,31 +8,32 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 ## `FvdepCore.Cli`
 
 - Contract: U1 K2; docs/interface.md §1–§2; U2 X5
-- Claim: Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`), every invocation writes one stream alone: exit 0 with stderr empty, or exit 2 with the usage on stderr + stdout empty. The plan performs exactly the outcome's outputs (stdout, then stderr), an interrupted run a prefix of them; it never reads or replaces a file.
+- Claim: Outside `fvdep index [--check]` (row `FvdepCore.Index.Command`) + a well-formed `fvdep oracle` (row `FvdepCore.Oracle.Command`, run with SHA-256 + T's default limits), every invocation writes one stream alone: exit 0 with stderr empty, or exit 2 with its usage on stderr (`usageOf`: `oracle`'s own for an `oracle` line) + stdout empty. The plan performs exactly the outcome's outputs (stdout, then stderr), an interrupted run a prefix of them; it never reads or replaces a file.
 - Subject: `FvdepCore.Cli.plan`
 - Path: `main` → `FvdepCore.Cli.plan`
-- Statement `FvdepLedger.Rows.cliStreams` (hash 0x6de8561e), proved by `FvdepCore.Cli.run_streams`:
+- Statement `FvdepLedger.Rows.cliStreams` (hash 0x927654a6), proved by `FvdepCore.Cli.run_streams`:
 
   ```lean
   ∀ (args : List String),
     (FvdepCore.Cli.run args).exit = 0 ∧ (FvdepCore.Cli.run args).stderr = "" ∨
       (FvdepCore.Cli.run args).exit = 2 ∧
-        (FvdepCore.Cli.run args).stdout = "" ∧ (FvdepCore.Cli.run args).stderr = FvdepCore.Cli.usage
+        (FvdepCore.Cli.run args).stdout = "" ∧
+          (FvdepCore.Cli.run args).stderr = FvdepCore.Cli.usageOf args
   ```
-- Statement `FvdepLedger.Rows.cliPlanComplete` (hash 0x88d8755e), proved by `FvdepCore.Cli.plan_complete`:
+- Statement `FvdepLedger.Rows.cliPlanComplete` (hash 0x6c3c8199), proved by `FvdepCore.Cli.plan_complete`:
 
   ```lean
   ∀ (args : List String),
-    ¬FvdepCore.Cli.IndexArgs args →
+    ¬FvdepCore.Cli.PlanArgs args →
       ∀ (evs : List (FvdepCore.Eff × FvdepCore.Response)) (code : UInt32),
         (FvdepCore.Cli.plan args).Runs evs (some code) ↔
           evs = FvdepCore.Cli.outputs (FvdepCore.Cli.run args) ∧ code = (FvdepCore.Cli.run args).exit
   ```
-- Statement `FvdepLedger.Rows.cliPlanInterrupted` (hash 0xe53eff03), proved by `FvdepCore.Cli.plan_interrupted`:
+- Statement `FvdepLedger.Rows.cliPlanInterrupted` (hash 0x3ac3b0fb), proved by `FvdepCore.Cli.plan_interrupted`:
 
   ```lean
   ∀ (args : List String),
-    ¬FvdepCore.Cli.IndexArgs args →
+    ¬FvdepCore.Cli.PlanArgs args →
       ∀ (evs : List (FvdepCore.Eff × FvdepCore.Response)),
         (FvdepCore.Cli.plan args).Runs evs none →
           evs <+: FvdepCore.Cli.outputs (FvdepCore.Cli.run args)
@@ -776,7 +777,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 J1 + J5; Decisions Data formats
 - Claim: `Value.object` = the members stably sorted by key; `get?` = the first equal key's value (`none` when absent or not an object); each projection = exactly its constructor's payload.
 - Subject: `FvdepCore.Json.Value.get?`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.JsonClaims.objectLaw` (hash 0x92c070e9), proved by `FvdepAudit.Json.Proof.object_law`:
 
   ```lean
@@ -823,7 +824,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 J1–J3 + J5–J6; Decisions Data formats
 - Claim: `decode` returns exactly the outcome the reviewed byte grammar assigns (too deep, malformed, too large, the duplicate key's site, else the canonical value); every success is a valid value; a text denotes one value.
 - Subject: `FvdepCore.Json.decode`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.JsonClaims.decodeExact` (hash 0x824d1cd), proved by `FvdepAudit.Json.Proof.decode_exact`:
 
   ```lean
@@ -1142,7 +1143,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 S3
 - Claim: `saturate`, the byte count `finish` passes to the C limit check (2^61 bytes; residue `hacl-sha256`), = min n (2^64 − 1), never wrapped. `update`, `finish`, `ofReader` + `sha256File` join a row's subject closure when U8 wires them.
 - Subject: `FvdepIO.Hash.Sha256.saturate`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.HashClaims.saturateLaw` (hash 0xe7b8dad0), proved by `FvdepAudit.Hash.Proof.saturate_toNat`:
 
   ```lean
@@ -1157,7 +1158,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 T1 + T5
 - Claim: `utf8ErrorOffset` is `none` exactly on valid UTF-8, else the length of the longest valid prefix; `textStage` refuses more than 65,536 bytes first, then a leading BOM, then the first invalid UTF-8 offset, else returns the text whose bytes are the input.
 - Subject: `FvdepCore.Manifest.textStage`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ManifestClaims.utf8Offset` (hash 0x7ec747ff), proved by `FvdepAudit.Manifest.Proof.utf8Offset`:
 
   ```lean
@@ -1183,7 +1184,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 T2–T3 + T5
 - Claim: `validate` accepts exactly the trees that spell a well-formed manifest (member order free) + returns that manifest, else refuses with the first of T3 + D5's ordered violations (repeated keys, discriminators, unknown, forbidden + missing keys, values in key byte order, list overlap); the tree a well-formed manifest prints to validates back to it.
 - Subject: `FvdepCore.Manifest.validate`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ManifestClaims.validateOk` (hash 0x3688cd18), proved by `FvdepAudit.Manifest.Proof.validate_ok`:
 
   ```lean
@@ -1244,7 +1245,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 T1 + T5
 - Claim: `ofLake` rebuilds Lake's table exactly (keys = their one string component, scalars, element + member order, float/date-time tags) or names a key of another shape. `parseTree` (Lake's parser, residue `toml-parse`), `readManifest` (text stage → `parseTree` → `validate`) + `ReadError.code` (`internal` for that key) join a row's subject closure when U8 wires the read path as a plan effect.
 - Subject: `FvdepIO.Toml.ofLake`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ManifestClaims.ofLakeExact` (hash 0xa81d8130), proved by `FvdepAudit.Manifest.Proof.ofLake_exact`:
 
   ```lean
@@ -1295,7 +1296,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 F3 + F4
 - Claim: `create` (create-exclusive, one F3 step): its result is exactly the one `Create` assigns to its calls, ok + error alike; one F3 step is at most `budget + 1` calls of one request, the 65th EINTR ending it as `retryExhausted`.
 - Subject: `FvdepIO.Sys.Policy.create`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.createExact` (hash 0x71849a77), proved by `FvdepAudit.Sys.Proof.create_exact`:
 
   ```lean
@@ -1329,7 +1330,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U3 F3 + F4
 - Claim: `writer` (write all, fsync, one close, finalizer): its result is exactly the one `WriterOperation` assigns to its calls; a success acknowledged every byte; it uses only its descriptor, none once closed; a writer's calls (`actions`) attempt close at most once.
 - Subject: `FvdepIO.Sys.Policy.writer`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SysClaims.writerExact` (hash 0xea563337), proved by `FvdepAudit.Sys.Proof.writer_exact`:
 
   ```lean
@@ -1620,7 +1621,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U4 B2–B4; docs/interface.md §8
 - Claim: Each value encodes to its §8 layout; decoding at a type returns exactly the value whose layout it is, refusing every other value; a value whose strings fit encodes to a valid value; a request line decodes exactly when J decodes it to the target op's request object with typed arguments; a reply line = its reply object's canonical text + LF; the request lines = the LF-separated segments.
 - Subject: `FvdepCore.Protocol.decodeRequest`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProtocolClaims.valLayout` (hash 0x7d7d3d77), proved by `FvdepAudit.Protocol.Proof.val_layout`:
 
   ```lean
@@ -1689,7 +1690,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U4 C6 + C8; Decisions Data formats
 - Claim: `index.json` schema 1: on a J1-valid value the D5 walk accepts exactly the layouts of indexes whose nodes are well formed; `IndexFile.ofJson` accepts exactly the layouts of well-formed indexes (the relational clauses V8 + V9 included) and refuses with the walk's first violation, else the first relational one; `decodeIndex` = J's decode of the bytes with one final LF removed, then `IndexFile.ofJson`: it accepts exactly the bytes J decodes to a well-formed index's layout, a text refusal is J's, a document refusal is that value's first violation; a well-formed index's canonical bytes decode back to it.
 - Subject: `FvdepCore.Index.decodeIndex`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.IndexClaims.indexSchemaExact` (hash 0x3df28654), proved by `FvdepAudit.Index.Proof.index_schema_exact`:
 
   ```lean
@@ -2129,7 +2130,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 R1
 - Claim: `bwrapArgs s`: bwrap reads exactly `ops s`, then the helper + the step's argv verbatim; the writable storage = two sized tmpfs (`/fvdep/work`, `/tmp`); the environment = cleared + exactly the spec's variables; `/` + `/dev` remounted read-only after every mount; every destination in the layout. Every host path is bound read-only: `Op` has no writable bind, network or namespace-sharing constructor.
 - Subject: `FvdepCore.Sandbox.bwrapArgs`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SandboxClaims.argsRead` (hash 0x300dd265), proved by `FvdepAudit.Sandbox.Proof.bwrapArgs_read`:
 
   ```lean
@@ -2180,7 +2181,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 R5 + R6
 - Claim: `classify`: one exit-code line → `exited` (a later deadline kill changes nothing); two or more → `protocol`; none → `timedOut` when the supervisor killed the step, else `setupFailed` with bwrap's first stderr line.
 - Subject: `FvdepCore.Sandbox.classify`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.SandboxClaims.outcomeExact` (hash 0x483b1b28), proved by `FvdepAudit.Sandbox.Proof.classify_exact`:
 
   ```lean
@@ -2205,7 +2206,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K2
 - Claim: `plan nodes roots`: an order = a valid build order of the closure (each reached module once, a node, after all its imports); a refusal names a duplicate, a reached module no node provides (+ who imports it) or a nonempty set of reached modules each importing another of them; a missing or stuck refusal ⇒ no valid order exists.
 - Subject: `FvdepCore.Build.plan`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.BuildClaims.planValid` (hash 0x3d536164), proved by `FvdepAudit.Build.Proof.plan_ok`:
 
   ```lean
@@ -2260,7 +2261,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K1 + T2
 - Claim: `preimage k` = the canonical JSON of `keyValue k` (recipe incl. the toolchain fingerprint, module, path, the source's SHA-256, the ordered imports with their keys): within the JSON profile's bounds distinct inputs have distinct preimages, so two inputs share a key (`keyOf h` = SHA-256 of the preimage) only through a SHA-256 collision (a stated premise, never a theorem).
 - Subject: `FvdepCore.Build.preimage`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.BuildClaims.preimageInjective` (hash 0xc069fb12), proved by `FvdepAudit.Build.Proof.preimage_injective`:
 
   ```lean
@@ -2278,7 +2279,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K5
 - Claim: `evictPlan entries target`: from the unpinned entries in (used, key) order, the shortest prefix bringing the charged total to the target or under it — all of them when none does; a pinned entry is never named.
 - Subject: `FvdepCore.Build.evictPlan`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.BuildClaims.evictExact` (hash 0x9779a8c6), proved by `FvdepAudit.Build.Proof.evict_exact`:
 
   ```lean
@@ -2307,7 +2308,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K6
 - Claim: `validate h dir m files` ⇔ the manifest is schema 1, its key inputs hash to the directory's name, no artifact takes a metadata file's name, both metadata files are present, every listed artifact is present with its size + digest, every file present is an artifact or one of the two metadata files.
 - Subject: `FvdepCore.Build.validate`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.BuildClaims.validateExact` (hash 0xc3959c35), proved by `FvdepAudit.Build.Proof.validate_exact`:
 
   ```lean
@@ -2324,7 +2325,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 P5
 - Claim: `stepVerdict`: a step passes exactly on bwrap exit 0 + a complete frame recording the child's exit 0 + no size cap hit; it fails on its input exactly when bwrap + the frame agree on the child's exit code, no size cap was hit, + that code is nonzero (Lean refusing it; never a library root) or 0 with an incomplete artifact family; every other step gets `infra` (`Verdict`'s third case).
 - Subject: `FvdepCore.Phase.stepVerdict`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.PhaseClaims.verdictPass` (hash 0xe393d971), proved by `FvdepAudit.Phase.Proof.verdict_pass`:
 
   ```lean
@@ -2381,7 +2382,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 S2, T2
 - Claim: `stem` (`A.B` → `A/B`): a module's dot-separated components joined by `/` (the paths `compileArgv`, `family` + `sourceFiles` build); distinct module names without `/` (U3 T3's) have distinct stems, so the frames of `implSources` + `proofSources` name distinct files.
 - Subject: `FvdepCore.Phase.stem`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.PhaseClaims.stemComponents` (hash 0x91059c37), proved by `FvdepAudit.Phase.Proof.stem_components`:
 
   ```lean
@@ -2633,7 +2634,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 T2, P1
 - Claim: `compileArgv`: under `consumer/1` = `lean --json -j 4 -R /fvdep/src`, the three outputs under `/fvdep/work/out`, the source as `./A/B.lean` last; under `library/1` the same with `-D <name>=<value>` per `libraryOptions` entry before the outputs; both recipes search `/fvdep/lib` then `/fvdep/prior` (`stepEnv`: the compile environment + that `LEAN_PATH`), keep their release + fingerprint + differ in id + options alone.
 - Subject: `FvdepCore.Phase.compileArgv`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.PhaseClaims.compileArgvExact` (hash 0x6d16faef), proved by `FvdepAudit.Phase.Proof.compile_argv_exact`:
 
   ```lean
@@ -2685,7 +2686,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b X1–X6
 - Claim: `read`: one `leanexport` output → each declaration's name, kind, level params, type + value, every record validated in full under the pinned profile (dense indices, no `mdata`, J's bounds), or the first violating line + its class (`readAccepts`, `readFirst`).
 - Subject: `FvdepCore.Export.read`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ExportClaims.readAccepts` (hash 0xe7b2c6e4), proved by `FvdepAudit.Export.Proof.read_accepts`:
 
   ```lean
@@ -2715,7 +2716,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b P1–P3
 - Claim: `selectProject`: `--project` decides alone, else the nearest candidate holding a manifest.
 - Subject: `FvdepCore.Project.selectProject`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.selectProjectExact` (hash 0x5a7a30ab), proved by `FvdepAudit.Library.Proof.selectProject_exact`:
 
   ```lean
@@ -2732,7 +2733,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L1
 - Claim: `sourceKey`: `h` over exactly the anchored spelling's bytes; unequal ones differ.
 - Subject: `FvdepCore.Library.sourceKey`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.sourceKeyExact` (hash 0x54092de8), proved by `FvdepAudit.Library.Proof.sourceKey_exact`:
 
   ```lean
@@ -2748,7 +2749,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L4
 - Claim: `parseTree`: exactly the NUL-terminated record layouts of well-formed entries.
 - Subject: `FvdepCore.Library.parseTree`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.treeExact` (hash 0xe9d1858b), proved by `FvdepAudit.Library.Proof.parseTree_exact`:
 
   ```lean
@@ -2766,7 +2767,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L4
 - Claim: `planTree`: the policy's listings alone; the plan = their blobs in listing order.
 - Subject: `FvdepCore.Library.planTree`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.planTreeExact` (hash 0xb7f38b58), proved by `FvdepAudit.Library.Proof.planTree_exact`:
 
   ```lean
@@ -2784,7 +2785,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L4
 - Claim: `parseBatch`: exactly the replies to the planned blobs, contents in plan order.
 - Subject: `FvdepCore.Library.parseBatch`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.batchExact` (hash 0xff84ff98), proved by `FvdepAudit.Library.Proof.parseBatch_exact`:
 
   ```lean
@@ -2803,7 +2804,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L5
 - Claim: `headOf`: exactly the well-formed records' `head.json` bytes (`headText`).
 - Subject: `FvdepCore.Library.headOf`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.headExact` (hash 0x14ba0350), proved by `FvdepAudit.Library.Proof.head_exact`:
 
   ```lean
@@ -2820,7 +2821,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L6
 - Claim: `start`: a published pin served, else the pin's or the head's fetch.
 - Subject: `FvdepCore.Library.start`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.startExact` (hash 0xc54571c2), proved by `FvdepAudit.Library.Proof.start_exact`:
 
   ```lean
@@ -2836,7 +2837,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L6
 - Claim: `afterPin`: the pin's tree, or a refusal (no fallback).
 - Subject: `FvdepCore.Library.afterPin`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.pinExact` (hash 0x68f3add1), proved by `FvdepAudit.Library.Proof.afterPin_exact`:
 
   ```lean
@@ -2853,7 +2854,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L6
 - Claim: `afterHead`: the head's tree; a transport failure → the last head + a notice; else refused.
 - Subject: `FvdepCore.Library.afterHead`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.headSelectExact` (hash 0xcd88be8f), proved by `FvdepAudit.Library.Proof.afterHead_exact`:
 
   ```lean
@@ -2871,7 +2872,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L7
 - Claim: `toolchainRefusal`: none exactly when the trimmed `lean-toolchain` equals fvdep's.
 - Subject: `FvdepCore.Library.toolchainRefusal`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.LibraryClaims.toolchainExact` (hash 0x20fb9f7d), proved by `FvdepAudit.Library.Proof.toolchain_exact`:
 
   ```lean
@@ -2888,7 +2889,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b W0, W4
 - Claim: Each served representation's values carry its protocol type (`Val.ty`).
 - Subject: `FvdepCore.Protocol.Val.ty`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.WireClaims.nativeTys` (hash 0xef245057), proved by `FvdepAudit.Oracle.Wire.Proof.native_tys`:
 
   ```lean
@@ -2944,7 +2945,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b W2, W3, W4
 - Claim: A result line reads as a reply exactly when the result type admits it + the line is its W2 layout (`ok <token>`, `err` for an optional none); the printers write that layout.
 - Subject: `FvdepCore.Oracle.Wire.parseResult`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.WireClaims.resultExact` (hash 0xcd546bec), proved by `FvdepAudit.Oracle.Wire.Proof.parseResult_exact`:
 
   ```lean
@@ -3047,7 +3048,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b V4, V5
 - Claim: The replies in request order: a refused request's `invalid` reply where it stands, a valid one's admitted reply whose W2 line is the step's next LF-terminated line, one line per valid request, else refused; W's encoder + decoder link up.
 - Subject: `FvdepCore.Oracle.merge`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.OracleClaims.trace` (hash 0xe9ed4668), proved by `FvdepAudit.Oracle.Proof.merge_exact`:
 
   ```lean
@@ -3078,7 +3079,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L3–L4
 - Claim: One git run: spawned through `PATH` in its own process group with exactly the given environment + stdin file, stdout kept to its cap, stderr's head kept, the group killed at the deadline or past the cap before the reap, then reaped.
 - Subject: `FvdepIO.Git.run`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Git.killGroup`, `FvdepIO.Git.spawn`
 - Residue: `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `git` (git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` (`posix_spawnp` through the caller's `PATH`, its own process group, an exact environment, stdin from a file or `/dev/null`, stdout + stderr pipes above descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's cap, stderr's head, the group killed at the deadline or past the cap before the reap, a 5 s drain bound) + what git does with L3's configuration over a remote (fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`))
@@ -3088,7 +3089,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5b L2–L6
 - Claim: The snapshot for a pin or the head: a published pin served without the lock; else the store locked within `lockSeconds`, stale temps removed, `start` → at most one fetch into a fresh private bare repository (L3's argv + environment) → the reads through `parseTree` + `planTree` + `parseBatch` → durable publication (`.complete` last) + `head.json` → `afterPin` | `afterHead` (the head record read only after a transport failure); the repository + staging removed after every attempt.
 - Subject: `FvdepIO.Library.snapshot`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.writerRelease`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Git.killGroup`, `FvdepIO.Sys.Native.writerNew`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Git.spawn`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.writerAcquire`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Sys.Native.read`, `FvdepIO.Sys.Native.openRead`
 - Residue: `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `library-store` (the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock (`flock` polled within `lockSeconds`), stale temps removed, staging (files written 0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + `trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader), `git` (git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` (`posix_spawnp` through the caller's `PATH`, its own process group, an exact environment, stdin from a file or `/dev/null`, stdout + stderr pipes above descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's cap, stderr's head, the group killed at the deadline or past the cap before the reap, a 5 s drain bound) + what git does with L3's configuration over a remote (fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`))
@@ -3096,10 +3097,10 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 ## `FvdepIO.Project`
 
 - Contract: U5b P1–P2
-- Claim: `fvdep.toml` candidates observed by `lstat` (never followed, never opened); the chosen manifest read (at most 64 KiB + 1 bytes) through U3's reader → its pin, or U3's refusal naming the file.
-- Subject: `FvdepIO.Project.pin`
-- Path: none yet (wired by U5b)
-- Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Sys.Native.read`, `FvdepIO.Sys.Native.openRead`
+- Claim: `fvdep.toml` candidates observed by `lstat` (never followed, never opened); `pin` = the chosen manifest (at most 64 KiB + 1 bytes) through U3's reader → its pin, or U3's refusal naming the file (the dev seam + `lake test`; `fvdep oracle` runs the same stages as plan effects: `manifest`, `parse`).
+- Subject: `FvdepIO.Project.observe`
+- Path: none (a supporting component)
+- Uninterpreted: none
 - Residue: `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `toml-parse` (Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `library-store` (the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock (`flock` polled within `lockSeconds`), stale temps removed, staging (files written 0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + `trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader)
 
@@ -3108,7 +3109,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 R8
 - Claim: The supervisor reads back exactly what the step helper framed: the status record + the files in path order, when the status fits J's profile, the frame lies in H2's domain + every file path is safe (nonempty, `/`-separated components, each nonempty, never `.` or `..`, no NUL); whatever it accepts lies in that domain + is the helper's frame of the status + files it returns (the status entry = that status's canonical JSON: another spelling of the same value is refused), so it accepts exactly the helper's frames.
 - Subject: `FvdepCore.Step.read`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.StepClaims.frameRead` (hash 0xdac9fdb3), proved by `FvdepAudit.Step.Proof.frame_read`:
 
   ```lean
@@ -3191,7 +3192,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 R2–R7
 - Claim: One step = bwrap with `bwrapArgs`, stdout + stderr + the status descriptor + descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, the frame up to `frameBytes`), the deadline's SIGKILL + a bounded drain, then `classify` + `read` over what arrived.
 - Subject: `FvdepIO.Sandbox.run`
-- Path: none yet (wired by U8)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Spawn.bwrap`
 - Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`))
@@ -3201,7 +3202,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K2–K5, K7
 - Claim: A closure's entries resolved in `plan` order: valid (`validate` over the observed files, the manifest taken in canonical form alone) + pinned under `LOCK_SH`, else filled under `LOCK_EX` (within `lockWait`) by one step against a view of hard links + published durably (temp, fsync, rename, directory fsync); eviction = `evictPlan` over the observed entries under `evict.lock`, each removal under its key's lock.
 - Subject: `FvdepIO.Cache.build`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Sys.Native.writerRelease`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.writerNew`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Cache.touch`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.writerAcquire`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Cache.link`, `FvdepIO.Sys.Native.read`, `FvdepIO.Hash.sha256`, `FvdepIO.Sys.Native.openRead`
 - Residue: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`))
@@ -3211,7 +3212,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 K2
 - Claim: A module's `module` keyword + its imports in header order with their flags (a non-`prelude` header's implicit `Init` + `meta Init` included), over the bytes read once; a header with a parse error or an import without a plain module name is refused.
 - Subject: `FvdepIO.Header.observe`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Uninterpreted: none
 - Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes)
@@ -3221,7 +3222,7 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Contract: U5 T1
 - Claim: SHA-256 of `fingerprintText` over `bin/lean`, `bin/leanexport` + every file under `lib/lean` (a link or special file refused), kept in `FVDEP_CACHE/toolchains/v1/<release>.json` while the tree's stat stamp holds.
 - Subject: `FvdepIO.Toolchain.fingerprint`
-- Path: none yet (wired by U5b)
+- Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Sys.Native.read`, `FvdepIO.Hash.sha256`, `FvdepIO.Hash.Sha256.initState`, `FvdepIO.Sys.Native.openRead`
 - Residue: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over)
@@ -3266,6 +3267,268 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - Residue: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `failure-bundle` (B2's failure bundles (`FvdepIO.Bundle.write`: the inputs listed + copied, the record, staging + rename under `bundles/lock`, retention's removals) + B1's reason text + B2's picks (`omitOrder`, `retainPick`))
 
+## `FvdepCore.Oracle.Resolve`
+
+- Contract: U5b E1
+- Claim: An operation target reads exactly when the text is the printed `<id>@<x.y.z>` (U2 I4); a profile target `<eco>:<pkg>@<ver>` = tested presentation until U10 (index schema 1 lists none: absent).
+- Subject: `FvdepCore.Oracle.Target.parse`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ResolveClaims.targetOp` (hash 0x99a685e0), proved by `FvdepAudit.Oracle.Resolve.Proof.target_op`:
+
+  ```lean
+  ∀ (s : String) (m : FvdepCore.Ids.ModuleId) (v : FvdepCore.Ids.EntryVersion),
+    FvdepCore.Oracle.Target.parse s = some (FvdepCore.Oracle.Target.op m v) ↔
+      toString { id := m, version := some v } = s
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Resolve`
+
+- Contract: U5b E1
+- Claim: The target's row = an operation of `index.json` with its id + version; none exactly when the index lists none (a removed record + a notice never make or erase a row).
+- Subject: `FvdepCore.Oracle.rowOf`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ResolveClaims.rowListed` (hash 0x979d152a), proved by `FvdepAudit.Oracle.Resolve.Proof.rowOf_listed`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile) (m : FvdepCore.Ids.ModuleId) (v : FvdepCore.Ids.EntryVersion)
+    (o : FvdepCore.Index.Operation),
+    FvdepCore.Oracle.rowOf i m v = some o → FvdepAudit.Oracle.Resolve.Spec.Listed i m v o
+  ```
+- Statement `FvdepLedger.Rows.ResolveClaims.rowAbsent` (hash 0x2b210beb), proved by `FvdepAudit.Oracle.Resolve.Proof.rowOf_none`:
+
+  ```lean
+  ∀ (i : FvdepCore.Index.IndexFile) (m : FvdepCore.Ids.ModuleId) (v : FvdepCore.Ids.EntryVersion),
+    FvdepCore.Oracle.rowOf i m v = none ↔
+      ∀ (o : FvdepCore.Index.Operation), ¬FvdepAudit.Oracle.Resolve.Spec.Listed i m v o
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Resolve`
+
+- Contract: U5b E2
+- Claim: Coherent exactly when every module of the entry module's C4 closure (the entry module + the modules its header graph reaches) was discovered with its source, `index.json`'s toolchain = the tree's `lean-toolchain` trimmed + the row's digest = `h` of C4's entry frame over that closure (no other root enters it).
+- Subject: `FvdepCore.Oracle.coherence`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ResolveClaims.coherenceExact` (hash 0x5eb63dd4), proved by `FvdepAudit.Oracle.Resolve.Proof.coherence_none`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (tc : String) (i : FvdepCore.Index.IndexFile)
+    (o : FvdepCore.Index.Operation) (M : Lean.Name) (srcs : List FvdepCore.Oracle.Src),
+    FvdepCore.Oracle.coherence h tc i o M srcs = none ↔
+      FvdepAudit.Oracle.Resolve.Spec.Coherent h tc i o M srcs
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Resolve`
+
+- Contract: U5b E3, E5
+- Claim: The countdown = the expanded size C2's decoder may visit against the budget; the entry stage yields `S.<fn>` exactly when `<M>.entry` is a definition with a value within the budget that C2 reads (no read-through facts) as a record naming the target's id + version + `S.<fn>`, `S` in `M`'s closure; its budget refusal exactly past the budget.
+- Subject: `FvdepCore.Oracle.entrySpec`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ResolveClaims.withinExact` (hash 0xebd08f27), proved by `FvdepAudit.Oracle.Resolve.Proof.within_eq`:
+
+  ```lean
+  ∀ (k : Nat) (e : Lean.Expr) (env : List Lean.Expr),
+    FvdepCore.Oracle.within k e env =
+      if FvdepAudit.Oracle.Resolve.Spec.size e env ≤ k then
+        some (k - FvdepAudit.Oracle.Resolve.Spec.size e env)
+      else none
+  ```
+- Statement `FvdepLedger.Rows.ResolveClaims.entryExact` (hash 0x44fcafc3), proved by `FvdepAudit.Oracle.Resolve.Proof.entry_exact`:
+
+  ```lean
+  ∀ (budget : Nat) (m : FvdepCore.Ids.ModuleId) (v : FvdepCore.Ids.EntryVersion)
+    (mods : List Lean.Name) (ds : List FvdepCore.Export.Decl) (spec : Lean.Name),
+    FvdepCore.Oracle.entrySpec budget m v mods ds = Except.ok spec ↔
+      FvdepAudit.Oracle.Resolve.Spec.EntryOk budget m v mods ds spec
+  ```
+- Statement `FvdepLedger.Rows.ResolveClaims.entryBudget` (hash 0x1e4500e), proved by `FvdepAudit.Oracle.Resolve.Proof.entry_budget`:
+
+  ```lean
+  ∀ (budget : Nat) (m : FvdepCore.Ids.ModuleId) (v : FvdepCore.Ids.EntryVersion)
+    (mods : List Lean.Name) (ds : List FvdepCore.Export.Decl),
+    FvdepCore.Oracle.entrySpec budget m v mods ds = Except.error FvdepCore.Oracle.Why.budget ↔
+      FvdepAudit.Oracle.Resolve.Spec.EntryOver budget m v ds
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Resolve`
+
+- Contract: U5b E4
+- Claim: The signature = the spec definition's type read by `sigOf`, `op` = the spec's last component; the type refusal exactly when `sigOf` refuses a definition's type.
+- Subject: `FvdepCore.Oracle.specSig`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ResolveClaims.sigExact` (hash 0xbd6ecdf3), proved by `FvdepAudit.Oracle.Resolve.Proof.sig_exact`:
+
+  ```lean
+  ∀ (spec : Lean.Name) (ds : List FvdepCore.Export.Decl) (sig : FvdepCore.Protocol.Sig),
+    FvdepCore.Oracle.specSig spec ds = Except.ok sig ↔
+      FvdepAudit.Oracle.Resolve.Spec.SigOk spec ds sig
+  ```
+- Statement `FvdepLedger.Rows.ResolveClaims.sigRefused` (hash 0x3540ef6a), proved by `FvdepAudit.Oracle.Resolve.Proof.sig_refused`:
+
+  ```lean
+  ∀ (spec : Lean.Name) (ds : List FvdepCore.Export.Decl),
+    FvdepCore.Oracle.specSig spec ds = Except.error FvdepCore.Oracle.Why.cannotCarry ↔
+      FvdepAudit.Oracle.Resolve.Spec.SigRefused spec ds
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Oracle.Command`
+
+- Contract: U5b E1–E5, V1–V5, O1–O3
+- Claim: A completed run of `fvdep oracle` = exactly the run written apart (`OracleRun`): the project, its manifest's pin or the head, the snapshot (its notice), the toolchain, `index.json`, the target's row, K's discovery + E2, the view, export 1 + the entry, export 2 + the signature, stdin, V2's staging + budgets over `Protocol.lines`, the one evaluation (none for no valid request), the merge, the batch budget, then the replies in one stdout write; each refusal = its line on stderr + exit 2, no effect after it; an interrupted run = a prefix of one; no project file written, none read through the generic project-file effects (the selected `fvdep.toml` = P2's `manifest` effect); every text write = LF-ended lines with no `Cc` inside (§1's line rule, structurally); the `oracle` grammar exact (`cliOracleArgs`) + routed to this plan with SHA-256 + T's default limits (`cliOracle`); a line outside it, `oracle --help` aside = exit 2 + `oracle`'s usage alone (`cliOracleUsage`).
+- Subject: `FvdepCore.Oracle.Command.plan`
+- Path: `main` → `FvdepCore.Cli.plan` → `FvdepCore.Oracle.Command.plan`
+- Statement `FvdepLedger.Rows.OracleRunClaims.oracleExact` (hash 0x439556c), proved by `FvdepAudit.Oracle.Command.Proof.oracle_exact`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (FvdepCore.Eff × FvdepCore.Response)) (code : UInt32),
+    (FvdepCore.Oracle.Command.plan h lim t explicit).Runs evs (some code) ↔
+      FvdepAudit.Oracle.Command.Spec.OracleRun h lim t explicit evs code
+  ```
+- Statement `FvdepLedger.Rows.OracleRunClaims.oraclePrefix` (hash 0x6d1301), proved by `FvdepAudit.Oracle.Command.Proof.oracle_prefix`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (FvdepCore.Eff × FvdepCore.Response)),
+    (FvdepCore.Oracle.Command.plan h lim t explicit).Runs evs none →
+      ∃ rest code, FvdepAudit.Oracle.Command.Spec.OracleRun h lim t explicit (evs ++ rest) code
+  ```
+- Statement `FvdepLedger.Rows.OracleRunClaims.oracleFiles` (hash 0xdedde110), proved by `FvdepAudit.Oracle.Command.Proof.oracle_files`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (FvdepCore.Eff × FvdepCore.Response)) (r : Option UInt32),
+    (FvdepCore.Oracle.Command.plan h lim t explicit).Runs evs r →
+      ∀ (x : FvdepCore.Eff × FvdepCore.Response),
+        x ∈ evs →
+          (∀ (f : FvdepCore.ProjectFile), x.fst ≠ FvdepCore.Eff.read f) ∧
+            ∀ (f : FvdepCore.ProjectFile) (b : ByteArray), x.fst ≠ FvdepCore.Eff.replace f b
+  ```
+- Statement `FvdepLedger.Rows.OracleRunClaims.oracleLines` (hash 0x3b6ecf90), proved by `FvdepAudit.Oracle.Command.Proof.oracle_lines`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (lim : FvdepCore.Oracle.Command.Limits) (t : FvdepCore.Oracle.Target)
+    (explicit : Option String) (evs : List (FvdepCore.Eff × FvdepCore.Response)) (r : Option UInt32),
+    (FvdepCore.Oracle.Command.plan h lim t explicit).Runs evs r →
+      ∀ (x : FvdepCore.Eff × FvdepCore.Response),
+        x ∈ evs →
+          ∀ (s : String),
+            x.fst = FvdepCore.Eff.out s ∨ x.fst = FvdepCore.Eff.err s →
+              ∃ ls,
+                ls ≠ [] ∧
+                  s = String.join (List.map (fun x => x ++ "\n") ls) ∧
+                    ∀ (l : String),
+                      l ∈ ls →
+                        ∀ (c : Char), c ∈ l.toList → ¬(c.toNat < 32 ∨ 127 ≤ c.toNat ∧ c.toNat ≤ 159)
+  ```
+- Statement `FvdepLedger.Rows.cliOracle` (hash 0xa6e3b3d1), proved by `FvdepCore.Cli.plan_oracle`:
+
+  ```lean
+  ∀ (args : List String) (t : FvdepCore.Oracle.Target) (p : Option String),
+    FvdepCore.Cli.oracleArgs args = some (t, p) →
+      FvdepCore.Cli.plan args = FvdepCore.Oracle.Command.plan FvdepCore.Cli.sha { } t p
+  ```
+- Statement `FvdepLedger.Rows.cliOracleArgs` (hash 0x5544302d), proved by `FvdepCore.Cli.oracleArgs_eq`:
+
+  ```lean
+  ∀ (args : List String) (t : FvdepCore.Oracle.Target) (p : Option String),
+    FvdepCore.Cli.oracleArgs args = some (t, p) ↔
+      ∃ s,
+        FvdepCore.Oracle.Target.parse s = some t ∧
+          (args = ["oracle", s] ∧ p = none ∨
+            ∃ d,
+              p = some d ∧
+                (args = ["oracle", "--project", d, s] ∨
+                  s ≠ "--project" ∧ args = ["oracle", s, "--project", d]))
+  ```
+- Statement `FvdepLedger.Rows.cliOracleUsage` (hash 0x498e911), proved by `FvdepCore.Cli.run_oracle_malformed`:
+
+  ```lean
+  ∀ (rest : List String),
+    rest ≠ ["--help"] →
+      FvdepCore.Cli.oracleArgs ("oracle" :: rest) = none →
+        (FvdepCore.Cli.run ("oracle" :: rest)).exit = 2 ∧
+          (FvdepCore.Cli.run ("oracle" :: rest)).stdout = "" ∧
+            (FvdepCore.Cli.run ("oracle" :: rest)).stderr = FvdepCore.Oracle.Command.usage
+  ```
+- Uninterpreted: none
+- Residue: `interpreter` (the IO interpreter's effect → primitive mapping (`FvdepIO.Run`)), `library-store` (the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock (`flock` polled within `lockSeconds`), stale temps removed, staging (files written 0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + `trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader), `git` (git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` (`posix_spawnp` through the caller's `PATH`, its own process group, an exact environment, stdin from a file or `/dev/null`, stdout + stderr pipes above descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's cap, stderr's head, the group killed at the deadline or past the cap before the reap, a 5 s drain bound) + what git does with L3's configuration over a remote (fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`)), `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `step-helper` (`fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), the `statvfs` samples, the regular files under `/fvdep/work/out` read without following a link, the frame written on descriptor 4), `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes), `oracle-driver` (the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the spec's argument + result types, the toolchain elaborating + interpreting the text (`lean --run`) inside a U5 step over the snapshot's view), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `toml-parse` (Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives)), `os` (OS, filesystem + process semantics)
+- Unproven: none
+
+## `FvdepCore.Oracle.Driver`
+
+- Contract: U5b W0, W5, V3, Q4
+- Claim: The driver = the entry module + version imports, `Protocol/Types.lean` + `Oracle/Wire.lean` after their import lines as fvdep was built (embedded; `lake test` checks the bytes), then a `main` answering each `requests.txt` line by `answer (@S.fn)` into `/fvdep/work/out/replies.txt`.
+- Subject: `FvdepCore.Oracle.Driver.driverText`
+- Path: none (a supporting component)
+- Uninterpreted: none
+- Residue: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `oracle-driver` (the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the spec's argument + result types, the toolchain elaborating + interpreting the text (`lean --run`) inside a U5 step over the snapshot's view)
+
+## `FvdepIO.Oracle`
+
+- Contract: U5b O2
+- Claim: Each oracle effect → its raw observation: the project candidates by `lstat`, the manifest's bytes, Lake's parse, the snapshot + its two files, K's discovery (kept for the build), T1's tools + the fills from that discovery + one view, the export + evaluation steps over that view (P5's verdict, typed causes), stdin to its cap; the run directory + the cache's pins released at the end.
+- Subject: `FvdepIO.Oracle.view`
+- Path: none (a supporting component)
+- Uninterpreted: `FvdepIO.Sys.Native.write`, `FvdepIO.Sys.Native.close`, `FvdepIO.Sys.Native.unlink`, `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Sys.Native.writerRelease`, `FvdepIO.Sys.Native.lock`, `FvdepIO.Sys.Native.writerNew`, `FvdepIO.Sys.Native.openFile`, `FvdepIO.Sys.Native.openLock`, `FvdepIO.Cache.touch`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Sys.Native.writerMarkClosed`, `FvdepIO.Sys.Native.sync`, `FvdepIO.Sys.Native.writerAcquire`, `FvdepIO.Sys.Native.openDir`, `FvdepIO.Sys.Native.rename`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Cache.link`, `FvdepIO.Sys.Native.read`, `FvdepIO.Hash.sha256`, `FvdepIO.Hash.Sha256.initState`, `FvdepIO.Sys.Native.openRead`
+- Residue: `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `toml-parse` (Lake's TOML parser + elaborator (`Lake.Toml.loadToml`): text → table, repeated + redefined keys refused, the first error's position + message), `sys-shim` (the persistence syscall shim `c/fvdep_sys.c` (one libc call per export, errno at once: the open variants, read, write, fsync, close, rename, unlink, flock) + its native writer guard (closed flag, mutex, finalizer close-if-open) + `FvdepIO.Sys`'s instantiation of the proven policy (`syscalls`: each request → its export, run once in the policy's order with its answer returned; the read buffer; the guard's closed mark; `withWriterLock` re-raising the act's exception after the close)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `library-store` (the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock (`flock` polled within `lockSeconds`), stale temps removed, staging (files written 0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + `trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader), `git` (git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` (`posix_spawnp` through the caller's `PATH`, its own process group, an exact environment, stdin from a file or `/dev/null`, stdout + stderr pipes above descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's cap, stderr's head, the group killed at the deadline or past the cap before the reap, a 5 s drain bound) + what git does with L3's configuration over a remote (fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`)), `cache-fs` (the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `step-helper` (`fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), the `statvfs` samples, the regular files under `/fvdep/work/out` read without following a link, the frame written on descriptor 4), `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes), `oracle-driver` (the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the spec's argument + result types, the toolchain elaborating + interpreting the text (`lean --run`) inside a U5 step over the snapshot's view)
+
+## `FvdepIO.Tools`
+
+- Contract: U5 T1
+- Claim: The cache root (`FVDEP_CACHE`, else XDG, else `~/.cache`), the first `bwrap` on `PATH` at least 0.8.0, fvdep's own toolchain (elan's `lean --print-prefix`, `lean` + `leanexport` present), the step helper copied beside the run, T1's fingerprint.
+- Subject: `FvdepIO.Tools.tools`
+- Path: none (a supporting component)
+- Uninterpreted: none
+- Residue: `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Unproven: `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `lean-toolchain` (`lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes), `step-helper` (`fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), the `statvfs` samples, the regular files under `/fvdep/work/out` read without following a link, the frame written on descriptor 4)
+
+## `FvdepCore.Manifest.Tree`
+
+- Contract: U3 T1
+- Claim: `Tree` (Lake's table, keys as strings) + `ParseError` (Lake's first error or `ofLake`'s key): data shapes + their derived instances (the toolchain's deriving handlers; each compiled body = its kernel definition; `lake test` + the manifest suite compare with them, U8's workflow reads manifests).
+- Subject: `FvdepCore.Manifest.instBEqParseError`
+- Path: none yet (wired by U8)
+- Uninterpreted: none
+- Residue: none
+- Unproven: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+
+## `FvdepCore.Library.Limits`
+
+- Contract: U5b L2–L4, T
+- Claim: `Caps` + `Limits`: L4's tree caps + the fetch, lock + diagnostic limits with T's defaults; derived instances (the toolchain's deriving handlers).
+- Subject: `FvdepCore.Library.Limits.fetchSeconds`
+- Path: none (a supporting component)
+- Uninterpreted: none
+- Residue: none
+- Unproven: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+
+## `Fvdep.Semver.Version.V1_0_0`
+
+- Contract: U4 A; U5b W1
+- Claim: `Version` + `Ident` (the library's shared type, admitted with the semver entries) + their derived instances (the toolchain's deriving handlers).
+- Subject: `Fvdep.Semver.Version.V1_0_0.Version.major`
+- Path: none (a supporting component)
+- Uninterpreted: none
+- Residue: none
+- Unproven: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
@@ -3285,3 +3548,4 @@ Root: `FvdepIO.Step.main` = `FvdepIO.Step.execute` (interpreter) applied to `Fvd
 - `failure-bundle` — B2's failure bundles (`FvdepIO.Bundle.write`: the inputs listed + copied, the record, staging + rename under `bundles/lock`, retention's removals) + B1's reason text + B2's picks (`omitOrder`, `retainPick`): presentation + a debugging aid: no verdict reads a bundle or a reason's text (P5 classifies; a `failed` reason's text = B1's presentation, like U3's render ruling); tested by `lake test` (reason, picks) + tester-6's bundle cases (B.retention; B.complete + B.incomplete with D4) (ruling: "the failure bundle's writes")
 - `git` — git as a process (U5b L3–L4): `c/fvdep_spawn.c`'s `fvdep_spawn_proc` (`posix_spawnp` through the caller's `PATH`, its own process group, an exact environment, stdin from a file or `/dev/null`, stdout + stderr pipes above descriptor 2, every descriptor ≥ 3 closed) + `fvdep_spawn_killpg` (0, 1, a negative value + the caller's own group refused) + `FvdepIO.Git.run` (the pumps, stdout's cap, stderr's head, the group killed at the deadline or past the cap before the reap, a 5 s drain bound) + what git does with L3's configuration over a remote (fetch + fsck, `cat-file`, `rev-parse`, `ls-tree`): an external program over a remote, with no Lean semantics: its two machine outputs are read by proved readers (`parseTree`, `parseBatch`) + the selection decided by the proved tables; tested by `lake test`'s library cases (real git over local fixture repositories: head, pin, warm pin, offline head, never fetched, received failures; the transport classifier over git 2.53.0's measured lines; a fake git: the exact environment + argv, the deadline's group kill, diagnostics scrubbed + escaped) + tester-7's L cases (U5b-O) (ruling: "`git` (an external program over a remote)")
 - `library-store` — the library store's filesystem effects (U5b L2, L5) + P1–P2's reads: the lock (`flock` polled within `lockSeconds`), stale temps removed, staging (files written 0644 + fsynced, directories fsynced, the `.complete` marker last), the rename + `trees/` fsync, `head.json`'s F2 replace + read, links never followed when removing; each `fvdep.toml` candidate by `lstat`, the chosen one read through U3's reader: filesystem semantics have no Lean model here; the selection + every refusal over the observed state are the proved tables (`start`, `afterPin`, `afterHead`) or tested texts; tested by `lake test`'s library cases (layout + modes, incomplete trees rebuilt, damaged records, the lock's timeout, a pin's warm serve) + tester-7's L + P cases (U5b-O) (ruling: "`library-store` (filesystem effects)")
+- `oracle-driver` — the evaluation step's driver (U5b W5, V3): `Driver.lean`'s file IO (`requests.txt` read, `/fvdep/work/out/replies.txt` written), the one generated line naming `@S.fn`, type-class resolution choosing W's `Native`/`Answer`/`Serve` instances for the spec's argument + result types, the toolchain elaborating + interpreting the text (`lean --run`) inside a U5 step over the snapshot's view: the step runs the snapshot's code under the toolchain, + fvdep owns no proof of Lean's elaborator or interpreter; the conversions it runs are W's proved functions, shipped as their source (`include_str` + `lake test`'s Q4 byte check); tested by tester-7's W cases (one fixture entry per served representation, a 3-argument implicit-binder one, generated values vs independent references) + tester-1's `oracle.*` cases (ruling: "`oracle-driver` (the toolchain elaborating + interpreting the driver text)")
