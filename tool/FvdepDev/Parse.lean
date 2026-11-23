@@ -39,7 +39,8 @@ def firstError (log : MessageLog) : IO String := do
     return "a parse error"
 
 /-- The module `text` (`path` names it): its header, then each command parsed in `env` under `opts`;
-a parse error, a recovered command or an end before the input's end → the refusal. -/
+a parse error, a recovered command or an end before the input's end → the refusal; `#exit` + a body
+`import` end the list (their trees kept). -/
 def parseModule (env : Environment) (opts : Options) (path text : String) :
     IO (Except String (List Tree)) := do
   let input := Parser.mkInputContext text path
@@ -57,9 +58,10 @@ def parseModule (env : Environment) (opts : Options) (path text : String) :
       if input.atEnd st'.pos then
         break
       return .error s!"{path}: the parse ended before the end of the input"
-    if cmd.isOfKind ``Parser.Command.exit || cmd.isOfKind ``Parser.Command.import then
-      return .error s!"{path}: `{cmd.getKind}` ends the parse before the end of the input"
     out := out.push (toTree input.fileMap cmd)
+    -- Lean's frontend stops at these (U6 D4 keeps the node + its keyword position).
+    if cmd.isOfKind ``Parser.Command.exit || cmd.isOfKind ``Parser.Command.import then
+      break
     st := st'
   return .ok out.toList
 
