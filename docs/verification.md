@@ -3712,6 +3712,67 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 
+## `FvdepCore.Profile.Types`
+
+- Contract: U6 P5a, P5b, P6, T, C1
+- Claim: The profile's data: C1's tree of occurrences, P6's limits + their defaults, the roles + their spelling (`Role.text`), the request + record shapes; derived instances (the toolchain's deriving handlers).
+- Subject: `FvdepCore.Profile.Role.text`
+- Path: none yet (wired by U6)
+- Uninterpreted: none
+- Residue: none
+- Unproven: `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+
+## `FvdepCore.Profile.Record`
+
+- Contract: U6 P5b
+- Claim: `intake`: the parse child's result record read back exactly (canonical J text of a well-formed record alone: T's rules + arities, J's bounds, plain module names, lowercase SHA-256 digests) + bound to the supervisor's request in P5b's order — profile, request digest, recipe, module count, each name, each digest, a refusal's module inside the batch; the first failure named (`recordRead`, `recordExact`, `intakeExact`).
+- Subject: `FvdepCore.Profile.intake`
+- Path: none yet (wired by U6)
+- Statement `FvdepLedger.Rows.ProfileClaims.recordRead` (hash 0x201a5a9f), proved by `FvdepAudit.Profile.Proof.record_read`:
+
+  ```lean
+  ∀ (r : FvdepCore.Profile.Record),
+    r.ok = true → FvdepCore.Profile.readRecord (FvdepCore.Json.print r.toJson) = some r
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.recordExact` (hash 0xdb287159), proved by `FvdepAudit.Profile.Proof.record_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (r : FvdepCore.Profile.Record),
+    FvdepCore.Profile.readRecord b = some r → r.ok = true ∧ FvdepCore.Json.print r.toJson = b
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.intakeExact` (hash 0xc38c59b6), proved by `FvdepAudit.Profile.Proof.intake_exact`:
+
+  ```lean
+  ∀ (profile : String) (req : FvdepCore.Profile.Request) (digest : String) (b : ByteArray),
+    FvdepCore.Profile.intake profile req digest b =
+      FvdepAudit.Profile.Spec.intake profile req digest b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Profile.Record`
+
+- Contract: U6 P5a
+- Claim: `readRequest`: the request read back exactly (canonical J text of a well-formed request alone: both module lists strictly ascending, each path = its module's file, the role's recipe, P6's limits ≥ 1, J's bounds) (`requestRead`, `requestExact`).
+- Subject: `FvdepCore.Profile.readRequest`
+- Path: none yet (wired by U6)
+- Statement `FvdepLedger.Rows.ProfileClaims.requestRead` (hash 0xfee7437c), proved by `FvdepAudit.Profile.Proof.request_read`:
+
+  ```lean
+  ∀ (r : FvdepCore.Profile.Request),
+    r.ok = true → FvdepCore.Profile.readRequest (FvdepCore.Json.print r.toJson) = some r
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.requestExact` (hash 0x48c6890), proved by `FvdepAudit.Profile.Proof.request_exact`:
+
+  ```lean
+  ∀ (b : ByteArray) (r : FvdepCore.Profile.Request),
+    FvdepCore.Profile.readRequest b = some r → r.ok = true ∧ FvdepCore.Json.print r.toJson = b
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")

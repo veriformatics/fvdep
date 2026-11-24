@@ -21,6 +21,7 @@ import FvdepAudit.Oracle.Proof
 import FvdepAudit.Oracle.Resolve.Proof
 import FvdepAudit.Oracle.Wire.Serve
 import FvdepAudit.Phase.Proof
+import FvdepAudit.Profile.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
@@ -2059,6 +2060,39 @@ def indexCli : Prop :=
     Cli.plan ["index", "--check"] = Index.Command.plan Cli.sha true
 
 end FvdepLedger.Rows.CommandClaims
+
+namespace FvdepLedger.Rows.ProfileClaims
+
+open FvdepCore.Profile
+open FvdepCore.Json (print)
+
+/-- P5b: every well-formed record's canonical J text reads back exactly (the child's record, as
+the supervisor reads it). -/
+def recordRead : Prop := ∀ (r : Record) (_h : r.ok = true), readRecord (print r.toJson) = some r
+
+/-- P5b: whatever `readRecord` accepts is the canonical J text of a well-formed record (another
+spelling of the same value is refused); with `recordRead`, it accepts exactly those texts. -/
+def recordExact : Prop :=
+  ∀ (b : ByteArray) (r : Record) (_h : readRecord b = some r), r.ok = true ∧ print r.toJson = b
+
+/-- P5a: every well-formed request's canonical J text reads back exactly (the supervisor's request,
+as the child reads it). -/
+def requestRead : Prop := ∀ (r : Request) (_h : r.ok = true), readRequest (print r.toJson) = some r
+
+/-- P5a: whatever `readRequest` accepts is the canonical J text of a well-formed request; with
+`requestRead`, it accepts exactly those texts. -/
+def requestExact : Prop :=
+  ∀ (b : ByteArray) (r : Request) (_h : readRequest b = some r), r.ok = true ∧ print r.toJson = b
+
+/-- P5b: the supervisor's intake of the record bytes = the spec's: an unreadable record is
+malformed, a read one fails at its first failing binding check in P5b's order (profile, request
+digest, recipe, module count, each name, each digest, a refusal's module inside the batch), else
+it is accepted. -/
+def intakeExact : Prop :=
+  ∀ (profile : String) (req : Request) (digest : String) (b : ByteArray),
+    intake profile req digest b = FvdepAudit.Profile.Spec.intake profile req digest b
+
+end FvdepLedger.Rows.ProfileClaims
 
 namespace FvdepLedger.Rows
 
@@ -4324,6 +4358,59 @@ def versionTypeRow : Row :=
     residue := []
     unproven := ["runtime"] }
 
+/-- U6 P5b: the supervisor's reading + binding of the parse child's result record. -/
+def profileRecordRow : Row :=
+  { component := `FvdepCore.Profile.Record
+    contract := "U6 P5b"
+    claim :=
+      "`intake`: the parse child's result record read back exactly (canonical J text of a " ++
+        "well-formed record alone: T's rules + arities, J's bounds, plain module names, " ++
+        "lowercase SHA-256 digests) + bound to the supervisor's request in P5b's order — " ++
+        "profile, request digest, recipe, module count, each name, each digest, a refusal's " ++
+        "module inside the batch; the first failure named (`recordRead`, `recordExact`, " ++
+        "`intakeExact`)."
+    claims :=
+      [(``ProfileClaims.recordRead, ``FvdepAudit.Profile.Proof.record_read),
+        (``ProfileClaims.recordExact, ``FvdepAudit.Profile.Proof.record_exact),
+        (``ProfileClaims.intakeExact, ``FvdepAudit.Profile.Proof.intake_exact)]
+    subject := ``FvdepCore.Profile.intake
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := [] }
+
+/-- U6 P5a: the request the supervisor writes + the parse child reads. -/
+def profileRequestRow : Row :=
+  { component := `FvdepCore.Profile.Record
+    contract := "U6 P5a"
+    claim :=
+      "`readRequest`: the request read back exactly (canonical J text of a well-formed request " ++
+        "alone: both module lists strictly ascending, each path = its module's file, the role's " ++
+        "recipe, P6's limits ≥ 1, J's bounds) (`requestRead`, `requestExact`)."
+    claims :=
+      [(``ProfileClaims.requestRead, ``FvdepAudit.Profile.Proof.request_read),
+        (``ProfileClaims.requestExact, ``FvdepAudit.Profile.Proof.request_exact)]
+    subject := ``FvdepCore.Profile.readRequest
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := [] }
+
+/-- U6 P5a, P5b, P6, T, C1: the profile's data (data shapes; the role's spelling). -/
+def profileTypesRow : Row :=
+  { component := `FvdepCore.Profile.Types
+    contract := "U6 P5a, P5b, P6, T, C1"
+    claim :=
+      "The profile's data: C1's tree of occurrences, P6's limits + their defaults, the roles " ++
+        "+ their spelling (`Role.text`), the request + record shapes; derived instances (the " ++
+        "toolchain's deriving handlers)."
+    claims := []
+    subject := ``FvdepCore.Profile.Role.text
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := ["runtime"] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -4350,7 +4437,8 @@ def ledger : Ledger :=
         stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
         snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
-        oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow]
+        oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
+        profileTypesRow, profileRecordRow, profileRequestRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

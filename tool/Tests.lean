@@ -1,5 +1,6 @@
 import FvdepCore
 import FvdepCore.Oracle
+import FvdepCore.Profile.Record
 import FvdepIO.Library
 import FvdepIO.Phase
 import FvdepIO.Project
@@ -3522,6 +3523,118 @@ def ioCases : List (String × IO Bool) :=
 
 end LibraryR
 
+namespace ProfileR
+
+open FvdepCore.Profile FvdepCore.Json
+
+/-- 64 copies of `c` (a stand-in SHA-256). -/
+def hex (c : Char) : String := String.ofList (List.replicate 64 c)
+
+def req : Request :=
+  { library := [⟨"Fvdep.Base64.Rfc4648.V1_0_0", []⟩, ⟨"Fvdep.Semver.Version.V1_0_0", []⟩]
+    limits := {}
+    modules := [⟨"Impl", "Impl.lean", hex 'a'⟩, ⟨"Impl.Util", "Impl/Util.lean", hex 'b'⟩]
+    profile := "fvdep/profile/1"
+    recipe := "consumer/1"
+    role := .consumer
+    toolchain := hex 'c' }
+
+def rec (o : FvdepCore.Profile.Outcome) : Record :=
+  { modules := [⟨"Impl", hex 'a', ["Init"]⟩, ⟨"Impl.Util", hex 'b', ["Init", "Std.Data.HashMap"]⟩]
+    outcome := o
+    profile := "fvdep/profile/1"
+    recipe := "consumer/1"
+    request := hex 'd' }
+
+def refusal (rule : String) (detail : List String) : FvdepCore.Profile.Outcome :=
+  .refused ⟨"Impl.Util", 3, 11, rule, detail⟩
+
+def bytesOf (r : Record) : ByteArray := print r.toJson
+
+/-- A `_`-led component of `n` bytes. -/
+def long (n : Nat) : String := "_" ++ String.ofList (List.replicate (n - 1) 'x')
+
+def textOf (b : ByteArray) : String := (String.fromUTF8? b).getD ""
+
+/-- `r`'s canonical text with `a` replaced by `b` (a respelling or a planted defect). -/
+def edited (r : Record) (a b : String) : ByteArray := ((textOf (bytesOf r)).replace a b).toUTF8
+
+def errOf : Except IntakeError Record → Option IntakeError
+  | .error e => some e
+  | .ok _ => none
+
+def intakeOf (r : Record) : Option IntakeError :=
+  errOf (intake "fvdep/profile/1" req (hex 'd') (bytesOf r))
+
+def cases : List (String × (Unit → Bool)) :=
+  [("profile: a record of each outcome reads back exactly", fun _ =>
+      [.accepted, refusal "kind" ["Lean.Parser.Command.eval"], .over].all fun o =>
+        readRecord (bytesOf (rec o)) == some (rec o)),
+    ("profile: a request reads back exactly", fun _ => readRequest (print req.toJson) == some req),
+    ("profile: another spelling of a valid record is refused (a space, reordered keys)", fun _ =>
+      readRecord (edited (rec .accepted) "{\"modules\"" "{ \"modules\"") == none &&
+        readRecord
+            (edited (rec .accepted) "\"profile\":\"fvdep/profile/1\",\"recipe\":\"consumer/1\""
+              "\"recipe\":\"consumer/1\",\"profile\":\"fvdep/profile/1\"") ==
+          none),
+    ("profile: a field outside the schema, a missing field, schema 2 are refused", fun _ =>
+      readRecord (edited (rec .accepted) "\"schema\":1" "\"schema\":1,\"x\":1") == none &&
+        readRecord (edited (rec .accepted) ",\"recipe\":\"consumer/1\"" "") == none &&
+        readRecord (edited (rec .accepted) "\"schema\":1" "\"schema\":2") == none),
+    ("profile: T's rules + arities: known pairs read, others refused", fun _ =>
+      [("parse", ["unexpected end of input"]), ("cap", ["depth", "4096"]), ("header", ["module"]),
+              ("header", ["modifier", "meta"]), ("header", ["import", "Lean.Elab.Command"]),
+              ("scope", ["open", "Do"]), ("ownership", ["Fvdep.x"]),
+              ("shape", ["Lean.Parser.Command.derivingClass"]),
+              ("atom", ["Lean.Parser.Command.sectionHeader", "noncomputable"]),
+              ("reserved", ["_unsafe_rec"]), ("name", ["deriving", "ToJson"])].all
+          (fun (rule, d) => (readRecord (bytesOf (rec (refusal rule d)))).isSome) &&
+        [("cap", ["depth", "0"]), ("cap", ["depth", "007"]), ("cap", ["width", "1"]),
+              ("header", ["modifier", "private"]), ("header", ["module", "x"]), ("kind", []),
+              ("atom", ["k"]), ("name", ["attribute", "x"]), ("rule", ["x"])].all
+          fun (rule, d) => (readRecord (bytesOf (rec (refusal rule d)))).isNone),
+    ("profile: a detail over 1,024 bytes, line 0, a bad digest or module name are refused", fun _ =>
+      (readRecord (bytesOf (rec (refusal "reserved" [long 1025])))).isNone &&
+        (readRecord (bytesOf (rec (refusal "reserved" [long 1024])))).isSome &&
+        (readRecord (bytesOf (rec (.refused ⟨"Impl", 0, 0, "kind", ["k"]⟩)))).isNone &&
+        (readRecord (bytesOf { rec .accepted with request := hex 'D' })).isNone &&
+        (readRecord (bytesOf { rec .accepted with modules := [⟨"Impl.", hex 'a', []⟩] })).isNone),
+    ("profile: a request whose path, recipe or limits break P5a is refused", fun _ =>
+      (readRequest (print { req with modules := [⟨"Impl", "x.lean", hex 'a'⟩] }.toJson)).isNone &&
+        (readRequest (print { req with recipe := "library/1" }.toJson)).isNone &&
+        (readRequest (print { req with limits := { depth := 0 } }.toJson)).isNone),
+    ("profile: a request whose module lists are out of order or repeat a module is refused",
+      fun _ =>
+      let dup : ReqModule := ⟨"Impl", "Impl.lean", hex 'a'⟩
+      [{ req with modules := req.modules.reverse }, { req with library := req.library.reverse },
+            { req with modules := [dup, dup] }].all
+        fun r => (readRequest (print r.toJson)).isNone),
+    ("profile: intake accepts the bound record + names each failure in P5b's order", fun _ =>
+      intakeOf (rec .accepted) == none &&
+        errOf (intake "fvdep/profile/1" req (hex 'd') "{}".toUTF8) == some .malformed &&
+        intakeOf
+            { rec .accepted with
+              profile := "fvdep/profile/2", request := hex 'e' } ==
+          some (.profile "fvdep/profile/2") &&
+        intakeOf
+            { rec .accepted with
+              request := hex 'e', recipe := "library/1" } ==
+          some (.request (hex 'e') (hex 'd')) &&
+        intakeOf { rec .accepted with recipe := "library/1" } == some (.recipe "library/1") &&
+        intakeOf { rec .accepted with modules := [⟨"Impl", hex 'a', []⟩] } == some (.count 1 2) &&
+        intakeOf
+            { rec .accepted with modules := [⟨"Impl.Util", hex 'b', []⟩, ⟨"Impl", hex 'a', []⟩] } ==
+          some (.name "Impl.Util" 1 "Impl") &&
+        intakeOf
+            { rec .accepted with modules := [⟨"Impl", hex 'a', []⟩, ⟨"Impl.Util", hex 'f', []⟩] } ==
+          some (.digest (hex 'f') "Impl.Util" (hex 'b')) &&
+        intakeOf (rec (.refused ⟨"Other", 1, 0, "kind", ["k"]⟩)) == some (.outside "Other")),
+    ("profile: intake texts", fun _ =>
+      (IntakeError.name "B" 1 "A").text == "lists B at 1, expected A" &&
+        IntakeError.malformed.text == "is malformed")]
+
+end ProfileR
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -3570,7 +3683,8 @@ def main : IO UInt32 := do
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
                   WireT.cases seed ++
-                  OracleT.cases).map
+                  OracleT.cases ++
+                  ProfileR.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←

@@ -22,7 +22,7 @@ root="$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/.." && pwd)"
 cd -- "$root"
 
 TARGETS=(json-decode lock-decode unframe manifest-decode protocol-request index-decode export-decode
-    git-tree git-batch oracle-result
+    git-tree git-batch oracle-result profile-record
     sha256 sys-actions)
 
 die() {
@@ -52,6 +52,7 @@ lean_target() {
     git-tree) echo "FvdepFuzz.Library fvdep_fuzz_git_tree 0" ;;
     git-batch) echo "FvdepFuzz.Library fvdep_fuzz_git_batch 0" ;;
     oracle-result) echo "FvdepFuzz.Oracle fvdep_fuzz_oracle 0" ;;
+    profile-record) echo "FvdepFuzz.Profile fvdep_fuzz_profile 0" ;;
     *) return 1 ;;
     esac
 }
