@@ -3955,7 +3955,12 @@ def cases : List (String × (Unit → Bool)) :=
         anchorOk (ks "Lean.Parser.Command.structParent") [nul [I "toP" 1 0, A ":" 1 4], N "x" []] &&
         !anchorOk (ks "Lean.Parser.Command.openSimple") [nul []] &&
         !anchorOk (ks "Lean.Parser.Command.openSimple") [nul [I "A" 1 5, A "x" 1 7]] &&
-        anchorOk (ks "Lean.Parser.Command.openSimple") [nul [I "A" 1 5, I "B" 1 7]]),
+        anchorOk (ks "Lean.Parser.Command.openSimple") [nul [I "A" 1 5, I "B" 1 7]] &&
+        -- A `where` helper's name is required (Lean 4.35 elaborates each helper as a named
+        -- `let rec`; witness corpus): an empty name slot = `shape`, a named helper passes.
+        !anchorOk (ks "Lean.Parser.Term.letRecDecl") [nul [], nul [], N "x" [N "y" [N "z" []]]] &&
+        anchorOk (ks "Lean.Parser.Term.letRecDecl")
+          [nul [], nul [], N "x" [N "y" [N "z" [I "tweak" 3 2]]]]),
     ("profile header: I1's import sets + I2's names, per role", fun _ =>
       importOk .consumer [] [] "Impl" "Init" && !importOk .consumer [] [] "Impl" "Init.Core" &&
         importOk .consumer [] [] "Impl" "Std" &&

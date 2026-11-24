@@ -135,8 +135,9 @@ role. -/
 abbrev Path := List (Option Nat)
 
 /-- I3 (b) + P4 + K4: each anchor kind's path to its identifiers (Lean 4.35's parser layouts;
-`fvdep-dev profile tree` prints them) + whether the slot is required (an optional one = an empty
-`null` when absent: `structParent`'s `toFoo :`, a `where` helper of another let form). -/
+`fvdep-dev profile tree` prints them) + whether the slot is required (the optional one = an empty
+`null` when absent: `structParent`'s `toFoo :`; a `where` helper is required — Lean 4.35 elaborates
+each as a named `let rec`, the witness corpus finds no compiling nameless form). -/
 def anchors : List (List String × Path × IdRole × Bool) :=
   [("Lean.Parser.Command.declId".splitOn ".", [some 0], .declName, true),
     ("Lean.Parser.Command.ctor".splitOn ".", [some 3], .slot, true),
@@ -146,7 +147,7 @@ def anchors : List (List String × Path × IdRole × Bool) :=
     ("Lean.Parser.Command.structImplicitBinder".splitOn ".", [some 2, none], .slot, true),
     ("Lean.Parser.Command.structInstBinder".splitOn ".", [some 2, none], .slot, true),
     ("Lean.Parser.Command.structParent".splitOn ".", [some 0, some 0], .slot, false),
-    ("Lean.Parser.Term.letRecDecl".splitOn ".", [some 2, some 0, some 0, some 0], .slot, false),
+    ("Lean.Parser.Term.letRecDecl".splitOn ".", [some 2, some 0, some 0, some 0], .slot, true),
     ("Lean.Parser.Command.derivingClass".splitOn ".", [some 1], .derivName, true),
     ("Lean.Parser.Command.openSimple".splitOn ".", [some 0, none], .openName, true)]
 

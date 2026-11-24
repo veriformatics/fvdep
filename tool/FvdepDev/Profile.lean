@@ -1,6 +1,7 @@
 import FvdepDev.Parse
 import FvdepDev.ProfileCheck
 import FvdepDev.Walk
+import FvdepDev.Witness
 
 /-! Never shipped. The residue dumps (contract U6 D4: a test reads kinds, atoms + positions from
 them, never a verdict): each file parsed in the trusted grammar (`Init` + `Std`; the variable
@@ -273,6 +274,8 @@ partial def treeLines (path : List Nat) : Tree → List String
 
 def run : List String → IO UInt32
   | "check" :: rest => FvdepDev.ProfileCheck.run rest
+  | ["targets"] => FvdepDev.Witness.run ["targets"]
+  | "witness" :: files@(_ :: _) => FvdepDev.Witness.run ("witness" :: files)
   | "kinds" :: files@(_ :: _) => do
     let env ← devGrammar
     let mut rc : UInt32 := 0

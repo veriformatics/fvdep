@@ -1,5 +1,5 @@
+import FvdepLedger.Freeze
 import FvdepLedger.Types
-import Lean
 
 /-! Ledger checker (gate stage `coverage`; contract `docs/contracts/U2-core.md` L1–L7). Loads the
 ledger module's environment from the build, decodes the ledger value from its elaborated term,
@@ -549,18 +549,33 @@ structure Args where
   module : Name := `FvdepLedger.Rows
   ledger : Name := `FvdepLedger.Rows.ledger
   spec : System.FilePath := "../.agent/spec.md"
+  freeze : Option System.FilePath := none
+  freezeWrite : Bool := false
+  freezePrint : Bool := false
 
 def usage : String :=
-  "usage: fvdep-ledger (--check|--write) <doc> [--module <M>] [--ledger <decl>] [--spec <file>]"
+  "usage: fvdep-ledger (--check|--write) <doc> [--module <M>] [--ledger <decl>] [--spec <file>] " ++
+    "[--freeze <record> | --freeze-write <record>] | --freeze-print [--module <M>]"
 
 def parse : List String → Option Args → Option Args
   | [], acc => acc
   | "--check" :: d :: rest, none => parse rest (some { write := false, doc := d })
   | "--write" :: d :: rest, none => parse rest (some { write := true, doc := d })
+  | "--freeze-print" :: rest, none =>
+    parse rest (some { write := false, doc := "", freezePrint := true })
   | "--module" :: m :: rest, some a => parse rest (some { a with module := m.toName })
   | "--ledger" :: n :: rest, some a => parse rest (some { a with ledger := n.toName })
   | "--spec" :: f :: rest, some a => parse rest (some { a with spec := f })
+  | "--freeze" :: f :: rest, some a => parse rest (some { a with freeze := some f })
+  | "--freeze-write" :: f :: rest, some a =>
+    parse rest
+      (some
+        { a with
+          freeze := some f, freezeWrite := true })
   | _, _ => none
+
+/-- `t` without its line feeds (a record line as printed in a finding). -/
+def oneLine (t : String) : String := String.ofList (t.toList.filter (· != '\n'))
 
 /-- The first line where `a` and `b` differ (1-based), when they differ. -/
 def firstDiff (a b : String) : Option Nat :=
@@ -583,6 +598,14 @@ unsafe def main (argv : List String) : IO UInt32 := do
       importModules #[{ module := a.module }] {} (loadExts := true)
     catch e =>
       IO.eprintln s!"ledger: usage: cannot load {a.module}: {e}"
+      return 2
+  if a.freezePrint then
+    match Freeze.current env with
+    | .ok (id, hex) =>
+      IO.println s!"{id} {hex}"
+      return 0
+    | .error e =>
+      IO.eprintln s!"ledger: profile: freeze: {e}"
       return 2
   let some ci := env.find? a.ledger
     |
@@ -607,6 +630,27 @@ unsafe def main (argv : List String) : IO UInt32 := do
       return 2
   let mut fs := findings env l spec (← axiomsOf env l)
   fs := fs ++ (← replay env)
+  if let some fr := a.freeze then
+    match Freeze.current env with
+    | .error e =>
+      fs := fs.push ⟨"profile", "freeze", e⟩
+    | .ok (id, hex) =>
+      let line := s!"{id} {hex}\n"
+      if a.freezeWrite then
+        IO.FS.writeFile fr line
+      else
+        let old ←
+          try
+            IO.FS.readFile fr
+          catch _ =>
+            pure ""
+        unless old == line do
+          fs :=
+            fs.push
+              ⟨"profile", "freeze",
+                s!"{fr} records {oneLine old}, the profile is {oneLine line}: a rule or " ++
+                  "datum changed under the same id — a new version id + requalification " ++
+                  "(contract U6 Q2), or `--freeze-write` while v1 is unfrozen"⟩
   let text ← render env l a.ledger
   unless fs.isEmpty do
     for f in fs do

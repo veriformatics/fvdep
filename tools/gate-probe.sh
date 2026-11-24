@@ -544,6 +544,13 @@ with_build=0 probe spec plant_spec "spec-lint:" bash -c 'source tools/gate.sh; s
 plant_doc_drift() { sed -i '1s/^/x/' docs/verification.md; }
 probe coverage plant_doc_drift "ledger: root: doc:" bash -c 'source tools/gate.sh; coverage'
 
+# coverage, U6 Q2's freeze: a table atom added under the same profile id → the `freeze` finding.
+plant_freeze() {
+    sed -i 's/rule "Lean.Parser.Command.open" \["open"\],/rule "Lean.Parser.Command.open" ["open", "probe"],/' \
+        tool/FvdepCore/Profile/Table.lean
+}
+probe coverage-freeze plant_freeze "ledger: profile: freeze:" bash -c 'source tools/gate.sh; coverage'
+
 # coverage, extra roots: a further executable's entry not shaped `fun a => interpreter (plan a)`
 # (one root per shipped executable, U2 L1 + L4; the helper's root bent to `Cli.plan`) → the `root`
 # finding naming it.
@@ -694,6 +701,11 @@ plant_profile_case() {
 }
 probe profile-suite plant_profile_case "FAIL usage.empty" \
     env FVDEP_PROFILE_CASE=usage.empty bash -c 'source tools/gate.sh; profile_suite'
+
+# profile-witness: a fixture removed leaves the targets it alone covers uncovered, named (U6 Q).
+plant_witness_fixture() { rm tests/profile/witness/Termination.lean; }
+probe profile-witness plant_witness_fixture $'uncovered\trule\tLean.Parser.Termination.decreasingBy' \
+    bash -c 'source tools/gate.sh; profile_witness'
 
 # isolation: a case expecting another environment inside the step fails, named (one case).
 plant_isolation_case() { sed -i 's/"HOME,LC_ALL,PATH,PWD,TMPDIR"/"HOME,LC_ALL,PATH,TMPDIR"/' tests/isolation/run.py; }

@@ -107,6 +107,7 @@ sandbox-suite lean
 isolation   lean
 oracle-suite lean
 profile-suite lean
+profile-witness lean
 acceptance  suites
 index       lean
 index-history lean
@@ -136,7 +137,7 @@ GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite acceptance index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -218,10 +219,12 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 # docs/verification.md = the rendering. Verdict reused like a suite's in the fast gate (input
 # closure = the tool package, the library, the doc + `.agent/spec.md`: `noCaller` names its rows).
 # The checker loads `FvdepLedger.Rows` at run time (`lake exe` builds its own imports alone) ⇒ the
-# rows' build first: a row edit or plant is checked as written, never a stale `.olean`.
+# rows' build first: a row edit or plant is checked as written, never a stale `.olean`. + U6 Q2's
+# freeze: docs/profile-freeze.txt = `<profileId> <digest>` of the profile's normative content.
 coverage() {
     suite coverage "$(stage_key coverage)" "" \
-        bash -c 'cd tool && lake build -q FvdepLedger && lake exe fvdep-ledger --check ../docs/verification.md'
+        bash -c 'cd tool && lake build -q FvdepLedger &&
+            lake exe fvdep-ledger --check ../docs/verification.md --freeze ../docs/profile-freeze.txt'
 }
 
 # SHA-256 over the tracked + untracked-unignored files under PATH…, both Lake configs + toolchain
@@ -353,6 +356,13 @@ profile_suite() {
         bash tests/profile/run.sh "${cases[@]}"
 }
 
+# The witness corpus (U6 Q1 + Q2; tests/profile/witness.py): one `phase check … --profile` over the
+# fixtures (accepted + compiled on the same bytes), then every table target (`fvdep-dev profile
+# targets`) covered by them (`profile witness`); an uncovered target is named.
+profile_witness() {
+    suite profile-witness "$(stage_key profile-witness)" "" bash tests/profile/witness.sh
+}
+
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the
 # gate (MANIFEST status `merged`) through the built `fvdep`; the rest wait for their units.
 acceptance() {
@@ -368,11 +378,11 @@ index_key() { shipped_closure index.json tool/Main.lean; }
 
 # Each keyed stage's input-closure key (its `suite` mark holds it): one place, read by the stage +
 # by `marks`.
-KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite acceptance index'
+KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance index'
 stage_key() { # NAME
     case "$1" in
     lean-style) closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt ;;
-    coverage) shipped_closure tool docs/verification.md .agent/spec.md ;;
+    coverage) shipped_closure tool docs/verification.md docs/profile-freeze.txt .agent/spec.md ;;
     ledger-suite) ledger_suite_key ;;
     codec-suite)
         { shipped_closure tests/codec tests/sha256; awk '$1 == "jq"' tools/tools.lock; } |
@@ -388,7 +398,7 @@ stage_key() { # NAME
     sandbox-suite) sandbox_closure tests/sandbox ;;
     isolation) sandbox_closure tests/isolation ;;
     oracle-suite) sandbox_closure tests/oracle tool/Main.lean ;;
-    profile-suite) sandbox_closure tests/profile tool/Main.lean tool/ParseMain.lean ;;
+    profile-suite | profile-witness) sandbox_closure tests/profile tool/Main.lean tool/ParseMain.lean ;;
     acceptance) shipped_closure tests/acceptance tool/Main.lean ;;
     index) index_key ;;
     *)
