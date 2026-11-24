@@ -93,7 +93,10 @@ ssh "${ssh_opts[@]}" "$host" "[ -e /etc/systemd/system/$slice ] && systemctl is-
     fail_setup "$slice missing, inactive or capped at or below MemoryMax $memory, or bundle upload failed"
 
 # Runs inside the unit, under the workspace lock: sync from the tar stream on stdin, then the
-# command with stdin from /dev/null. Exit 125 before the command = sync refused or failed.
+# command with stdin from /dev/null. Exit 125 before the command = sync refused or failed. The
+# sync's own output goes to stderr: stdout carries the command's alone (rsync prints `cannot
+# delete non-empty directory` there for a remote directory whose excluded `.lake/` stays, and
+# `tools/ledger-doc.sh` + `tools/update-index.sh` write a run's stdout as their file).
 # shellcheck disable=SC2016
 inner='set -uo pipefail
 ws=$1 origin=$2 bundle=$3 head=$4
@@ -114,7 +117,7 @@ git -C "$ws" reset -q --hard FETCH_HEAD || fail "reset failed"
 rm -rf "$ws/.incoming" && mkdir "$ws/.incoming" || fail "staging failed"
 tar -C "$ws/.incoming" -xf - || fail "file stream truncated"
 rsync -a --delete --exclude=/.git/ --exclude=.lake/ --exclude=/.tools/ --exclude=/.gate/ \
-    --exclude=/.incoming/ "$ws/.incoming/" "$ws/" || fail "file sync failed"
+    --exclude=/.incoming/ "$ws/.incoming/" "$ws/" >&2 || fail "file sync failed"
 rm -rf "$ws/.incoming"
 cd "$ws" || fail "workspace missing"
 "$@" </dev/null'

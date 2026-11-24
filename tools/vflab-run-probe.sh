@@ -107,6 +107,15 @@ ln -s probe-exec.sh "$root/probe-link"
 rc=$?
 rm -f "$root/probe-exec.sh" "$root/probe-link"
 check exec-bit-symlink "rc $rc, want 0" test "$rc" -eq 0
+# The command's stdout comes back alone, even when the sync prints a notice (a remote directory
+# rsync cannot delete because the excluded `.lake/` inside it stays): `tools/ledger-doc.sh` +
+# `tools/update-index.sh` take a run's stdout as the file they write.
+"$run" bash -c 'mkdir -p probe-stale-dir/.lake && printf kept >probe-stale-dir/.lake/kept' \
+    >/dev/null 2>&1
+out="$("$run" printf only 2>/dev/null)"
+rc=$?
+"$run" rm -rf probe-stale-dir >/dev/null 2>&1
+check sync-stdout "rc $rc, stdout \"$out\"" test "$rc" -eq 0 -a "$out" = only
 
 # Runs of one worktree serialize: two 3 s runs take ≥ 6 s together.
 start=$SECONDS
