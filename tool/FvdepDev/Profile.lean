@@ -1,3 +1,4 @@
+import FvdepDev.Differential
 import FvdepDev.Parse
 import FvdepDev.ProfileCheck
 import FvdepDev.Walk
@@ -275,6 +276,7 @@ partial def treeLines (path : List Nat) : Tree → List String
 def run : List String → IO UInt32
   | "check" :: rest => FvdepDev.ProfileCheck.run rest
   | ["targets"] => FvdepDev.Witness.run ["targets"]
+  | "differential" :: args@(_ :: _) => FvdepDev.Differential.run args
   | "witness" :: files@(_ :: _) => FvdepDev.Witness.run ("witness" :: files)
   | "kinds" :: files@(_ :: _) => do
     let env ← devGrammar

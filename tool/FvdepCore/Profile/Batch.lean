@@ -10,9 +10,6 @@ it observed. Pure. -/
 
 namespace FvdepCore.Profile
 
-/-- The profile this child implements (P5b's `profile`; Q2's version id). -/
-def profileId : String := "fvdep/profile/1"
-
 /-- I1's names of a header tree's imports in source order, fail closed: `none` when the header or
 one of its imports is outside Lean 4.35's layout (`headerParts`, `importParts`). -/
 def importsExact (h : Tree) : Option (List String) :=
@@ -85,9 +82,11 @@ def grammars (req : Request) (obs : List Observed) : List (List String) :=
   let fuel := 2 * edges + heads.length + req.library.length + 2
   obs.map fun o => grammar imports fuel o.module
 
-/-- P5b's outcome of an event in module `m`. -/
+/-- P5b's outcome of an event in module `m`; every detail through T's cap here (one producer
+boundary: a parse event's text is Lean's, a walk finding's is cut already — `cutDetail` is
+idempotent). -/
 def outcomeOf (m : String) : Event → Outcome
-  | .finding f => .refused ⟨m, f.pos.line, f.pos.col, f.rule, f.detail⟩
+  | .finding f => .refused ⟨m, f.pos.line, f.pos.col, f.rule, f.detail.map cutDetail⟩
   | .over => .over
 
 /-- The batch's outcome + each module's grammar (C1, P3, P5b): the header stage over every module,

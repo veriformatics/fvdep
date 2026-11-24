@@ -3787,7 +3787,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Profile.Check`
 
 - Contract: U6 P3
-- Claim: `grammar`: a module's grammar list opens with `Init` (`grammarInit`); its depth-first first-meeting order + one listing per module = `lake test` ProfileC (the walk's C2 claims = U6-D).
+- Claim: `grammar`: a module's grammar list opens with `Init` (`grammarInit`: the proved part); its tail — the closure's toolchain modules, depth-first first-meeting order, one listing each — is tested, not proved (ruling, U6-D: `lake test` ProfileC + P4's differential, whose loaded order = the frontend's `allImportedModuleNames`).
 - Subject: `FvdepCore.Profile.grammar`
 - Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProfileClaims.grammarInit` (hash 0xf77219d8), proved by `FvdepAudit.Profile.Proof.grammar_init`:
@@ -3803,13 +3803,20 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Profile.Check`
 
 - Contract: U6 T
-- Claim: `cutDetail`: every detail string stays within 1,024 UTF-8 bytes (`detailBytes`); the cut = the longest prefix within 1,021 bytes + `...` (`lake test` ProfileC).
+- Claim: `cutDetail`: its output stays within 1,024 UTF-8 bytes (`detailBytes`), the cut = the longest prefix within 1,021 bytes + `...` (`lake test` ProfileC); every recorded refusal's detail passes through it (`outcomeDetails`, at `outcomeOf`: a parse or cap event's text included).
 - Subject: `FvdepCore.Profile.cutDetail`
 - Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProfileClaims.detailBytes` (hash 0xa69a436), proved by `FvdepAudit.Profile.Proof.detail_bytes`:
 
   ```lean
   ∀ (s : String), (FvdepCore.Profile.cutDetail s).utf8ByteSize ≤ FvdepCore.Profile.detailMax
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.outcomeDetails` (hash 0x302b19e), proved by `FvdepAudit.Profile.Proof.outcome_details`:
+
+  ```lean
+  ∀ (m : String) (e : FvdepCore.Profile.Event) (r : FvdepCore.Profile.Refusal),
+    FvdepCore.Profile.outcomeOf m e = FvdepCore.Profile.Outcome.refused r →
+      ∀ (d : String), d ∈ r.detail → d.utf8ByteSize ≤ FvdepCore.Profile.detailMax
   ```
 - Uninterpreted: none
 - Residue: none
@@ -3818,7 +3825,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Profile.Check`
 
 - Contract: U6 C1, C2, K0, K0', P4, I2, I3, K4
-- Claim: `walk`: a command's first finding = the head of the spec's findings in C1's total order, every rule restated over the occurrence's ancestor chain (`walkFirst`); a clean command = no rule fires at any occurrence (`walkAccepts`); the layouts (`shapeOk`) = spec text shared with the implementation, their match to Lean's parser = residue.
+- Claim: `walk`: a command's first finding = the head of the spec's findings in C1's total order, every rule restated over the occurrence's ancestor chain (`walkFirst`; a declaring slot's path holds no anchor kind); a clean command = no rule fires at any occurrence (`walkAccepts`); the layouts (`shapeOk`) = spec text shared with the implementation, their match to Lean's parser = residue.
 - Subject: `FvdepCore.Profile.walk`
 - Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProfileClaims.walkFirst` (hash 0xd474a8bc), proved by `FvdepAudit.Profile.Walk.Proof.walk_first`:
@@ -3863,7 +3870,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Profile.Check`
 
 - Contract: U6 C1, C2, I1, I2, I3, K0'
-- Claim: `header`: a module's header finding = the head of the spec's header findings in C1's order — its own name (I2), the header's layout, `module`, `prelude`, each import's layout, modifier, name (I1) + I3 (a) on the name (`headerFirst`); the layout readers (`headerParts`, `optSlot`, `importParts`) = spec text shared with the implementation, their match to Lean's parser = residue; `importAdmitted` restates `importOk` verbatim (I1's sets, read against the contract).
+- Claim: `header`: a module's header finding = the head of the spec's header findings in C1's order — its own name (I2), the header's layout, `module`, `prelude`, each import's layout, modifier, name (I1: by parsed components, another batch module alone) + I3 (a) on the name, each at C1's location (`headerFirst`); the layout readers (`headerParts`, `optSlot`, `importParts`) = spec text shared with the implementation, their match to Lean's parser = residue; `importAdmitted` restates `importOk` verbatim (I1's sets, read against the contract).
 - Subject: `FvdepCore.Profile.header`
 - Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProfileClaims.headerFirst` (hash 0xf87afeb4), proved by `FvdepAudit.Profile.Stage.Proof.header_first`:

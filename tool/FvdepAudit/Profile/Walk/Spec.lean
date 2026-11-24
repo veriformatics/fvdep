@@ -85,15 +85,18 @@ def insideKids (i : Nat) : List Tree → List (Tree × List Nat)
 end
 
 /-- K0' + I3 (b) + P4 + K4: an anchor kind's declaring slots, fail closed — every occurrence inside
-its children on a proper prefix of its path is a node, every occurrence at its full length an
-identifier; a required slot reaches at least one. -/
+its children on a proper prefix of its path is a node of no anchor kind (one would decide the
+roles below it), every occurrence at its full length an identifier; a required slot reaches at
+least one. -/
 def slotsHold (k : List String) (kids : List Tree) : Bool :=
   match anchors.find? (·.1 == k) with
   | some (_, p, _, req) =>
     (insideKids 0 kids).all
         (fun o =>
           if o.2.length < p.length && pathMatches (p.take o.2.length) o.2 then
-            (o.1 matches .node _ _)
+            match o.1 with
+            | .node k _ => !isAnchor k
+            | _ => false
           else if pathMatches p o.2 then (o.1 matches .ident _ _) else true) &&
       (!req || (insideKids 0 kids).any fun o => pathMatches p o.2)
   | none => true

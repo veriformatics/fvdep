@@ -1,4 +1,4 @@
-import FvdepCore.Profile.Check
+import FvdepCore.Profile.Batch
 import FvdepDev.Parse
 import FvdepIO.Parse
 
@@ -6,7 +6,8 @@ import FvdepIO.Parse
 witness corpus): the table's targets — every rule, every (kind, atom) pair outside the payload
 shapes, the scope shapes' two rows, every anchor's slot (an optional one absent + present), every
 deriving class — + the targets a module covers, read by the walk's own computation (the shipped
-converter's trees, the owner + pending path as `walk` threads them). A module counts only when the
+converter's trees under the module's own P3 grammar, the owner + pending path as `walk` threads
+them). A module counts only when the
 checker accepts it + it compiles on the same bytes (the runner's `phase check --profile`). -/
 
 namespace FvdepDev.Witness
@@ -125,6 +126,19 @@ def witnessFile (env : Environment) (path : String) : IO (Except String (List St
     pst := pst'
   return .ok out.toList
 
+/-- A consumer module's grammar per P3 (`grammar` over its header's imports; no library rows: the
+corpus imports Init + Std alone), loaded from the toolchain — the environment the child parses it
+in. -/
+def moduleGrammar (path : String) : IO Environment := do
+  let input := Parser.mkInputContext (← IO.FS.readFile path) path
+  let (item, _, _) ← FvdepIO.Parse.headItem {} ⟨0, 0⟩ input
+  let own :=
+    match item with
+    | .tree h _ => importsOf h
+    | .stop _ => []
+  let g := grammar (fun x => if x == path then own else []) (2 * own.length + 4) path
+  FvdepDev.Parse.grammar (g.map FvdepIO.Parse.nameOf)
+
 /-- `fvdep-dev profile targets`, `fvdep-dev profile witness <file>…`: one target per line, each
 witness line once per module (sorted). -/
 def run : List String → IO UInt32
@@ -133,9 +147,8 @@ def run : List String → IO UInt32
       IO.println t
     return 0
   | "witness" :: files@(_ :: _) => do
-    let env ← FvdepDev.Parse.grammar [`Init, `Std]
     for f in files do
-      match ← witnessFile env f with
+      match ← witnessFile (← moduleGrammar f) f with
       | .ok ts =>
         for t in (ts.mergeSort fun a b => Decidable.decide (a ≤ b)).eraseDups do
           IO.println s!"{f}\t{t}"

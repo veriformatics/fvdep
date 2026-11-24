@@ -1,5 +1,6 @@
 #!/usr/bin/env bash
-# U6 Q: the witness corpus (tests/profile/witness.py). Builds the binaries the phase check runs.
+# U6 Q: the witness corpus (tests/profile/witness.py) + P3/P4's differential (differential.sh).
+# Builds the binaries the phase check runs.
 set -euo pipefail
 root=$(cd -- "$(dirname -- "${BASH_SOURCE[0]}")/../.." && pwd)
 cd -- "$root"
@@ -12,4 +13,8 @@ if ! (cd tool && lake build '«fvdep-dev»' '«fvdep-step»' '«fvdep-cli»' '«
 fi
 export FVDEP_BIN=${FVDEP_BIN:-$root/tool/.lake/build/bin/fvdep}
 export FVDEP_DEV_BIN=${FVDEP_DEV_BIN:-$root/tool/.lake/build/bin/fvdep-dev}
-exec python3 -I tests/profile/witness.py "$@"
+rc=0
+python3 -I tests/profile/witness.py "$@" || rc=$?
+# P3 + P4's differential (Q1): the child's trees + grammar order = the frontend's.
+bash tests/profile/differential.sh || rc=$((rc > 1 ? rc : 1))
+exit "$rc"

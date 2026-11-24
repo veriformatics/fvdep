@@ -3,7 +3,7 @@ import FvdepAudit.Doc.Proof.Rules
 import FvdepAudit.Doc.Proof.Valid
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Profile.Spec
-import FvdepCore.Profile.Check
+import FvdepCore.Profile.Batch
 
 /-! U6 P5a + P5b (contract `docs/contracts/U6-profile.md`): the request + the record read back
 exactly (canonical texts of well-formed values alone); the intake = the spec's first failing
@@ -210,13 +210,16 @@ theorem role_fits (r : Role) : r.text.utf8ByteSize ≤ maxStringBytes := by case
 
 theorem request_valid (r : Request) (h : r.ok = true) : Valid r.toJson := by
   simp only [Request.ok, Bool.and_eq_true, List.all_eq_true] at h
-  obtain ⟨⟨⟨⟨⟨⟨⟨⟨hls, -⟩, hl⟩, hms⟩, -⟩, hp⟩, hrc⟩, -⟩, ht⟩ := h
+  obtain ⟨⟨⟨⟨⟨⟨⟨⟨⟨hls, -⟩, -⟩, hl⟩, hms⟩, -⟩, hp⟩, hrc⟩, -⟩, ht⟩ := h
   obtain ⟨l1, l2, l3, l4⟩ :=
     list_bounds LibModule.toJson 2 r.library fun l hl => libModule_bounds l (hls l hl)
   obtain ⟨q1, q2, q3, q4⟩ :=
     list_bounds ReqModule.toJson 1 r.modules fun m hm => reqModule_bounds m (hms m hm)
   obtain ⟨b1, b2, b3, b4⟩ := limits_bounds r.limits hl
-  have hp' := label_fits hp
+  have hpl : isLabel r.profile = true := by
+    rw [beq_iff_eq.1 hp]
+    decide
+  have hp' := label_fits hpl
   have hrc' := label_fits hrc
   have ht' := digest_fits ht
   have hro := role_fits r.role
@@ -391,5 +394,20 @@ theorem detail_bytes (s : String) : (cutDetail s).utf8ByteSize ≤ detailMax := 
     have h3 : "...".utf8ByteSize = 3 := by decide
     simp only [detailMax] at this ⊢
     omega
+
+/-- T at the producer boundary (`outcomeDetails`): every detail of a refusal the batch records is
+within the cap — a walk finding's (cut at `found`) and a parse or cap event's alike (cut at
+`outcomeOf`). -/
+theorem outcome_details (m : String) (e : Event) (r : Refusal) (h : outcomeOf m e = .refused r) :
+    ∀ d ∈ r.detail, d.utf8ByteSize ≤ detailMax := by
+  cases e with
+  | finding f =>
+    simp only [outcomeOf, Outcome.refused.injEq] at h
+    subst h
+    intro d hd
+    simp only [List.mem_map] at hd
+    obtain ⟨x, _, rfl⟩ := hd
+    exact detail_bytes x
+  | over => simp [outcomeOf] at h
 
 end FvdepAudit.Profile.Proof

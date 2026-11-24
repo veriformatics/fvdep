@@ -19,6 +19,9 @@ inductive Tree where
   | missing
   deriving Repr, Inhabited
 
+/-- The profile this child implements (P5a's + P5b's `profile`; Q2's version id). -/
+def profileId : String := "fvdep/profile/1"
+
 /-- T's cap on one detail string, in UTF-8 bytes. -/
 def detailMax : Nat := 1024
 

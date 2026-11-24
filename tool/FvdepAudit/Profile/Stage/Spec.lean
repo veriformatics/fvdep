@@ -6,7 +6,7 @@ import FvdepAudit.Profile.Walk.Spec
 parse or cap stop = the event at its item; the header = its findings in C1's order (the module's
 name, the header's layout, `module`, `prelude`, then each import: its layout, its modifier, its
 name, I3 (a) on the name). Shared with the implementation + read as spec text: the layout readers
-`headerParts`, `optSlot`, `importParts` + `identAt` (K0''s layouts). -/
+`headerParts`, `optSlot`, `importParts` (with `modifierSlot`) + `identAt` (K0''s layouts). -/
 
 namespace FvdepAudit.Profile.Stage.Spec
 
@@ -56,40 +56,49 @@ def nameAdmitted (role : Role) (m : String) : Bool :=
     | some c, .library => c == "Fvdep" || c == "FvdepPreview"
     | none, _ => false
 
-/-- I1: an import `m` of module `self` (`lib` = the pinned library's modules, `batch` = the
-batch's) — `Init` alone, `Std` + every `Std.*`; consumer: a library module whose first component is
-exactly `Fvdep`, or a batch module; library: a batch module whose first component is `Fvdep`, or —
-`self`'s first component `FvdepPreview` — one whose first component is `FvdepPreview`. -/
-def importAdmitted (role : Role) (lib batch : List String) (self m : String) : Bool :=
-  let first := fun (x : String) => (x.splitOn ".").headD ""
+/-- I1: an import (its parsed name components `n`) of module `self` (`lib` = the pinned library's
+modules, `batch` = the batch's: plain dotted names, read by component) — `Init` alone, `Std` +
+every `Std.*`; consumer: a library module whose first component is exactly `Fvdep`, or another batch
+module; library: another batch module whose first component is `Fvdep`, or — `self`'s first
+component `FvdepPreview` — one whose first component is `FvdepPreview`. -/
+def importAdmitted (role : Role) (lib batch : List String) (self : String) (n : List String) :
+    Bool :=
+  let named := fun (x : String) => x.splitOn "." == n
+  let other := batch.any fun x => x != self && named x
   match role with
   | .consumer =>
-    m == "Init" || first m == "Std" || (lib.contains m && first m == "Fvdep") || batch.contains m
+    n == ["Init"] || n.head? == some "Std" || (n.head? == some "Fvdep" && lib.any named) || other
   | .library =>
-    m == "Init" || first m == "Std" ||
-      (batch.contains m &&
-        (first m == "Fvdep" || (first self == "FvdepPreview" && first m == "FvdepPreview")))
+    n == ["Init"] || n.head? == some "Std" ||
+      (other &&
+        (n.head? == some "Fvdep" ||
+          ((self.splitOn ".").head? == some "FvdepPreview" && n.head? == some "FvdepPreview")))
 
-/-- K0' + C1: an optional header slot (`module`, `prelude`): another layout → `shape` (at 1:0), its
-keyword present → `header <rule>` at the keyword's first positioned leaf. -/
-def slotRules (rule : String) (t : Tree) : List Finding :=
+/-- C1's location in the header stage: the occurrence's first positioned leaf, else its nearest
+enclosing occurrence's (`anc`, innermost first), else 1:0. -/
+def headerLoc (t : Tree) (anc : List Tree) : Pos := ((t :: anc).findSome? leafPos).getD ⟨1, 0⟩
+
+/-- K0' + C1: an optional header slot `t` (`module`, `prelude`) of header `h`: another layout →
+`shape` at the slot, its keyword present → `header <rule>` at the keyword. -/
+def slotRules (rule : String) (h t : Tree) : List Finding :=
   match optSlot t with
-  | none => [mk ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]]
-  | some (some u) => [mk ((leafPos u).getD ⟨1, 0⟩) "header" [rule]]
+  | none => [mk (headerLoc t [h]) "shape" ["Lean.Parser.Module.header"]]
+  | some (some u) => [mk (headerLoc u [t, h]) "header" [rule]]
   | some none => []
 
 /-- K0' + I1 + I3 (a) + C1: one import's findings in order — its layout (`shape`), its modifier
 (`header modifier`), its name (`header import`), then I3 (a) on the name (`reserved`, at the
-identifier, else at the import); the rest at the import's first positioned leaf. -/
-def importRules (role : Role) (lib batch : List String) (self : String) (t : Tree) : List Finding :=
-  let here := (leafPos t).getD ⟨1, 0⟩
+identifier, else at the import); the rest at the import under its ancestors `anc`. -/
+def importRules (role : Role) (lib batch : List String) (self : String) (anc : List Tree)
+    (t : Tree) : List Finding :=
+  let here := headerLoc t anc
   match importParts t with
   | none => [mk here "shape" ["Lean.Parser.Module.import"]]
   | some (md, n, q) =>
     (match md with
       | some a => [mk here "header" ["modifier", a]]
       | none => []) ++
-      (if importAdmitted role lib batch self (dotted n) then []
+      (if importAdmitted role lib batch self n then []
       else [mk here "header" ["import", dotted n]]) ++
       match firstReserved false n with
       | some c => [mk (q.getD here) "reserved" [c]]
@@ -101,8 +110,8 @@ def headerRules (role : Role) (lib batch : List String) (self : String) (h : Tre
   (if nameAdmitted role self then [] else [mk ⟨1, 0⟩ "header" ["name", self]]) ++
     match headerParts h with
     | some (m, p, imps) =>
-      slotRules "module" m ++ slotRules "prelude" p ++
-        imps.flatMap (importRules role lib batch self)
-    | none => [mk ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]]
+      slotRules "module" h m ++ slotRules "prelude" h p ++
+        imps.flatMap (importRules role lib batch self [.node ["null"] imps, h])
+    | none => [mk (headerLoc h []) "shape" ["Lean.Parser.Module.header"]]
 
 end FvdepAudit.Profile.Stage.Spec

@@ -3,7 +3,7 @@
 namespace takes the `deriving` name; Lean finds no handler for it + the build fails (no other
 handler runs). -/
 
-namespace Witness.Shadow
+namespace Witness.ShadowRepr
 
 class Repr (α : Type) where
   tag : Nat
@@ -12,4 +12,4 @@ structure Point where
   x : Nat
   deriving Repr
 
-end Witness.Shadow
+end Witness.ShadowRepr

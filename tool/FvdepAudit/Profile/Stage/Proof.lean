@@ -52,13 +52,22 @@ theorem nameOk_eq (role : Role) (m : String) : nameOk role m = nameAdmitted role
   unfold nameOk nameAdmitted
   cases role <;> cases m.splitOn "." <;> simp [Bool.not_or]
 
-theorem importOk_eq (role : Role) (lib batch : List String) (self m : String) :
-    importOk role lib batch self m = importAdmitted role lib batch self m := by
+theorem importOk_eq (role : Role) (lib batch : List String) (self : String) (n : List String) :
+    importOk role lib batch self n = importAdmitted role lib batch self n := by
   cases role <;> simp [importOk, importAdmitted, Bool.or_assoc]
 
-theorem importFinding_eq (role : Role) (lib batch : List String) (self : String) (t : Tree) :
-    importFinding role lib batch self ⟨1, 0⟩ t = (importRules role lib batch self t).head? := by
-  simp only [importFinding, importRules, firstPos_leafPos, importOk_eq, reservedComponent_eq,
+/-- The header stage's location = the spec's (`locate` reads `firstPos` = `leafPos`). -/
+theorem locate_headerLoc (t : Tree) (anc : List Tree) : locate ⟨1, 0⟩ t anc = headerLoc t anc := by
+  have h : (Tree.firstPos : Tree → Option Pos) = leafPos := funext firstPos_leafPos
+  unfold locate headerLoc
+  rw [h]
+  cases (t :: anc).findSome? leafPos <;> rfl
+
+theorem importFinding_eq (role : Role) (lib batch : List String) (self : String) (anc : List Tree)
+    (t : Tree) :
+    importFinding role lib batch self ⟨1, 0⟩ anc t =
+      (importRules role lib batch self anc t).head? := by
+  simp only [importFinding, importRules, locate_headerLoc, importOk_eq, reservedComponent_eq,
     found_eq]
   cases importParts t with
   | none => rfl
@@ -67,7 +76,7 @@ theorem importFinding_eq (role : Role) (lib batch : List String) (self : String)
     cases md with
     | some a => simp
     | none =>
-      by_cases ha : importAdmitted role lib batch self (dotted n) = true <;>
+      by_cases ha : importAdmitted role lib batch self n = true <;>
         rcases hr : firstReserved false n with _ | c <;>
         simp [ha, hr]
 
@@ -75,14 +84,14 @@ theorem importFinding_eq (role : Role) (lib batch : List String) (self : String)
 theorem header_first (role : Role) (lib batch : List String) (self : String) (h : Tree) :
     header role lib batch self h =
       (FvdepAudit.Profile.Stage.Spec.headerRules role lib batch self h).head? := by
-  simp only [header, headerRules, nameOk_eq, found_eq]
+  simp only [header, headerRules, nameOk_eq, found_eq, locate_headerLoc]
   by_cases hn : nameAdmitted role self = true
   · simp only [hn, Bool.not_true, Bool.false_eq_true, ↓reduceIte, List.nil_append]
     cases headerParts h with
     | none => rfl
     | some x =>
       rcases x with ⟨m, p, imps⟩
-      simp only [slotRules, firstPos_leafPos]
+      simp only [slotRules]
       cases optSlot m with
       | none => rfl
       | some om =>
@@ -98,7 +107,7 @@ theorem header_first (role : Role) (lib batch : List String) (self : String) (h 
               simp only [List.nil_append, List.head?_flatMap]
               congr 1
               funext t
-              exact importFinding_eq role lib batch self t
+              exact importFinding_eq role lib batch self [.node ["null"] imps, h] t
   · simp [hn]
 
 end FvdepAudit.Profile.Stage.Proof

@@ -30,6 +30,12 @@ inductive Shape where
   | sectionCmd
   /-- K3 + C1: `end`, an optional identifier + its empty tail (`identWithPartialTrailingDot`). -/
   | endCmd
+  /-- K4 + K0': an `extends` parent: its optional `toFoo :` slot (an empty `null`, or the
+  projection's name + `:`), then the parent's type. -/
+  | structParent
+  /-- K4 + K0' + I2: `instance`: its attribute kind, the keyword, its priority, its optional name
+  (an empty `null`, or a `declId`), its signature + value. -/
+  | instanceCmd
   deriving DecidableEq, Repr
 
 /-- K: an admitted kind (its name's components), the atoms it may own (K0: an atom inside `null` or
@@ -57,13 +63,14 @@ def table : List Rule :=
     rule "Lean.Parser.Command.declModifiers" [], rule "Lean.Parser.Command.private" ["private"],
     rule "Lean.Parser.Command.protected" ["protected"],
     rule "Lean.Parser.Command.definition" ["def"], rule "Lean.Parser.Command.abbrev" ["abbrev"],
-    rule "Lean.Parser.Command.instance" ["instance"], rule "Lean.Parser.Term.attrKind" [],
-    rule "Lean.Parser.Command.structure" [":=", "where"],
+    rule "Lean.Parser.Command.instance" ["instance"] .instanceCmd,
+    rule "Lean.Parser.Term.attrKind" [], rule "Lean.Parser.Command.structure" [":=", "where"],
     rule "Lean.Parser.Command.structureTk" ["structure"],
     rule "Lean.Parser.Command.classTk" ["class"],
     rule "Lean.Parser.Command.extends" [",", "extends"],
-    rule "Lean.Parser.Command.structParent" [":"], rule "Lean.Parser.Command.structCtor" ["::"],
-    rule "Lean.Parser.Command.structFields" [], rule "Lean.Parser.Command.structSimpleBinder" [],
+    rule "Lean.Parser.Command.structParent" [":"] .structParent,
+    rule "Lean.Parser.Command.structCtor" ["::"], rule "Lean.Parser.Command.structFields" [],
+    rule "Lean.Parser.Command.structSimpleBinder" [],
     rule "Lean.Parser.Command.structExplicitBinder" ["(", ")"],
     rule "Lean.Parser.Command.structImplicitBinder" ["{", "}"],
     rule "Lean.Parser.Command.structInstBinder" ["[", "]"],
@@ -91,8 +98,8 @@ def table : List Rule :=
     rule "Lean.Parser.Term.explicit" ["@"], rule "Lean.Parser.Term.namedArgument" ["(", ")", ":="],
     rule "Lean.Parser.Term.typeSpec" [":"], rule "Lean.Parser.Term.explicitBinder" ["(", ")", ":"],
     rule "Lean.Parser.Term.implicitBinder" [":", "{", "}"],
-    rule "Lean.Parser.Term.instBinder" ["[", "]"],
-    rule "Lean.Parser.Term.strictImplicitBinder" [":", "⦃", "⦄"],
+    rule "Lean.Parser.Term.instBinder" ["[", ":", "]"],
+    rule "Lean.Parser.Term.strictImplicitBinder" [":", "{", "}", "⦃", "⦄"],
     rule "Lean.Parser.Term.binderDefault" [":="], rule "Lean.binderIdent" [],
     rule "Lean.explicitBinders" [], rule "Lean.unbracketedExplicitBinders" [":"],
     rule "Lean.bracketedExplicitBinders" ["(", ")", ":"], rule "Lean.binderPred<_" ["<"],

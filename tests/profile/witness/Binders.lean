@@ -15,3 +15,11 @@ def strict ⦃α : Type u⦄ (a : α) : α := a
 def synthesize {α : Type u} [Inhabited α] : α := default
 
 end Witness.Binders
+
+namespace Witness.BinderSpellings
+
+def named [h : Inhabited Nat] : Nat := h.default
+
+def strict {{α : Type}} (x : α) : α := x
+
+end Witness.BinderSpellings

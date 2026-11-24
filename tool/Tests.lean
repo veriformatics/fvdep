@@ -3602,7 +3602,23 @@ def cases : List (String × (Unit → Bool)) :=
     ("profile: a request whose path, recipe or limits break P5a is refused", fun _ =>
       (readRequest (print { req with modules := [⟨"Impl", "x.lean", hex 'a'⟩] }.toJson)).isNone &&
         (readRequest (print { req with recipe := "library/1" }.toJson)).isNone &&
-        (readRequest (print { req with limits := { depth := 0 } }.toJson)).isNone),
+        (readRequest (print { req with limits := { depth := 0 } }.toJson)).isNone &&
+        -- P5a's literal profile id + the library role's empty rows (reviewer-21 R12).
+        (readRequest (print { req with profile := "fvdep/profile/2" }.toJson)).isNone &&
+        (readRequest
+            (print
+              { req with
+                  role := .library, recipe := "library/1" }.toJson)).isNone &&
+        (readRequest
+            (print
+              { req with
+                  role := .library, recipe := "library/1", library := [] }.toJson)).isSome),
+    ("profile: every outcome detail leaves the batch within T's cap (a parse event's too)", fun _ =>
+      match
+        outcomeOf "Impl"
+          (.finding ⟨⟨1, 0⟩, "parse", [String.ofList (List.replicate 2000 'x')]⟩) with
+      | .refused r => r.detail.all fun d => d.utf8ByteSize ≤ 1024
+      | _ => false),
     ("profile: a request whose module lists are out of order or repeat a module is refused",
       fun _ =>
       let dup : ReqModule := ⟨"Impl", "Impl.lean", hex 'a'⟩
@@ -3858,12 +3874,19 @@ def cases : List (String × (Unit → Bool)) :=
         namespaceScope [] ["_root_", "X"] == some ["_root_", "X"]),
     ("profile walk: ownership by role (consumer roots, library root, an anonymous root instance)",
       fun _ =>
+      -- Lean 4.35's `instance` layout (`fvdep-dev profile tree`): attrKind, `instance`, priority,
+      -- the optional name, the signature, the value (the exact shape `.instanceCmd`).
       let inst := fun (kids3 : List Tree) =>
         N "Lean.Parser.Command.declaration"
           [N "Lean.Parser.Command.declModifiers"
               [nul [], nul [], nul [], nul [], nul [], nul [], nul []],
             N "Lean.Parser.Command.instance"
-              [N "Lean.Parser.Term.attrKind" [nul []], A "instance" 1 0, nul [], nul kids3]]
+              [N "Lean.Parser.Term.attrKind" [nul []], A "instance" 1 0, nul [], nul kids3,
+                N "Lean.Parser.Command.declSig"
+                  [nul [], N "Lean.Parser.Term.typeSpec" [A ":" 1 9, I "Inhabited" 1 11]],
+                N "Lean.Parser.Command.declValSimple"
+                  [A ":=" 1 21, I "x" 1 24, N "Lean.Parser.Termination.suffix" [nul [], nul []],
+                    nul []]]]
       ownershipBroken con ["Fvdep", "x"] && ownershipBroken con ["FvdepX"] &&
         ownershipBroken con ["Lake"] &&
         !ownershipBroken con ["Impl", "x"] &&
@@ -3917,6 +3940,30 @@ def cases : List (String × (Unit → Bool)) :=
           1 0 "shape" ["Lean.Parser.Module.import"] &&
         is (header .consumer [] [] "Impl" (N "Lean.Parser.Module.header" [nul [], nul []])) 1 0
           "shape" ["Lean.Parser.Module.header"] &&
+        -- A modifier slot holds its own modifier kind + keyword (reviewer-21 R15).
+        is
+          (header .consumer [] [] "Impl"
+            (hdr false false
+              [N "Lean.Parser.Module.import"
+                  [nul [N "x" [A "public" 1 0]], nul [], A "import" 1 7, nul [], I "Std" 1 14,
+                    nul []]]))
+          1 0 "shape" ["Lean.Parser.Module.import"] &&
+        -- I1 by name components + another batch module alone (reviewer-21 R9): a one-component
+        -- `«Fvdep.X»` names no library module; `Impl` importing itself is refused.
+        is
+          (header .consumer ["Fvdep.X"] [] "Impl"
+            (hdr false false
+              [N "Lean.Parser.Module.import"
+                  [nul [], nul [], A "import" 1 0, nul [], .ident ["Fvdep.X"] (some ⟨1, 7⟩),
+                    nul []]]))
+          1 0 "header" ["import", "Fvdep.X"] &&
+        is (header .consumer [] ["Impl"] "Impl" (hdr false false [imp [] "Impl" 1])) 1 0 "header"
+          ["import", "Impl"] &&
+        -- A leafless import = its nearest positioned ancestor's location (C1; reviewer-21 R9).
+        is
+          (header .consumer [] [] "Impl"
+            (hdr false false [imp [] "Std" 7, N "Lean.Parser.Module.import" []]))
+          7 0 "shape" ["Lean.Parser.Module.import"] &&
         importsOf (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) ==
           ["Init", "Std.Time"] &&
         -- A library header's rows fail closed: a header or an import outside the layout = `none`.
@@ -3950,6 +3997,27 @@ def cases : List (String × (Unit → Bool)) :=
                     nul []],
                 nul []]))
           1 4 "shape" ["Lean.Parser.Command.declId"] &&
+        -- An `extends` parent's layout is exact (K0'): a missing or foreign `toFoo :` container
+        -- = `shape`, the empty `null` + a named slot pass.
+        is (run1 con (N "Lean.Parser.Command.structParent" [])) 1 0 "shape"
+          ["Lean.Parser.Command.structParent"] &&
+        -- An anonymous instance's name slot is exact (reviewer-21 R3): a missing one = `shape`.
+        is (run1 lib (N "Lean.Parser.Command.instance" [])) 1 0 "shape"
+          ["Lean.Parser.Command.instance"] &&
+        -- An anchor kind on another anchor's path = `shape` (reviewer-21 R5).
+        is
+          (run1 con
+            (N "Lean.Parser.Command.structExplicitBinder"
+              [nul [], nul [],
+                N "Lean.Parser.Command.structSimpleBinder" [I "rec" 1 0, I "field" 1 4]]))
+          1 0 "shape" ["Lean.Parser.Command.structExplicitBinder"] &&
+        is (run1 con (N "Lean.Parser.Command.structParent" [N "x" [], I "Base" 1 0])) 1 0 "shape"
+          ["Lean.Parser.Command.structParent"] &&
+        run1 con (N "Lean.Parser.Command.structParent" [nul [], I "Base" 1 0]) == none &&
+        run1 con
+            (N "Lean.Parser.Command.structParent"
+              [nul [I "toBase" 1 0, A ":" 1 7], I "Base" 1 9]) ==
+          none &&
         anchorOk (ks "Lean.Parser.Command.structParent") [nul [], N "x" []] &&
         !anchorOk (ks "Lean.Parser.Command.structParent") [nul [A "toP" 1 0], N "x" []] &&
         anchorOk (ks "Lean.Parser.Command.structParent") [nul [I "toP" 1 0, A ":" 1 4], N "x" []] &&
@@ -3962,18 +4030,24 @@ def cases : List (String × (Unit → Bool)) :=
         anchorOk (ks "Lean.Parser.Term.letRecDecl")
           [nul [], nul [], N "x" [N "y" [N "z" [I "tweak" 3 2]]]]),
     ("profile header: I1's import sets + I2's names, per role", fun _ =>
-      importOk .consumer [] [] "Impl" "Init" && !importOk .consumer [] [] "Impl" "Init.Core" &&
-        importOk .consumer [] [] "Impl" "Std" &&
-        importOk .consumer [] [] "Impl" "Std.Time" &&
-        !importOk .consumer [] [] "Impl" "Lean" &&
-        importOk .consumer ["Fvdep.X"] [] "Impl" "Fvdep.X" &&
-        !importOk .consumer ["FvdepPreview"] [] "Impl" "FvdepPreview" &&
-        !importOk .consumer [] [] "Impl" "Fvdep.X" &&
-        importOk .consumer [] ["Impl.B"] "Impl" "Impl.B" &&
-        importOk .library [] ["Fvdep.Y"] "Fvdep.X" "Fvdep.Y" &&
-        !importOk .library [] [] "Fvdep.X" "Fvdep.Y" &&
-        !importOk .library [] ["FvdepPreview.Y"] "Fvdep.X" "FvdepPreview.Y" &&
-        importOk .library [] ["FvdepPreview.Y"] "FvdepPreview.X" "FvdepPreview.Y" &&
+      importOk .consumer [] [] "Impl" ["Init"] &&
+        !importOk .consumer [] [] "Impl" ["Init", "Core"] &&
+        importOk .consumer [] [] "Impl" ["Std"] &&
+        importOk .consumer [] [] "Impl" ["Std", "Time"] &&
+        !importOk .consumer [] [] "Impl" ["Lean"] &&
+        importOk .consumer ["Fvdep.X"] [] "Impl" ["Fvdep", "X"] &&
+        !importOk .consumer ["FvdepPreview"] [] "Impl" ["FvdepPreview"] &&
+        !importOk .consumer [] [] "Impl" ["Fvdep", "X"] &&
+        importOk .consumer [] ["Impl.B"] "Impl" ["Impl", "B"] &&
+        importOk .library [] ["Fvdep.Y"] "Fvdep.X" ["Fvdep", "Y"] &&
+        !importOk .library [] [] "Fvdep.X" ["Fvdep", "Y"] &&
+        !importOk .library [] ["FvdepPreview.Y"] "Fvdep.X" ["FvdepPreview", "Y"] &&
+        importOk .library [] ["FvdepPreview.Y"] "FvdepPreview.X" ["FvdepPreview", "Y"] &&
+        -- Component identity, never the printed name; another batch module, never itself
+        -- (reviewer-21 R9).
+        !importOk .consumer ["Fvdep.X"] [] "Impl" ["Fvdep.X"] &&
+        !importOk .consumer [] ["Impl", "Impl.B"] "Impl" ["Impl"] &&
+        !importOk .library [] ["Fvdep.X"] "Fvdep.X" ["Fvdep", "X"] &&
         nameOk .consumer "Impl" &&
         !nameOk .consumer "Std.X" &&
         !nameOk .consumer "FvdepX" &&
@@ -4108,6 +4182,10 @@ def ioCases : List (String × IO Bool) :=
           (← walkLine "def a := 1\n" ["--limit=nodes=29"]) == "refused Impl 1:0 cap nodes 29" &&
           (← walkLine "def a := 1\n" ["--limit=nodes=30"]) == "accepted" &&
           (← walkLine "def a := 1\n" ["--limit=batchNodes=29"]) == "over"),
+    ("profile walk: the named instance binder + ASCII strict-implicit spellings (reviewer-22 T4)",
+      do
+      return (← walkLine "def named [h : Inhabited Nat] : Nat := h.default\n") == "accepted" &&
+          (← walkLine "def strict {{α : Type}} (x : α) : α := x\n") == "accepted"),
     ("profile walk: bytes that are not UTF-8 refuse at the module's header", do
       let d ← IO.FS.createTempDir
       try

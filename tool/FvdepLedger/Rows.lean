@@ -2101,9 +2101,15 @@ def grammarInit : Prop :=
   ∀ (imports : String → List String) (fuel : Nat) (m : String),
     (grammar imports fuel m).head? = some "Init"
 
-/-- T: every detail string a finding carries stays within 1,024 UTF-8 bytes (the record within J's
-string cap). -/
+/-- T: `cutDetail`'s output stays within 1,024 UTF-8 bytes (applied to every recorded detail:
+`outcomeDetails`). -/
 def detailBytes : Prop := ∀ (s : String), (cutDetail s).utf8ByteSize ≤ detailMax
+
+/-- T at the producer boundary: every detail of a refusal the batch records is within the cap — a
+walk finding's and a parse or cap event's alike (`outcomeOf` cuts each). -/
+def outcomeDetails : Prop :=
+  ∀ (m : String) (e : Event) (r : Refusal) (_h : outcomeOf m e = .refused r),
+    ∀ d ∈ r.detail, d.utf8ByteSize ≤ detailMax
 
 /-- C1 + P5: the batch concludes `accepted` only when its observations name the request's modules in
 order + every header was observed with no event + every body met its input's end with no event (an
@@ -2169,8 +2175,9 @@ def judgeExact : Prop :=
     judge req digest seconds frameBytes run =
       FvdepAudit.Profile.Barrier.Spec.judgeSpec req digest seconds frameBytes run
 
-/-- P5c: a run with no failure carries the record's bytes (`results.json`): exit 0 + exactly that
-file = the only way to a verdict from a record. -/
+/-- P5c: the verdict spec's last arm is unreachable — a run no failure condition holds for carries
+`results.json` (that exit 0 + exactly that file is the only way to a record's verdict is
+`judgeExact`'s order; the frame's file uniqueness = the frame codec's). -/
 def judgeRecord : Prop :=
   ∀ (seconds frameBytes : Nat) (run : Run)
     (_h : FvdepAudit.Profile.Barrier.Spec.failures seconds frameBytes run = []),
@@ -4556,9 +4563,10 @@ def profileGrammarRow : Row :=
   { component := `FvdepCore.Profile.Check
     contract := "U6 P3"
     claim :=
-      "`grammar`: a module's grammar list opens with `Init` (`grammarInit`); its depth-first " ++
-        "first-meeting order + one listing per module = `lake test` ProfileC (the walk's C2 " ++
-        "claims = U6-D)."
+      "`grammar`: a module's grammar list opens with `Init` (`grammarInit`: the proved part); " ++
+        "its tail — the closure's toolchain modules, depth-first first-meeting order, one " ++
+        "listing each — is tested, not proved (ruling, U6-D: `lake test` ProfileC + P4's " ++
+        "differential, whose loaded order = the frontend's `allImportedModuleNames`)."
     claims := [(``ProfileClaims.grammarInit, ``FvdepAudit.Profile.Proof.grammar_init)]
     subject := ``FvdepCore.Profile.grammar
     path := []
@@ -4571,9 +4579,13 @@ def profileDetailRow : Row :=
   { component := `FvdepCore.Profile.Check
     contract := "U6 T"
     claim :=
-      "`cutDetail`: every detail string stays within 1,024 UTF-8 bytes (`detailBytes`); the " ++
-        "cut = the longest prefix within 1,021 bytes + `...` (`lake test` ProfileC)."
-    claims := [(``ProfileClaims.detailBytes, ``FvdepAudit.Profile.Proof.detail_bytes)]
+      "`cutDetail`: its output stays within 1,024 UTF-8 bytes (`detailBytes`), the cut = the " ++
+        "longest prefix within 1,021 bytes + `...` (`lake test` ProfileC); every recorded " ++
+        "refusal's detail passes through it (`outcomeDetails`, at `outcomeOf`: a parse or cap " ++
+        "event's text included)."
+    claims :=
+      [(``ProfileClaims.detailBytes, ``FvdepAudit.Profile.Proof.detail_bytes),
+        (``ProfileClaims.outcomeDetails, ``FvdepAudit.Profile.Proof.outcome_details)]
     subject := ``FvdepCore.Profile.cutDetail
     path := []
     noCaller := "support"
@@ -4586,7 +4598,8 @@ def profileWalkRow : Row :=
     contract := "U6 C1, C2, K0, K0', P4, I2, I3, K4"
     claim :=
       "`walk`: a command's first finding = the head of the spec's findings in C1's total order, " ++
-        "every rule restated over the occurrence's ancestor chain (`walkFirst`); a clean " ++
+        "every rule restated over the occurrence's ancestor chain (`walkFirst`; a declaring " ++
+        "slot's path holds no anchor kind); a clean " ++
         "command = no rule fires at any occurrence (`walkAccepts`); the layouts (`shapeOk`) = " ++
         "spec text shared with the implementation, their match to Lean's parser = residue."
     claims :=
@@ -4624,7 +4637,8 @@ def profileHeaderRow : Row :=
     claim :=
       "`header`: a module's header finding = the head of the spec's header findings in C1's " ++
         "order — its own name (I2), the header's layout, `module`, `prelude`, each import's " ++
-        "layout, modifier, name (I1) + I3 (a) on the name (`headerFirst`); the layout readers " ++
+        "layout, modifier, name (I1: by parsed components, another batch module alone) + I3 " ++
+        "(a) on the name, each at C1's location (`headerFirst`); the layout readers " ++
         "(`headerParts`, `optSlot`, `importParts`) = spec text shared with the " ++
         "implementation, their match to Lean's parser = residue; `importAdmitted` restates " ++
         "`importOk` verbatim (I1's sets, read against the contract)."

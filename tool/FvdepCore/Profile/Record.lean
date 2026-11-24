@@ -78,13 +78,15 @@ def Role.recipe : Role → String
   | .consumer => "consumer/1"
   | .library => "library/1"
 
-/-- P5a + C1: both module lists strictly ascending by name (UTF-8 byte order = batch order). -/
+/-- P5a + C1: both module lists strictly ascending by name (UTF-8 byte order = batch order), this
+profile's literal id, the library role with no library rows (its batch = the library's modules). -/
 def Request.ok (r : Request) : Bool :=
   r.library.all LibModule.ok && FvdepCore.Doc.ascendingStrs (r.library.map (·.module)) &&
+    (r.role != .library || r.library.isEmpty) &&
     r.limits.ok &&
     r.modules.all ReqModule.ok &&
     FvdepCore.Doc.ascendingStrs (r.modules.map (·.module)) &&
-    isLabel r.profile &&
+    r.profile == profileId &&
     isLabel r.recipe &&
     r.recipe == r.role.recipe &&
     FvdepCore.Doc.isDigest r.toolchain

@@ -276,7 +276,10 @@ theorem anchors_well : anchors.all (fun a => wellPath a.2.1) = true := by decide
 
 /-- The spec's slot condition at one occurrence. -/
 def slotCond (p : Path) (o : Tree × List Nat) : Bool :=
-  if o.2.length < p.length && pathMatches (p.take o.2.length) o.2 then (o.1 matches .node _ _)
+  if o.2.length < p.length && pathMatches (p.take o.2.length) o.2 then
+    match o.1 with
+    | .node k _ => !isAnchor k
+    | _ => false
   else if pathMatches p o.2 then (o.1 matches .ident _ _) else true
 
 /-- The spec's slot check of `kids` against path `p`. -/
@@ -492,10 +495,10 @@ theorem slotOk_eq (req : Bool) :
       | node k ks =>
         dsimp only
         rw [slotOk_eq req (p :: rest) ks hw]
-        have h0 : slotCond (p :: rest) (Tree.node k ks, []) = true := by
+        have h0 : slotCond (p :: rest) (Tree.node k ks, []) = !isAnchor k := by
           simp [slotCond, pathMatches]
         have h1 : pathMatches (p :: rest) ([] : List Nat) = false := by cases p <;> rfl
-        simp [slotSpec, selfIn, inside, h0, h1]
+        cases hk : isAnchor k <;> simp [slotSpec, selfIn, inside, h0, h1, hk]
       | atom _ _ => simp [selfIn, inside, slotCond, pathMatches]
       | ident _ _ => simp [selfIn, inside, slotCond, pathMatches]
       | missing => simp [selfIn, inside, slotCond, pathMatches]
