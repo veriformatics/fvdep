@@ -13,11 +13,15 @@ namespace FvdepCore.Profile
 /-- The profile this child implements (P5b's `profile`; Q2's version id). -/
 def profileId : String := "fvdep/profile/1"
 
-/-- I1's names of a header tree's imports in source order (`importParts`: a header the stage
-accepted names every import). -/
-def importsOf : Tree → List String
-  | .node _ [_, _, .node ["null"] imps] => imps.filterMap fun t => (importParts t).map (dotted ·.2)
-  | _ => []
+/-- I1's names of a header tree's imports in source order, fail closed: `none` when the header or
+one of its imports is outside Lean 4.35's layout (`headerParts`, `importParts`). -/
+def importsExact (h : Tree) : Option (List String) :=
+  match headerParts h with
+  | some (_, _, imps) => imps.mapM fun t => (importParts t).map fun x => dotted x.2.1
+  | none => none
+
+/-- A header the stage accepted: its imports' names (`importsExact` holds for it). -/
+def importsOf (h : Tree) : List String := (importsExact h).getD []
 
 /-- One batch module as the child observed it: its header item (`none` = never observed: the
 batch's first event came earlier), the body stage's state after its items (`State.init` = none

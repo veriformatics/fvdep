@@ -418,13 +418,14 @@ def modifierSlot : Tree → Option (Option String)
 
 /-- One header import in Lean 4.35's exact layout (`null` per modifier, `import`, `null` for `all`,
 the module's identifier, the empty tail of `identWithPartialTrailingDot`): its first present
-modifier + its name; another layout = `none` (I1 fails closed: a `shape` finding). -/
-def importParts : Tree → Option (Option String × List String)
+modifier, its name + the name's position; another layout = `none` (I1 fails closed: a `shape`
+finding). -/
+def importParts : Tree → Option (Option String × List String × Option Pos)
   |
   .node ["Lean", "Parser", "Module", "import"]
-      [m0, m1, .atom "import" _, m3, .ident n _, .node ["null"] []] =>
+      [m0, m1, .atom "import" _, m3, .ident n q, .node ["null"] []] =>
     match modifierSlot m0, modifierSlot m1, modifierSlot m3 with
-    | some a, some b, some c => some (a <|> b <|> c, n)
+    | some a, some b, some c => some (a <|> b <|> c, n, q)
     | _, _, _ => none
   | _ => none
 
@@ -434,32 +435,33 @@ def importFinding (role : Role) (lib batch : List String) (self : String) (start
   let here := (t.firstPos).getD start
   match importParts t with
   | none => found here "shape" ["Lean.Parser.Module.import"]
-  | some (some a, _) => found here "header" ["modifier", a]
-  | some (none, n) =>
+  | some (some a, _, _) => found here "header" ["modifier", a]
+  | some (none, n, q) =>
     if !importOk role lib batch self (dotted n) then found here "header" ["import", dotted n]
     else
       match reservedComponent false n with
-      | some c =>
-        found
-          (match t with
-          | .node _ [_, _, _, _, .ident _ (some q), _] => q
-          | _ => here)
-          "reserved" [c]
+      | some c => found (q.getD here) "reserved" [c]
       | none => none
+
+/-- The header in Lean 4.35's exact layout (`module?`, `prelude?`, the import list): its three
+slots; another layout = `none` (a `shape` finding). -/
+def headerParts : Tree → Option (Tree × Tree × List Tree)
+  | .node ["Lean", "Parser", "Module", "header"] [m, p, .node ["null"] imps] => some (m, p, imps)
+  | _ => none
 
 /-- A module's header stage (C1 + I1 + I2): its name (`header name`, at 1:0), then the header's
 layout (`shape`), `module`, `prelude`, then each import in source order. -/
 def header (role : Role) (lib batch : List String) (self : String) (h : Tree) : Option Finding :=
   if !nameOk role self then found ⟨1, 0⟩ "header" ["name", self]
   else
-    match h with
-    | .node ["Lean", "Parser", "Module", "header"] [m, p, .node ["null"] imps] =>
+    match headerParts h with
+    | some (m, p, imps) =>
       match optSlot m, optSlot p with
       | some (some t), _ => found ((t.firstPos).getD ⟨1, 0⟩) "header" ["module"]
       | some none, some (some t) => found ((t.firstPos).getD ⟨1, 0⟩) "header" ["prelude"]
       | some none, some none => imps.findSome? (importFinding role lib batch self ⟨1, 0⟩)
       | _, _ => found ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]
-    | _ => found ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]
+    | none => found ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]
 
 /-! ## P3: a module's grammar -/
 

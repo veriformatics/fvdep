@@ -21,9 +21,9 @@ import FvdepAudit.Oracle.Proof
 import FvdepAudit.Oracle.Resolve.Proof
 import FvdepAudit.Oracle.Wire.Serve
 import FvdepAudit.Phase.Proof
+import FvdepAudit.Profile.Barrier.Proof
 import FvdepAudit.Profile.Batch
 import FvdepAudit.Profile.Proof
-import FvdepAudit.Profile.Walk.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
@@ -2144,6 +2144,45 @@ def walkAccepts : Prop :=
     walk s ns start none none [] t = none ↔
       ∀ o ∈ FvdepAudit.Profile.Walk.Spec.occsOf [] t,
         FvdepAudit.Profile.Walk.Spec.findingsAt s ns start o = []
+
+/-- C1: a module body's event = the spec's: its items in source order, each command's first finding
+(`Walk.Spec.findings`) under the namespace of the scope stack the earlier clean commands built
+(C1's transitions restated), a parse or cap stop = the event at its item. -/
+def bodyFirst : Prop :=
+  ∀ (s : Subject) (items : List Item),
+    (items.foldl (step s) State.init).event = FvdepAudit.Profile.Stage.Spec.bodyEvent s [] items
+
+/-- C1 + I1 + I2 + I3 (a) + K0': a module's header finding = the head of the spec's header findings
+in C1's order: its own name, the header's layout, `module`, `prelude`, then each import (its
+layout, its modifier, its name, I3 (a) on the name). -/
+def headerFirst : Prop :=
+  ∀ (role : Role) (lib batch : List String) (self : String) (h : Tree),
+    header role lib batch self h =
+      (FvdepAudit.Profile.Stage.Spec.headerRules role lib batch self h).head?
+
+/-- P5c + P5b + B3: the supervisor's verdict = the spec's — P5c's first failure of the parse step's
+run (one ordered list) as infrastructure, else P5b's intake of the record bytes + B3's outcome
+mapping (accepted → the compile may start, refused → NOT PROVEN at the record's cause, an
+unreadable or mis-bound record or the batch cap → infrastructure). -/
+def judgeExact : Prop :=
+  ∀ (req : Request) (digest : String) (seconds frameBytes : Nat) (run : Run),
+    judge req digest seconds frameBytes run =
+      FvdepAudit.Profile.Barrier.Spec.judgeSpec req digest seconds frameBytes run
+
+/-- P5c: a run with no failure carries the record's bytes (`results.json`): exit 0 + exactly that
+file = the only way to a verdict from a record. -/
+def judgeRecord : Prop :=
+  ∀ (seconds frameBytes : Nat) (run : Run)
+    (_h : FvdepAudit.Profile.Barrier.Spec.failures seconds frameBytes run = []),
+    (FvdepAudit.Profile.Barrier.Spec.recordBytes run).isSome = true
+
+/-- C1 + P5b: the batch's outcome = the spec's — the observations name the request's modules in
+batch order, the header stage's first event over every module (each header's findings from
+`Stage.Spec.headerRules`), else the body stage's (each module's observed event), else accepted;
+every module's grammar once the header stage is clean. -/
+def concludeFirst : Prop :=
+  ∀ (req : Request) (obs : List Observed),
+    conclude req obs = FvdepAudit.Profile.Barrier.Spec.concludeSpec req obs
 
 end FvdepLedger.Rows.ProfileClaims
 
@@ -4559,6 +4598,43 @@ def profileWalkRow : Row :=
     residue := []
     unproven := ["lean-parser"] }
 
+/-- U6 C1: the body stage's step, folded over a module's items (`fvdep-parse` folds it command by
+command). -/
+def profileBodyRow : Row :=
+  { component := `FvdepCore.Profile.Check
+    contract := "U6 C1, C2"
+    claim :=
+      "`step` folded over a module's items: the body stage's event = the spec's — each " ++
+        "command's first finding under the namespace of the scope stack the earlier clean " ++
+        "commands built, else a parse or cap stop at its item (`bodyFirst`); the transitions " ++
+        "(`nextScopes`) restate `next` verbatim: their link to K0''s layouts rests on the " ++
+        "table's `.namespaceCmd`, `.sectionCmd` + `.endCmd` rows + the fail-closed `lake test` " ++
+        "cases."
+    claims := [(``ProfileClaims.bodyFirst, ``FvdepAudit.Profile.Stage.Proof.body_first)]
+    subject := ``FvdepCore.Profile.step
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U6 C1, I1, I2, I3 (a), K0': the header stage. -/
+def profileHeaderRow : Row :=
+  { component := `FvdepCore.Profile.Check
+    contract := "U6 C1, C2, I1, I2, I3, K0'"
+    claim :=
+      "`header`: a module's header finding = the head of the spec's header findings in C1's " ++
+        "order — its own name (I2), the header's layout, `module`, `prelude`, each import's " ++
+        "layout, modifier, name (I1) + I3 (a) on the name (`headerFirst`); the layout readers " ++
+        "(`headerParts`, `optSlot`, `importParts`) = spec text shared with the " ++
+        "implementation, their match to Lean's parser = residue; `importAdmitted` restates " ++
+        "`importOk` verbatim (I1's sets, read against the contract)."
+    claims := [(``ProfileClaims.headerFirst, ``FvdepAudit.Profile.Stage.Proof.header_first)]
+    subject := ``FvdepCore.Profile.header
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := ["lean-parser"] }
+
 /-- U6 C1, P3, P5, P5b: the child's batch (`fvdep-parse` reaches it through `execute`). -/
 def profileConcludeRow : Row :=
   { component := `FvdepCore.Profile.Batch
@@ -4567,9 +4643,12 @@ def profileConcludeRow : Row :=
       "`conclude`: the batch's outcome + each module's grammar from the child's observations in " ++
         "C1's order (the header stage over every module, then the body stage); `accepted` only " ++
         "when the observations name the request's modules in order, every header was observed " ++
-        "with no event + every body met its input's end with no event (`concludeAccepts`); " ++
-        "exactness against C1's spec = U6-D."
-    claims := [(``ProfileClaims.concludeAccepts, ``FvdepAudit.Profile.Batch.conclude_accepts)]
+        "with no event + every body met its input's end with no event (`concludeAccepts`); the " ++
+        "outcome = the spec's over the header stage's findings + the observed body events " ++
+        "(`concludeFirst`)."
+    claims :=
+      [(``ProfileClaims.concludeAccepts, ``FvdepAudit.Profile.Batch.conclude_accepts),
+        (``ProfileClaims.concludeFirst, ``FvdepAudit.Profile.Barrier.Proof.conclude_first)]
     subject := ``FvdepCore.Profile.conclude
     path := []
     noCaller := "support"
@@ -4584,9 +4663,13 @@ def profileJudgeRow : Row :=
     claim :=
       "`judge`: P5c's disposition of the parse step, then P5b's intake + B3's outcome; " ++
         "`accepted r` exactly when the disposition yields the record's bytes + the intake binds " ++
-        "them to the request as `r` + `r` is accepted (`judgeAccepts`); P5c's order + B's " ++
-        "attribution = U6-D."
-    claims := [(``ProfileClaims.judgeAccepts, ``FvdepAudit.Profile.Batch.judge_accepts)]
+        "them to the request as `r` + `r` is accepted (`judgeAccepts`); every verdict = the " ++
+        "spec's: P5c's first failure in order, else P5b's intake + B3's outcome mapping " ++
+        "(`judgeExact`; no failure ⇒ the run carries the record: `judgeRecord`)."
+    claims :=
+      [(``ProfileClaims.judgeAccepts, ``FvdepAudit.Profile.Batch.judge_accepts),
+        (``ProfileClaims.judgeExact, ``FvdepAudit.Profile.Barrier.Proof.judge_exact),
+        (``ProfileClaims.judgeRecord, ``FvdepAudit.Profile.Barrier.Proof.judge_record)]
     subject := ``FvdepCore.Profile.judge
     path := []
     noCaller := "U8"
@@ -4670,8 +4753,8 @@ def ledger : Ledger :=
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
         profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
-        profileDetailRow, profileWalkRow, profileConcludeRow, profileJudgeRow, parseExecuteRow,
-        parsePlanRow, profileStepRow]
+        profileDetailRow, profileWalkRow, profileBodyRow, profileHeaderRow, profileConcludeRow,
+        profileJudgeRow, parseExecuteRow, parsePlanRow, profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

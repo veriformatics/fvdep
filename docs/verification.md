@@ -3843,10 +3843,45 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: `lean-parser` (the profile's parse: `fvdep-parse` (`FvdepIO.Parse`: the request + sources read at `/fvdep/src`, the digests compared, Lean's `parseHeader` + `parseCommand` under each module's grammar — `importModules (loadExts := true)` over the toolchain's modules at `/fvdep/sysroot` alone —, P5's failures read from the message log, the `Syntax` → tree conversion under P6's caps + C1's cap location, the record written) + the supervisor's in-process header reads of trusted library modules (`FvdepIO.Profile.headerImports`))
 
+## `FvdepCore.Profile.Check`
+
+- Contract: U6 C1, C2
+- Claim: `step` folded over a module's items: the body stage's event = the spec's — each command's first finding under the namespace of the scope stack the earlier clean commands built, else a parse or cap stop at its item (`bodyFirst`); the transitions (`nextScopes`) restate `next` verbatim: their link to K0''s layouts rests on the table's `.namespaceCmd`, `.sectionCmd` + `.endCmd` rows + the fail-closed `lake test` cases.
+- Subject: `FvdepCore.Profile.step`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ProfileClaims.bodyFirst` (hash 0x2fa79328), proved by `FvdepAudit.Profile.Stage.Proof.body_first`:
+
+  ```lean
+  ∀ (s : FvdepCore.Profile.Subject) (items : List FvdepCore.Profile.Item),
+    (List.foldl (FvdepCore.Profile.step s) FvdepCore.Profile.State.init items).event =
+      FvdepAudit.Profile.Stage.Spec.bodyEvent s [] items
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Profile.Check`
+
+- Contract: U6 C1, C2, I1, I2, I3, K0'
+- Claim: `header`: a module's header finding = the head of the spec's header findings in C1's order — its own name (I2), the header's layout, `module`, `prelude`, each import's layout, modifier, name (I1) + I3 (a) on the name (`headerFirst`); the layout readers (`headerParts`, `optSlot`, `importParts`) = spec text shared with the implementation, their match to Lean's parser = residue; `importAdmitted` restates `importOk` verbatim (I1's sets, read against the contract).
+- Subject: `FvdepCore.Profile.header`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ProfileClaims.headerFirst` (hash 0xf87afeb4), proved by `FvdepAudit.Profile.Stage.Proof.header_first`:
+
+  ```lean
+  ∀ (role : FvdepCore.Profile.Role) (lib batch : List String) (self : String)
+    (h : FvdepCore.Profile.Tree),
+    FvdepCore.Profile.header role lib batch self h =
+      (FvdepAudit.Profile.Stage.Spec.headerRules role lib batch self h).head?
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: `lean-parser` (the profile's parse: `fvdep-parse` (`FvdepIO.Parse`: the request + sources read at `/fvdep/src`, the digests compared, Lean's `parseHeader` + `parseCommand` under each module's grammar — `importModules (loadExts := true)` over the toolchain's modules at `/fvdep/sysroot` alone —, P5's failures read from the message log, the `Syntax` → tree conversion under P6's caps + C1's cap location, the record written) + the supervisor's in-process header reads of trusted library modules (`FvdepIO.Profile.headerImports`))
+
 ## `FvdepCore.Profile.Batch`
 
 - Contract: U6 C1, P3, P5, P5b
-- Claim: `conclude`: the batch's outcome + each module's grammar from the child's observations in C1's order (the header stage over every module, then the body stage); `accepted` only when the observations name the request's modules in order, every header was observed with no event + every body met its input's end with no event (`concludeAccepts`); exactness against C1's spec = U6-D.
+- Claim: `conclude`: the batch's outcome + each module's grammar from the child's observations in C1's order (the header stage over every module, then the body stage); `accepted` only when the observations name the request's modules in order, every header was observed with no event + every body met its input's end with no event (`concludeAccepts`); the outcome = the spec's over the header stage's findings + the observed body events (`concludeFirst`).
 - Subject: `FvdepCore.Profile.conclude`
 - Path: none (a supporting component)
 - Statement `FvdepLedger.Rows.ProfileClaims.concludeAccepts` (hash 0x647db699), proved by `FvdepAudit.Profile.Batch.conclude_accepts`:
@@ -3865,6 +3900,12 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                     none) ∧
               o.state.event = none ∧ o.ended = true
   ```
+- Statement `FvdepLedger.Rows.ProfileClaims.concludeFirst` (hash 0xbe239755), proved by `FvdepAudit.Profile.Barrier.Proof.conclude_first`:
+
+  ```lean
+  ∀ (req : FvdepCore.Profile.Request) (obs : List FvdepCore.Profile.Observed),
+    FvdepCore.Profile.conclude req obs = FvdepAudit.Profile.Barrier.Spec.concludeSpec req obs
+  ```
 - Uninterpreted: none
 - Residue: none
 - Unproven: none
@@ -3872,7 +3913,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Profile.Barrier`
 
 - Contract: U6 P5a, P5c, P5b, B3
-- Claim: `judge`: P5c's disposition of the parse step, then P5b's intake + B3's outcome; `accepted r` exactly when the disposition yields the record's bytes + the intake binds them to the request as `r` + `r` is accepted (`judgeAccepts`); P5c's order + B's attribution = U6-D.
+- Claim: `judge`: P5c's disposition of the parse step, then P5b's intake + B3's outcome; `accepted r` exactly when the disposition yields the record's bytes + the intake binds them to the request as `r` + `r` is accepted (`judgeAccepts`); every verdict = the spec's: P5c's first failure in order, else P5b's intake + B3's outcome mapping (`judgeExact`; no failure ⇒ the run carries the record: `judgeRecord`).
 - Subject: `FvdepCore.Profile.judge`
 - Path: none yet (wired by U8)
 - Statement `FvdepLedger.Rows.ProfileClaims.judgeAccepts` (hash 0xd51ca965), proved by `FvdepAudit.Profile.Batch.judge_accepts`:
@@ -3885,6 +3926,21 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
         FvdepCore.Profile.disposition seconds frameBytes run = Except.ok b ∧
           FvdepCore.Profile.intake FvdepCore.Profile.profileId req digest b = Except.ok r ∧
             r.outcome = FvdepCore.Profile.Outcome.accepted
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.judgeExact` (hash 0x5fa685bf), proved by `FvdepAudit.Profile.Barrier.Proof.judge_exact`:
+
+  ```lean
+  ∀ (req : FvdepCore.Profile.Request) (digest : String) (seconds frameBytes : Nat)
+    (run : FvdepCore.Profile.Run),
+    FvdepCore.Profile.judge req digest seconds frameBytes run =
+      FvdepAudit.Profile.Barrier.Spec.judgeSpec req digest seconds frameBytes run
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.judgeRecord` (hash 0x31fb3393), proved by `FvdepAudit.Profile.Barrier.Proof.judge_record`:
+
+  ```lean
+  ∀ (seconds frameBytes : Nat) (run : FvdepCore.Profile.Run),
+    FvdepAudit.Profile.Barrier.Spec.failures seconds frameBytes run = [] →
+      (FvdepAudit.Profile.Barrier.Spec.recordBytes run).isSome = true
   ```
 - Uninterpreted: none
 - Residue: none

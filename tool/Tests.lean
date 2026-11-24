@@ -3917,7 +3917,18 @@ def cases : List (String × (Unit → Bool)) :=
           1 0 "shape" ["Lean.Parser.Module.import"] &&
         is (header .consumer [] [] "Impl" (N "Lean.Parser.Module.header" [nul [], nul []])) 1 0
           "shape" ["Lean.Parser.Module.header"] &&
-        importsOf (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) == ["Init", "Std.Time"]),
+        importsOf (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) ==
+          ["Init", "Std.Time"] &&
+        -- A library header's rows fail closed: a header or an import outside the layout = `none`.
+        importsExact (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) ==
+          some ["Init", "Std.Time"] &&
+        importsExact (N "Lean.Parser.Module.header" [nul [], nul []]) == none &&
+        importsExact
+            (hdr false false
+              [imp [] "Init" 1,
+                N "Lean.Parser.Module.import"
+                  [nul [], nul [], A "import" 2 0, nul [], I "Std" 2 7]]) ==
+          none),
     ("profile walk: fail closed — `namespace`, `section` + `end` layouts, anchor slots", fun _ =>
       is (run1 con (N "Lean.Parser.Command.namespace" [A "namespace" 1 0])) 1 0 "shape"
           ["Lean.Parser.Command.namespace"] &&

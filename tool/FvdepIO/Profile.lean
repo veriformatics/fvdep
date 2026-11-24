@@ -18,7 +18,11 @@ def headerImports (path : String) (bytes : ByteArray) : IO (Except String (List 
   let (item, _, _) ← FvdepIO.Parse.headItem {} ⟨0, 0⟩ (Lean.Parser.mkInputContext text path)
   match item with
   | .tree h _ =>
-    return .ok (importsOf h)
+    match importsExact h with
+    | some is =>
+      return .ok is
+    | none =>
+      return .error s!"the header of {path} is outside Lean 4.35's layout"
   | .stop (.finding f) =>
     return .error s!"the header of {path} does not parse: {" ".intercalate f.detail}"
   | .stop .over =>
