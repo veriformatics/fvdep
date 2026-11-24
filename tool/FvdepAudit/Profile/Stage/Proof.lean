@@ -92,13 +92,13 @@ theorem header_first (role : Role) (lib batch : List String) (self : String) (h 
     | some x =>
       rcases x with ⟨m, p, imps⟩
       simp only [slotRules]
-      cases optSlot m with
+      cases keywordSlot "moduleTk" "module" m with
       | none => rfl
       | some om =>
         cases om with
         | some t => rfl
         | none =>
-          cases optSlot p with
+          cases keywordSlot "prelude" "prelude" p with
           | none => rfl
           | some op =>
             cases op with

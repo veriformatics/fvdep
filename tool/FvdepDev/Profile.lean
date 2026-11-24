@@ -12,7 +12,8 @@ them, never a verdict): each file parsed in the trusted grammar (`Init` + `Std`;
 `ident`; `positions` = each node at its first positioned leaf + each positioned atom + identifier;
 `idents` = every identifier leaf; `stats` = bytes, commands, occurrences + depth per file; `parse` =
 the parse time alone; `grammar` + `modules` = the parser kinds per category + the modules a
-toolchain import list loads; `scoped` = the namespaces carrying scoped parser entries. -/
+toolchain import list loads; `scoped` = the namespaces carrying scoped parser entries (`--check`:
+P4's gate check, the live set over `[Init, Std]` = `FvdepCore.Profile.scopedNamespaces`). -/
 
 namespace FvdepDev.Profile
 
@@ -20,7 +21,8 @@ open FvdepDev.ProfileTree
 
 def usage : String :=
   "usage: fvdep-dev profile (kinds|idents|parse|owned|positions|stats|tree) <file>..." ++
-    " | profile scoped | profile (grammar|modules) <module>... | profile tokens <kind>...\n" ++
+    " | profile scoped [--check] | profile (grammar|modules) <module>...\n" ++
+    "  | profile tokens <kind>...\n" ++
     "  | profile walk [--library] [--lib=<M>=<I>,...]... [--limit=<name>=<n>]... <file>...\n" ++
     "  | profile check --role consumer|library [--library <dir>] [--limit <name>=<n>]... " ++
     "[--results <file> | --child <file>] <src dir> <module>...\n"
@@ -303,6 +305,21 @@ def run : List String → IO UInt32
       | .error why =>
         IO.eprintln why
     return 0
+  | ["scoped", "--check"] => do
+    -- P4's gate check (stage `profile-witness`): the live S over `[Init, Std]` (every admitted
+    -- import lies in their closure) = the pinned `FvdepCore.Profile.scopedNamespaces`, as sets.
+    let env ← FvdepDev.Parse.grammar [`Init, `Std]
+    let st := Lean.Parser.parserExtension.ext.getState env
+    let order := fun (a b : List String) => decide (dotted a ≤ dotted b)
+    let live := (st.scopedEntries.map.toList.map fun e => FvdepDev.Parse.parts e.1).mergeSort order
+    let pinned := FvdepCore.Profile.scopedNamespaces.mergeSort order
+    if live == pinned then
+      IO.println s!"same scoped {live.length} namespaces"
+      return 0
+    let liveOnly := (live.filter fun n => !pinned.contains n).map dotted
+    let pinnedOnly := (pinned.filter fun n => !live.contains n).map dotted
+    IO.println s!"differ scoped live-only {liveOnly} pinned-only {pinnedOnly}"
+    return 1
   | ["scoped"] => do
     for mods in [[`Init], [`Init, `Std]] do
       let env ← FvdepDev.Parse.grammar mods

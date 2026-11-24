@@ -3,8 +3,8 @@ import FvdepCore.Profile.Table
 /-! The implementation profile's checks (contract `docs/contracts/U6-profile.md` C1, K0, P3, P4,
 I1–I3): one module's header stage, its body walk over the command trees in source order (the first
 finding in C1's order), the scope stack between commands + each module's grammar. Pure; mutual
-structural recursion with match-based first-wins (U6-D states the claims against a spec over
-trees). -/
+structural recursion with match-based first-wins (C2's claims equal it to the specs over trees,
+`FvdepAudit.Profile.{Walk,Stage}.Spec`). -/
 
 namespace FvdepCore.Profile
 
@@ -419,10 +419,12 @@ def importOk (role : Role) (lib batch : List String) (self : String) (n : List S
         (n.head? == some "Fvdep" ||
           ((self.splitOn ".").head? == some "FvdepPreview" && n.head? == some "FvdepPreview"))
 
-/-- Lean's `optional p` slot (a `null` node): absent, its one tree, else malformed (`none`). -/
-def optSlot : Tree → Option (Option Tree)
+/-- The header's optional keyword slot (`module`, `prelude`): absent, its keyword node (Lean 4.35's
+`null [Lean.Parser.Module.<k> [atom kw]]`), else malformed (`none`). -/
+def keywordSlot (k kw : String) : Tree → Option (Option Tree)
   | .node ["null"] [] => some none
-  | .node ["null"] [t] => some (some t)
+  | .node ["null"] [t@(.node ["Lean", "Parser", "Module", k'] [.atom a _])] =>
+    if k' == k && a == kw then some (some t) else none
   | _ => none
 
 /-- An import's modifier slot for keyword `kw` (`public`, `meta`, `all`): absent, `kw` itself (Lean
@@ -476,7 +478,7 @@ def header (role : Role) (lib batch : List String) (self : String) (h : Tree) : 
   else
     match headerParts h with
     | some (m, p, imps) =>
-      match optSlot m, optSlot p with
+      match keywordSlot "moduleTk" "module" m, keywordSlot "prelude" "prelude" p with
       | some (some t), _ => found (locate ⟨1, 0⟩ t [m, h]) "header" ["module"]
       | some none, some (some t) => found (locate ⟨1, 0⟩ t [p, h]) "header" ["prelude"]
       | some none, some none =>

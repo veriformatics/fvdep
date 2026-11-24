@@ -4,8 +4,9 @@ import FvdepIO.Parse
 
 /-! Never shipped. `fvdep-dev profile walk` (contract `docs/contracts/U6-profile.md` C1, I, P3–P6):
 the shipped child's observation + decision (`FvdepIO.Parse.observe`, `conclude`) in this process —
-no step, no request digest, the grammars loaded from the toolchain Lean finds. Prints D1's tail
-lines: `grammar <M> <G>…`, then `accepted` | `refused <M> <line>:<column> <cause>` | `over`. -/
+no step, no request digest, the grammars + the import presence read from the toolchain Lean
+finds. Prints D1's tail lines: `grammar <M> <G>…`, then `accepted` | `refused <M> <line>:<column>
+<cause>` | `over`. -/
 
 namespace FvdepDev.Walk
 
@@ -14,6 +15,9 @@ open FvdepCore.Profile
 /-- `fvdep-dev profile walk [--library] [--lib=<M>=<I>,…]… [--limit=<name>=<n>]… <file>…`: module =
 the file's stem; `--limit` = P6's `depth`, `nodes`, `batchNodes`. -/
 def run (args : List String) : IO UInt32 := do
+  let usage : IO UInt32 := do
+    IO.eprintln "usage: --limit=depth|nodes|batchNodes=<n> (a whole number)"
+    return 2
   let mut role : Role := .consumer
   let mut rows : List LibModule := []
   let mut files : List String := []
@@ -33,14 +37,16 @@ def run (args : List String) : IO UInt32 := do
         if a.startsWith "--limit=" then
           match (String.ofList (a.toList.drop 8)).splitOn "=" with
           | ["depth", n] =>
-            lim := { lim with depth := n.toNat?.getD lim.depth }
+            let some k := n.toNat? | return ← usage
+            lim := { lim with depth := k }
           | ["nodes", n] =>
-            lim := { lim with nodes := n.toNat?.getD lim.nodes }
+            let some k := n.toNat? | return ← usage
+            lim := { lim with nodes := k }
           | ["batchNodes", n] =>
-            lim := { lim with batchNodes := n.toNat?.getD lim.batchNodes }
+            let some k := n.toNat? | return ← usage
+            lim := { lim with batchNodes := k }
           | _ =>
-            IO.eprintln "usage: --limit=depth|nodes|batchNodes=<n>"
-            return 2
+            return ← usage
         else
           files := files ++ [a]
   let stem := fun (f : String) =>
@@ -53,9 +59,10 @@ def run (args : List String) : IO UInt32 := do
   for m in req.modules do
     let f := ((named.lookup m.module).getD m.module)
     texts := texts.push ({ m with path := f }, ← IO.FS.readBinFile f)
+  let lib := (← Lean.findSysroot) / "lib" / "lean"
   let obs ←
-    FvdepIO.Parse.observe (fun g => FvdepDev.Parse.grammar (g.map FvdepIO.Parse.nameOf)) req
-        texts.toList
+    FvdepIO.Parse.observe (fun g => FvdepDev.Parse.grammar (g.map FvdepIO.Parse.nameOf))
+        (fun n => (FvdepIO.Parse.oleanAt lib n).pathExists) req texts.toList
   let some (o, gs) := conclude req obs |
     do
       IO.println "short: the observations do not cover the batch"

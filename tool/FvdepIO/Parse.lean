@@ -27,6 +27,11 @@ def parts : Name → List String
 /-- A dotted module name as a `Name` (each component one string: never `String.toName`'s parse). -/
 def nameOf (m : String) : Name := (m.splitOn ".").foldl Name.mkStr .anonymous
 
+/-- Lean's own file for module `n` (its components) under the search root `root`
+(`modToFilePath`: the path `importModules` reads). -/
+def oleanAt (root : System.FilePath) (n : List String) : System.FilePath :=
+  modToFilePath root (n.foldl Name.mkStr .anonymous) "olean"
+
 def posOf (fm : FileMap) (info : SourceInfo) : Option Pos :=
   info.getPos?.map fun p =>
     let q := fm.toPosition p
@@ -203,11 +208,24 @@ def optionsOf : Role → Options
 /-- C1 + P5's ruling: bytes that are not UTF-8 refuse at the module's header (1:0). -/
 def notUtf8 : Event := parseAt ⟨1, 0⟩ "the source is not UTF-8"
 
+/-- I1's presence (P5): after the pure header rules, the first import in source order naming a
+toolchain module the toolchain does not hold (`holds`) → `header import <name>` at the import's
+location (C1, as the pure rules' import findings). Read before any grammar loads: a missing module
+is the consumer's own refusal (U5 K2's `absent`), never a failed load (infrastructure). -/
+def presence (holds : List String → IO Bool) (h : Tree) : IO (Option Finding) := do
+  let some (_, _, imps) := headerParts h | return none
+  for t in imps do
+    if let some (_, n, _) := importParts t then
+      if toolchainModule (dotted n) then
+        unless ← holds n do
+          return found (locate ⟨1, 0⟩ t [.node ["null"] imps, h]) "header" ["import", dotted n]
+  return none
+
 /-- The batch as the child observes it, in C1's order: every module's header (the header stage,
-until its first event), then — the stage clean — each module's body under its grammar (`load`
-builds a grammar's environment, once per distinct list) until the batch's first event. A module
-past that event stays unobserved. -/
-def observe (load : List String → IO Environment) (req : Request)
+until its first event: the pure rules, then `presence`), then — the stage clean — each module's
+body under its grammar (`load` builds a grammar's environment, once per distinct list) until the
+batch's first event. A module past that event stays unobserved. -/
+def observe (load : List String → IO Environment) (holds : List String → IO Bool) (req : Request)
     (texts : List (ReqModule × ByteArray)) : IO (List Observed) := do
   let lib := req.library.map (·.module)
   let batch := req.modules.map (·.module)
@@ -229,6 +247,19 @@ def observe (load : List String → IO Environment) (req : Request)
         let input := Parser.mkInputContext text m.path
         let (item, pst, c) ← headItem lim ⟨0, total⟩ input
         total := c.batch
+        let item ←
+          match item with
+          | .tree h _ =>
+            if (headEvent req.role lib batch m.module item).isSome then
+              pure item
+            else
+              match ← presence holds h with
+              | some f =>
+                pure (.stop (.finding f))
+              | none =>
+                pure item
+          | .stop _ =>
+            pure item
         heads := heads.push ({ blank with head := some item }, pst.map (input, ·), c.module)
         if (headEvent req.role lib batch m.module item).isSome then
           stopped := true
@@ -309,7 +340,7 @@ def execute : Except String Unit → IO UInt32
         return ← fail 4 s!"{m.path} differs from its digest in the request"
       texts := texts.push (m, bytes)
       shas := shas.push d
-    let obs ← observe load req texts.toList
+    let obs ← observe load (fun n => (oleanAt sysrootLib n).pathExists) req texts.toList
     let some (o, gs) := conclude req obs | fail 5 "the observations do not cover the batch"
     let r := assemble req (FvdepIO.Hash.sha256Hex reqBytes) shas.toList o gs
     IO.FS.writeBinFile outFile (FvdepCore.Json.print r.toJson)

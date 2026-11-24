@@ -46,6 +46,11 @@ for mod in ("Lean.Elab.Command", "Lake", "FvdepPreview", "FvdepProofs.Registry",
     batch_case("header.import." + mod, "R/I1/P5a", {"Impl": f"import {mod}\n{SIMPLE}"},
                refusal(1, 0, "header import " + mod), {}, library=LIBRARY_HEADERS)
 
+# MAIN regression (U6 close): a toolchain import the toolchain lacks = I1's refusal at the import,
+# never a failed grammar load (infrastructure); U5 K2 makes an absent import the consumer's own.
+batch_case("header.import.Std.NoSuch", "I1/P5", {"Impl": f"import Std.NoSuch\n{SIMPLE}"},
+           refusal(1, 0, "header import Std.NoSuch"), {}, library=LIBRARY_HEADERS)
+
 for mod in ("Fvdep.Impl", "Lean.Impl", "Std.Impl", "Init.Impl", "Lake.Impl", "FvdepX.Impl", "Impl._x", "_Impl"):
     batch_case("header.name." + mod, "R/I2", {mod: SIMPLE}, refusal(1, 0, "header name " + mod, mod), {})
 

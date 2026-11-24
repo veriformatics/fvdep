@@ -3,6 +3,7 @@ import FvdepCore.Oracle
 import FvdepCore.Profile.Record
 import FvdepIO.Library
 import FvdepIO.Phase
+import FvdepIO.Profile
 import FvdepIO.Project
 import FvdepIO.Sha256
 import FvdepIO.Snapshot
@@ -3940,6 +3941,16 @@ def cases : List (String × (Unit → Bool)) :=
           1 0 "shape" ["Lean.Parser.Module.import"] &&
         is (header .consumer [] [] "Impl" (N "Lean.Parser.Module.header" [nul [], nul []])) 1 0
           "shape" ["Lean.Parser.Module.header"] &&
+        -- A header keyword slot holds its own keyword node (reviewer-21 R15, round 2): a foreign
+        -- payload in the `module` or `prelude` slot = `shape`.
+        is
+          (header .consumer [] [] "Impl"
+            (N "Lean.Parser.Module.header" [nul [A "label" 1 0], nul [], nul []]))
+          1 0 "shape" ["Lean.Parser.Module.header"] &&
+        is
+          (header .consumer [] [] "Impl"
+            (N "Lean.Parser.Module.header" [nul [], nul [N "x" [A "prelude" 1 0]], nul []]))
+          1 0 "shape" ["Lean.Parser.Module.header"] &&
         -- A modifier slot holds its own modifier kind + keyword (reviewer-21 R15).
         is
           (header .consumer [] [] "Impl"
@@ -4066,19 +4077,27 @@ def cases : List (String × (Unit → Bool)) :=
         g [("M", ["A"]), ("A", ["M", "Std"])] "M" == ["Init", "Std"] &&
         g [] "M" == ["Init"])]
 
-/-- `fvdep-dev profile walk` over one module `Impl` holding `text`: its last output line. -/
-def walkLine (text : String) (extra : List String := []) : IO String := do
+/-- `fvdep-dev profile walk` over the modules `files` (module = the file's stem): its last output
+line, else `<rc n>`. -/
+def walkFiles (files : List (String × String)) (extra : List String := []) : IO String := do
   let d ← IO.FS.createTempDir
   try
-    IO.FS.writeFile (d / "Impl.lean") text
+    for (m, text) in files do
+      IO.FS.writeFile (d / (m ++ ".lean")) text
     let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
     let o ←
       IO.Process.output
           { cmd := dev.toString,
-            args := #["profile", "walk"] ++ extra.toArray ++ #[(d / "Impl.lean").toString] }
+            args :=
+              #["profile", "walk"] ++ extra.toArray ++
+                (files.map fun x => (d / (x.1 ++ ".lean")).toString).toArray }
     return ((o.stdout.splitOn "\n").filter (!·.isEmpty)).getLast?.getD s!"<rc {o.exitCode}>"
   finally
     IO.FS.removeDirAll d
+
+/-- `walkFiles` over one module `Impl` holding `text`. -/
+def walkLine (text : String) (extra : List String := []) : IO String :=
+  walkFiles [("Impl", text)] extra
 
 /-- R's expected findings on Lean's own trees (contract U6 R; tester-8's suite = the blind
 grader). -/
@@ -4197,6 +4216,46 @@ def ioCases : List (String × IO Bool) :=
         return o.stdout == "refused Impl 1:0 parse the source is not UTF-8\n" && o.exitCode == 1
       finally
         IO.FS.removeDirAll d),
+    ("profile walk: a toolchain import the toolchain lacks = I1's refusal at it, no load", do
+      -- Before any grammar loads (P5): a failed `importModules` would end the child as
+      -- infrastructure, while U5 K2 makes an absent import the consumer's own refusal. Order: a
+      -- module's pure header rules over every import, then presence; module by module.
+      return (← walkLine "import Std.NoSuch\ndef a := 1\n") ==
+            "refused Impl 1:0 header import Std.NoSuch" &&
+          (← walkLine "import Std.Time\nimport Std.NoSuch\ndef a := 1\n") ==
+            "refused Impl 2:0 header import Std.NoSuch" &&
+          (← walkLine "import Std.NoSuch\nimport Lean.Elab.Command\ndef a := 1\n") ==
+            "refused Impl 2:0 header import Lean.Elab.Command" &&
+          (←
+              walkFiles
+                  [("A", "import Std.NoSuch\ndef a := 1\n"),
+                    ("B", "import Lean.Elab.Command\ndef b := 1\n")]) ==
+            "refused A 1:0 header import Std.NoSuch" &&
+          (← walkLine "import Std.Data.HashMap\ndef a := 1\n") == "accepted"),
+    ("profile step: a source name that is no module writes nothing (`.tmp.x` = `/tmp/x.lean`)", do
+      -- Lean's `/` returns an absolute right side whole: an unguarded write of `.tmp.<n>`'s
+      -- `modulePath` lands at `/tmp/<n>.lean`, outside the run directory.
+      let d ← IO.FS.createTempDir
+      let stray : System.FilePath := "/tmp/fvdepRunStepProbe.lean"
+      try
+        let r ←
+          tryCatch
+              (FvdepIO.Profile.runStep "/nonexistent/bwrap" (d / "sys") (d / "run") "{}".toUTF8
+                [(".tmp.fvdepRunStepProbe", "x".toUTF8)] {})
+              fun _ => pure (.setup "threw")
+        let named :=
+          match r with
+          | .setup why => why == "the batch names .tmp.fvdepRunStepProbe, not a module name"
+          | _ => false
+        return named && !(← stray.pathExists)
+      finally
+        try
+          IO.FS.removeFile stray
+        catch _ =>
+          pure ()
+        IO.FS.removeDirAll d),
+    ("profile walk: a `--limit` value that is no whole number = a usage error", do
+      return (← walkLine "def a := 1\n" ["--limit=nodes=x"]) == "<rc 2>"),
     ("profile walk: the library role refuses a declaration outside the module's root", do
       let d ← IO.FS.createTempDir
       try

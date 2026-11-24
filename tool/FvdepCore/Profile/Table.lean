@@ -168,7 +168,8 @@ def table : List Rule :=
     rule "scientific" [] .literal, rule "name" [] .literal, rule "fieldIdx" [] .literal,
     rule "hygieneInfo" []]
 
-/-- P4: S over `[Init, Std]` (Lean 4.35.0; a gate check pins it against the live grammar). -/
+/-- P4: S over `[Init, Std]` (Lean 4.35.0; stage `profile-witness` pins it against the live
+grammar: `fvdep-dev profile scoped --check`). -/
 def scopedNamespaces : List (List String) :=
   [["Array"], ["BitVec"], ["Int"], ["Lean"], ["Lean", "Order"], ["Lean", "Parser", "Tactic"],
     ["Lean", "Parser", "Tactic", "Conv"], ["Lean", "Parser", "Tactic", "Grind"], ["List"], ["Rat"],

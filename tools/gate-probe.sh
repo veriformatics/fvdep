@@ -707,6 +707,12 @@ plant_witness_fixture() { rm tests/profile/witness/Termination.lean; }
 probe profile-witness plant_witness_fixture $'uncovered\trule\tLean.Parser.Termination.decreasingBy' \
     bash -c 'source tools/gate.sh; profile_witness'
 
+# profile-witness, P4's pinned scoped namespaces: one dropped from `scopedNamespaces` → the live set
+# differs, named (the scoped part alone).
+plant_scoped() { sed -i 's/, \["Std", "WP"\]\]$/]/' tool/FvdepCore/Profile/Table.lean; }
+probe profile-scoped plant_scoped "differ scoped live-only [Std.WP] pinned-only []" \
+    env FVDEP_WITNESS_PART=scoped bash -c 'source tools/gate.sh; profile_witness'
+
 # isolation: a case expecting another environment inside the step fails, named (one case).
 plant_isolation_case() { sed -i 's/"HOME,LC_ALL,PATH,PWD,TMPDIR"/"HOME,LC_ALL,PATH,TMPDIR"/' tests/isolation/run.py; }
 probe isolation plant_isolation_case "FAIL G1.env" \

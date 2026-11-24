@@ -3,14 +3,15 @@ import Lean
 /-! Q2's freeze digest (contract `docs/contracts/U6-profile.md` Q2; gate stage `coverage`, through
 `fvdep-ledger --check … --freeze <record>`): one hash over the profile's normative content — the
 deep roots (every constant of the profile's spec modules + its table + types modules, the
-converter's cap logic, the recipes + their options, `profileId`) hashed by type + value, each
-constant they reach in a profile module (`FvdepCore.Profile*`, `FvdepAudit.Profile*`,
-`FvdepIO.Parse`) likewise, every other reached constant by name alone (toolchain + shared codecs:
-their own claims + the toolchain commit cover them); a recursive `partial def` = an opaque constant
-⇒ its `_unsafe_rec` companion's value is hashed too; + the claim statements' own terms (shallow: a
-claim names the implementation it constrains, whose refactors leave the profile unchanged) + the
-toolchain's commit. `Expr.hash` ignores binder names + docstrings: an alpha-renaming or a comment
-edit keeps the digest. A change without a new version id → `ledger: profile: freeze: …`. -/
+converter's cap logic, I1's presence read, the recipes + their options, `profileId`) hashed by
+type + value, each constant they reach in a profile module (`FvdepCore.Profile*`,
+`FvdepAudit.Profile*`, `FvdepIO.Parse`) likewise, every other reached constant by name alone
+(toolchain + shared codecs: their own claims + the toolchain commit cover them); a recursive
+`partial def` = an opaque constant ⇒ its `_unsafe_rec` companion's value is hashed too; + the
+claim statements' own terms (shallow: a claim names the implementation it constrains, whose
+refactors leave the profile unchanged) + the toolchain's commit. `Expr.hash` ignores binder
+names + docstrings: an alpha-renaming or a comment edit keeps the digest. A change without a new
+version id → `ledger: profile: freeze: …`. -/
 
 open Lean
 
@@ -25,11 +26,13 @@ def rootModules : List Name :=
   [`FvdepAudit.Profile.Walk.Spec, `FvdepAudit.Profile.Stage.Spec, `FvdepAudit.Profile.Barrier.Spec,
     `FvdepAudit.Profile.Spec, `FvdepCore.Profile.Table, `FvdepCore.Profile.Types]
 
-/-- Named deep roots: the converter's cap logic + tie order, the recipes + their options, the id. -/
+/-- Named deep roots: the converter's cap logic + tie order, I1's presence read + its path rule,
+the recipes + their options, the id. -/
 def rootNames : List Name :=
   [`FvdepIO.Parse.loop, `FvdepIO.Parse.capAt, `FvdepIO.Parse.convert, `FvdepIO.Parse.optionsOf,
-    `FvdepCore.Build.consumer, `FvdepCore.Build.library, `FvdepCore.Build.libraryOptions,
-    `FvdepCore.Profile.Role.recipe, `FvdepCore.Profile.profileId]
+    `FvdepIO.Parse.presence, `FvdepIO.Parse.oleanAt, `FvdepCore.Build.consumer,
+    `FvdepCore.Build.library, `FvdepCore.Build.libraryOptions, `FvdepCore.Profile.Role.recipe,
+    `FvdepCore.Profile.profileId]
 
 /-- The claim statements: shallow roots. -/
 def claimNamespace : Name := `FvdepLedger.Rows.ProfileClaims
@@ -49,14 +52,16 @@ def terms (env : Environment) (n : Name) : List Expr :=
   | some ci => [ci.type]
   | none => []
 
-/-- The digest over `deep` (closure inside profile modules) + `shallow` (own terms alone). -/
-def digest (env : Environment) (deep shallow : List Name) : UInt64 :=
+/-- The digest over `deep` (closure inside profile modules) + `shallow` (own terms alone); a
+closure past `bound` steps fails closed (a digest over part of it would vouch for less). -/
+def digest (env : Environment) (deep shallow : List Name) (bound : Nat := 1000000) :
+    Except String UInt64 :=
   Id.run do
     let mut seen : NameSet := {}
     let mut todo := deep
     let mut lines : Array (Name × UInt64) := #[]
     let mut steps := 0
-    while !todo.isEmpty && steps < 1000000 do
+    while !todo.isEmpty && steps < bound do
       steps := steps + 1
       match todo with
       | [] =>
@@ -77,10 +82,12 @@ def digest (env : Environment) (deep shallow : List Name) : UInt64 :=
               todo := (n ++ `_unsafe_rec) :: todo
           else
             lines := lines.push (n, 0)
+    if !todo.isEmpty then
+      return .error s!"the profile's closure passes {bound} steps"
     for n in shallow do
       lines := lines.push (`shallow ++ n, (terms env n).foldl (fun h e => mixHash h e.hash) 11)
     let sorted := lines.qsort fun a b => a.1.toString < b.1.toString
-    return sorted.foldl (fun h x => mixHash (mixHash h (hash x.1)) x.2) (hash Lean.githash)
+    return .ok (sorted.foldl (fun h x => mixHash (mixHash h (hash x.1)) x.2) (hash Lean.githash))
 
 /-- The profile's id (`profileId`'s string literal) + its digest, or why they cannot be read. -/
 def current (env : Environment) : Except String (String × String) := do
@@ -98,7 +105,7 @@ def current (env : Environment) : Except String (String × String) := do
   let shallow :=
     (env.constants.fold (init := #[]) fun acc n _ =>
         if claimNamespace.isPrefixOf n && !n.isInternal then acc.push n else acc).toList
-  let h := digest env deep shallow
+  let h ← digest env deep shallow
   let hex := String.ofList ((Nat.toDigits 16 h.toNat).leftpad 16 '0')
   return (id, hex)
 

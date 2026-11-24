@@ -1,6 +1,8 @@
-/-! Q1 (K4's deriving handlers): each admitted class on a recursive, a nested + a mutual type, the
-forms where Lean 4.35's handlers take their `partial` branch (U7's graph check refuses an
-implementation reaching one; the profile admits the source). -/
+/-! Q1 (K4's deriving handlers): each admitted class on a recursive, a nested + a mutual type —
+`Repr`, `BEq`, `Hashable` + `Ord` take their `partial` branch on the nested + mutual ones (`Ord` on
+any recursion), `DecidableEq` emits total structural definitions on a mutual type + Lean declines it
+on a nested one, `Inhabited` builds no recursive function (U7's graph check refuses an
+implementation reaching a `partial` helper; the profile admits the source). -/
 
 namespace Witness.Deriving
 

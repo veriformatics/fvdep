@@ -2221,11 +2221,11 @@ def residue : List Residue :=
         "the profile's parse: `fvdep-parse` (`FvdepIO.Parse`: the request + sources read at " ++
           "`/fvdep/src`, the digests compared, Lean's `parseHeader` + `parseCommand` under each " ++
           "module's grammar — `importModules (loadExts := true)` over the toolchain's " ++
-          "modules at `/fvdep/sysroot` alone —, P5's failures read from the message log, the " ++
-          "`Syntax` → tree " ++
-          "conversion under P6's caps + C1's cap location, the record written) + the " ++
-          "supervisor's in-process header reads of trusted library modules " ++
-          "(`FvdepIO.Profile.headerImports`)"
+          "modules at `/fvdep/sysroot` alone, each clean header's toolchain imports first read " ++
+          "present at Lean's module path there (I1) —, P5's failures read from the message " ++
+          "log, the `Syntax` → tree conversion under P6's caps + C1's cap location, the " ++
+          "record written) + the supervisor's in-process header reads of trusted library " ++
+          "modules (`FvdepIO.Profile.headerImports`)"
       reason :=
         "Lean's parser + the `Syntax` projection have no fvdep-owned semantics to prove against " ++
           "(contract U6 N): that the checked tree = the tree the build elaborates is the " ++
@@ -2235,7 +2235,7 @@ def residue : List Residue :=
           "planted modules, the caps at their limits + one over, the step faults, the " ++
           "records) + " ++
           "`lake test` ProfileC (a 20,000-term left-nested chain past `depth`, non-UTF-8 bytes, " ++
-          "each table form on Lean's own trees)"
+          "an import the toolchain lacks, each table form on Lean's own trees)"
       ruling := "the Lean parser + the `Syntax` projection (residue `lean-parser`)"
       boundary := [``FvdepIO.Parse.load] },
     { id := "runtime"
@@ -4581,8 +4581,8 @@ def profileDetailRow : Row :=
     claim :=
       "`cutDetail`: its output stays within 1,024 UTF-8 bytes (`detailBytes`), the cut = the " ++
         "longest prefix within 1,021 bytes + `...` (`lake test` ProfileC); every recorded " ++
-        "refusal's detail passes through it (`outcomeDetails`, at `outcomeOf`: a parse or cap " ++
-        "event's text included)."
+        "refusal's detail stays within the cap (`outcomeDetails`; `outcomeOf` cuts each, a " ++
+        "parse or cap event's text included)."
     claims :=
       [(``ProfileClaims.detailBytes, ``FvdepAudit.Profile.Proof.detail_bytes),
         (``ProfileClaims.outcomeDetails, ``FvdepAudit.Profile.Proof.outcome_details)]
@@ -4637,9 +4637,10 @@ def profileHeaderRow : Row :=
     claim :=
       "`header`: a module's header finding = the head of the spec's header findings in C1's " ++
         "order — its own name (I2), the header's layout, `module`, `prelude`, each import's " ++
-        "layout, modifier, name (I1: by parsed components, another batch module alone) + I3 " ++
-        "(a) on the name, each at C1's location (`headerFirst`); the layout readers " ++
-        "(`headerParts`, `optSlot`, `importParts`) = spec text shared with the " ++
+        "layout, modifier, name (I1's pure rules: by parsed components, another batch module " ++
+        "alone; I1's presence read = residue `lean-parser`, after them) + I3 (a) on the name, " ++
+        "each at C1's location (`headerFirst`); the layout readers " ++
+        "(`headerParts`, `keywordSlot`, `importParts`) = spec text shared with the " ++
         "implementation, their match to Lean's parser = residue; `importAdmitted` restates " ++
         "`importOk` verbatim (I1's sets, read against the contract)."
     claims := [(``ProfileClaims.headerFirst, ``FvdepAudit.Profile.Stage.Proof.header_first)]
@@ -4697,7 +4698,8 @@ def parseExecuteRow : Row :=
     claim :=
       "The parse child performs P5a → P5b on the step's layout: the request read canonical-only " ++
         "(`readRequest`), each source's digest = the request's, each module's header + commands " ++
-        "parsed by Lean's parser under its grammar (P3: the toolchain's modules at " ++
+        "parsed by Lean's parser (a clean header's toolchain imports read present first: I1) " ++
+        "under its grammar (P3: the toolchain's modules at " ++
         "`/fvdep/sysroot` alone), each command converted under P6's caps + folded into the walk " ++
         "(`step`), stopping at the batch's first event, the batch concluded (`conclude`) + its " ++
         "record written (`assemble`)."

@@ -6,7 +6,7 @@ import FvdepAudit.Profile.Walk.Spec
 parse or cap stop = the event at its item; the header = its findings in C1's order (the module's
 name, the header's layout, `module`, `prelude`, then each import: its layout, its modifier, its
 name, I3 (a) on the name). Shared with the implementation + read as spec text: the layout readers
-`headerParts`, `optSlot`, `importParts` (with `modifierSlot`) + `identAt` (K0''s layouts). -/
+`headerParts`, `keywordSlot`, `importParts` (with `modifierSlot`) + `identAt` (K0''s layouts). -/
 
 namespace FvdepAudit.Profile.Stage.Spec
 
@@ -80,8 +80,8 @@ def headerLoc (t : Tree) (anc : List Tree) : Pos := ((t :: anc).findSome? leafPo
 
 /-- K0' + C1: an optional header slot `t` (`module`, `prelude`) of header `h`: another layout →
 `shape` at the slot, its keyword present → `header <rule>` at the keyword. -/
-def slotRules (rule : String) (h t : Tree) : List Finding :=
-  match optSlot t with
+def slotRules (rule k kw : String) (h t : Tree) : List Finding :=
+  match keywordSlot k kw t with
   | none => [mk (headerLoc t [h]) "shape" ["Lean.Parser.Module.header"]]
   | some (some u) => [mk (headerLoc u [t, h]) "header" [rule]]
   | some none => []
@@ -110,7 +110,7 @@ def headerRules (role : Role) (lib batch : List String) (self : String) (h : Tre
   (if nameAdmitted role self then [] else [mk ⟨1, 0⟩ "header" ["name", self]]) ++
     match headerParts h with
     | some (m, p, imps) =>
-      slotRules "module" h m ++ slotRules "prelude" h p ++
+      slotRules "module" "moduleTk" "module" h m ++ slotRules "prelude" "prelude" "prelude" h p ++
         imps.flatMap (importRules role lib batch self [.node ["null"] imps, h])
     | none => [mk (headerLoc h []) "shape" ["Lean.Parser.Module.header"]]
 

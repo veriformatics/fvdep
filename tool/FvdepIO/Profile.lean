@@ -98,9 +98,13 @@ def runOf (obs : FvdepIO.Sandbox.Observation) : Run :=
 
 /-- P1 + P5a: the profile step — `<run>/profile-src` = the request + the frozen batch at their paths
 (read-only at `/fvdep/src`), the sysroot + `<run>/step` (helper + child) read-only, U5's runner with
-`lim` (its deadline = P6's `seconds`); the child writes `out/results.json`. -/
+`lim` (its deadline = P6's `seconds`); the child writes `out/results.json`. Every source name is a
+module name before any write: Lean's `/` returns an absolute right side whole, so `.x`'s
+`modulePath` (`/x.lean`) would land outside the run directory. -/
 def runStep (bwrap : String) (sysroot run : System.FilePath) (reqBytes : ByteArray)
     (sources : List (String × ByteArray)) (lim : FvdepCore.Sandbox.Limits) : IO Run := do
+  if let some (m, _) := sources.find? fun x => !isModule x.1 then
+    return .setup s!"the batch names {m}, not a module name"
   let src := run / "profile-src"
   IO.FS.createDirAll src
   IO.FS.writeBinFile (src / "request.json") reqBytes

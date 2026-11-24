@@ -140,6 +140,7 @@ header.import.Init.Core	header	R/I1/P5a	1; refused Impl 1:0 header import Init.C
 header.import.FVdep.Trial	header	R/I1/P5a	1; refused Impl 1:0 header import FVdep.Trial
 header.import.Fvdep.Missing	header	R/I1/P5a	1; refused Impl 1:0 header import Fvdep.Missing
 header.import.AnotherImpl	header	R/I1/P5a	1; refused Impl 1:0 header import AnotherImpl
+header.import.Std.NoSuch	header	I1/P5	1; refused Impl 1:0 header import Std.NoSuch
 header.name.Fvdep.Impl	header	R/I2	1; refused Fvdep.Impl 1:0 header name Fvdep.Impl
 header.name.Lean.Impl	header	R/I2	1; refused Lean.Impl 1:0 header name Lean.Impl
 header.name.Std.Impl	header	R/I2	1; refused Std.Impl 1:0 header name Std.Impl

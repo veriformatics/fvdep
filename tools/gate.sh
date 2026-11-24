@@ -358,9 +358,12 @@ profile_suite() {
 
 # The witness corpus (U6 Q1 + Q2; tests/profile/witness.py): one `phase check … --profile` over the
 # fixtures (accepted + compiled on the same bytes), then every table target (`fvdep-dev profile
-# targets`) covered by them (`profile witness`); an uncovered target is named.
+# targets`) covered by them (`profile witness`); an uncovered target is named. + P3/P4's
+# differential + P4's pinned scoped namespaces (`profile scoped --check`). FVDEP_WITNESS_PART = one
+# part alone (a probe's narrowing).
 profile_witness() {
-    suite profile-witness "$(stage_key profile-witness)" "" bash tests/profile/witness.sh
+    suite profile-witness "$(stage_key profile-witness)" "${FVDEP_WITNESS_PART:-}" \
+        bash tests/profile/witness.sh
 }
 
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the
