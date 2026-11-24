@@ -3879,11 +3879,12 @@ def cases : List (String × (Unit → Bool)) :=
         N "Lean.Parser.Module.header"
           [nul (if m then [N "Lean.Parser.Module.moduleTk" [A "module" 1 0]] else []),
             nul (if p then [N "Lean.Parser.Module.prelude" [A "prelude" 1 0]] else []), nul imps]
+      let md := fun (k : String) (mods : List String) (l : Nat) =>
+        nul (if mods.contains k then [N ("Lean.Parser.Module." ++ k) [A k l 0]] else [])
       let imp := fun (mods : List String) (name : String) (l : Nat) =>
         N "Lean.Parser.Module.import"
-          [nul (if mods.contains "public" then [A "public" l 0] else []),
-            nul (if mods.contains "meta" then [A "meta" l 0] else []), A "import" l 0,
-            nul (if mods.contains "all" then [A "all" l 0] else []), I name l 7]
+          [md "public" mods l, md "meta" mods l, A "import" l 0, md "all" mods l, I name l 7,
+            nul []]
       is (header .consumer [] [] "Fvdep.X" (hdr false true [])) 1 0 "header" ["name", "Fvdep.X"] &&
         is (header .consumer [] [] "Impl" (hdr true true [])) 1 0 "header" ["module"] &&
         is (header .consumer [] [] "Impl" (hdr false false [imp ["all"] "Std" 1])) 1 0 "header"
@@ -3893,7 +3894,57 @@ def cases : List (String × (Unit → Bool)) :=
         is (header .consumer [] ["Impl", "Impl._y"] "Impl" (hdr false false [imp [] "Impl._y" 1])) 1
           7 "reserved" ["_y"] &&
         header .consumer [] [] "Impl" (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) ==
-          none),
+          none &&
+        -- Fail closed: a layout outside Lean 4.35's = `shape` (a bare modifier atom, no tail, a
+        -- non-empty tail, a header missing a slot).
+        is
+          (header .consumer [] [] "Impl"
+            (hdr false false
+              [N "Lean.Parser.Module.import"
+                  [nul [A "public" 1 0], nul [], A "import" 1 7, nul [], I "Std" 1 14, nul []]]))
+          1 0 "shape" ["Lean.Parser.Module.import"] &&
+        is
+          (header .consumer [] [] "Impl"
+            (hdr false false
+              [N "Lean.Parser.Module.import"
+                  [nul [], nul [], A "import" 1 0, nul [], I "Std" 1 7]]))
+          1 0 "shape" ["Lean.Parser.Module.import"] &&
+        is
+          (header .consumer [] [] "Impl"
+            (hdr false false
+              [N "Lean.Parser.Module.import"
+                  [nul [], nul [], A "import" 1 0, nul [], I "Std" 1 7, nul [A "." 1 10]]]))
+          1 0 "shape" ["Lean.Parser.Module.import"] &&
+        is (header .consumer [] [] "Impl" (N "Lean.Parser.Module.header" [nul [], nul []])) 1 0
+          "shape" ["Lean.Parser.Module.header"] &&
+        importsOf (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) == ["Init", "Std.Time"]),
+    ("profile walk: fail closed — `namespace`, `section` + `end` layouts, anchor slots", fun _ =>
+      is (run1 con (N "Lean.Parser.Command.namespace" [A "namespace" 1 0])) 1 0 "shape"
+          ["Lean.Parser.Command.namespace"] &&
+        is (run1 con (N "Lean.Parser.Command.end" [A "end" 1 0, nul [I "A" 1 4]])) 1 0 "shape"
+          ["Lean.Parser.Command.end"] &&
+        is
+          (run1 con
+            (N "Lean.Parser.Command.section"
+              [N "Lean.Parser.Command.sectionHeader" [nul [], nul [], nul [], nul []],
+                A "section" 1 0, nul [I "A" 1 8, I "B" 1 10]]))
+          1 0 "shape" ["Lean.Parser.Command.section"] &&
+        is
+          (run1 con
+            (N "Lean.Parser.Command.definition"
+              [A "def" 1 0, N "Lean.Parser.Command.declId" [A "x" 1 4, nul []],
+                N "Lean.Parser.Command.optDeclSig" [nul [], nul []],
+                N "Lean.Parser.Command.declValSimple"
+                  [A ":=" 1 6, num "1" 1 9, N "Lean.Parser.Termination.suffix" [nul [], nul []],
+                    nul []],
+                nul []]))
+          1 4 "shape" ["Lean.Parser.Command.declId"] &&
+        anchorOk (ks "Lean.Parser.Command.structParent") [nul [], N "x" []] &&
+        !anchorOk (ks "Lean.Parser.Command.structParent") [nul [A "toP" 1 0], N "x" []] &&
+        anchorOk (ks "Lean.Parser.Command.structParent") [nul [I "toP" 1 0, A ":" 1 4], N "x" []] &&
+        !anchorOk (ks "Lean.Parser.Command.openSimple") [nul []] &&
+        !anchorOk (ks "Lean.Parser.Command.openSimple") [nul [I "A" 1 5, A "x" 1 7]] &&
+        anchorOk (ks "Lean.Parser.Command.openSimple") [nul [I "A" 1 5, I "B" 1 7]]),
     ("profile header: I1's import sets + I2's names, per role", fun _ =>
       importOk .consumer [] [] "Impl" "Init" && !importOk .consumer [] [] "Impl" "Init.Core" &&
         importOk .consumer [] [] "Impl" "Std" &&

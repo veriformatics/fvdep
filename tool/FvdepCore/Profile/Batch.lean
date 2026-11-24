@@ -13,19 +13,10 @@ namespace FvdepCore.Profile
 /-- The profile this child implements (P5b's `profile`; Q2's version id). -/
 def profileId : String := "fvdep/profile/1"
 
-/-- I1's names of a header tree's imports in source order (an `import` node holds its module at
-child 4). -/
+/-- I1's names of a header tree's imports in source order (`importParts`: a header the stage
+accepted names every import). -/
 def importsOf : Tree → List String
-  | .node _ kids =>
-    match (kids[2]? : Option Tree) with
-    | some (.node _ imps) =>
-      imps.filterMap fun
-        | .node _ ks =>
-          match (ks[4]? : Option Tree) with
-          | some (.ident n _) => some (dotted n)
-          | _ => none
-        | _ => none
-    | _ => []
+  | .node _ [_, _, .node ["null"] imps] => imps.filterMap fun t => (importParts t).map (dotted ·.2)
   | _ => []
 
 /-- One batch module as the child observed it: its header item (`none` = never observed: the

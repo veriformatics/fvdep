@@ -24,6 +24,12 @@ inductive Shape where
   | doubleQuotedName
   /-- K4: the class term (child 1) is one identifier. -/
   | derivingClass
+  /-- K3 + P4: `namespace` + one identifier. -/
+  | namespaceCmd
+  /-- K3 + C1: the section header, `section`, an optional identifier. -/
+  | sectionCmd
+  /-- K3 + C1: `end`, an optional identifier + its empty tail (`identWithPartialTrailingDot`). -/
+  | endCmd
   deriving DecidableEq, Repr
 
 /-- K: an admitted kind (its name's components), the atoms it may own (K0: an atom inside `null` or
@@ -41,10 +47,11 @@ def rule (k : String) (atoms : List String) (shape : Shape := .free) : Rule :=
 def table : List Rule :=
   [rule "Lean.Parser.Command.moduleDoc" [] (.doc "/-!"),
     rule "Lean.Parser.Command.docComment" [] (.doc "/--"),
-    rule "Lean.Parser.Command.namespace" ["namespace"],
-    rule "Lean.Parser.Command.section" ["section"], rule "Lean.Parser.Command.sectionHeader" [],
-    rule "Lean.Parser.Command.end" ["end"], rule "Lean.Parser.Command.open" ["open"],
-    rule "Lean.Parser.Command.openSimple" [], rule "Lean.Parser.Command.openOnly" ["(", ")"],
+    rule "Lean.Parser.Command.namespace" ["namespace"] .namespaceCmd,
+    rule "Lean.Parser.Command.section" ["section"] .sectionCmd,
+    rule "Lean.Parser.Command.sectionHeader" [], rule "Lean.Parser.Command.end" ["end"] .endCmd,
+    rule "Lean.Parser.Command.open" ["open"], rule "Lean.Parser.Command.openSimple" [],
+    rule "Lean.Parser.Command.openOnly" ["(", ")"],
     rule "Lean.Parser.Command.variable" ["variable"],
     rule "Lean.Parser.Command.universe" ["universe"], rule "Lean.Parser.Command.declaration" [],
     rule "Lean.Parser.Command.declModifiers" [], rule "Lean.Parser.Command.private" ["private"],

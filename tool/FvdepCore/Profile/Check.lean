@@ -104,6 +104,20 @@ def shapeOk : Shape → List Tree → Bool
   | .doubleQuotedName, _ => false
   | .derivingClass, [_, .ident _ _] => true
   | .derivingClass, _ => false
+  | .namespaceCmd, [.atom "namespace" _, .ident _ _] => true
+  | .namespaceCmd, _ => false
+  | .sectionCmd,
+    [.node ["Lean", "Parser", "Command", "sectionHeader"] _, .atom "section" _,
+      .node ["null"] []] =>
+    true
+  | .sectionCmd,
+    [.node ["Lean", "Parser", "Command", "sectionHeader"] _, .atom "section" _,
+      .node ["null"] [.ident _ _]] =>
+    true
+  | .sectionCmd, _ => false
+  | .endCmd, [.atom "end" _, .node ["null"] []] => true
+  | .endCmd, [.atom "end" _, .node ["null"] [.ident _ _, .node ["null"] []]] => true
+  | .endCmd, _ => false
 
 /-! ## Identifiers -/
 
@@ -121,24 +135,53 @@ role. -/
 abbrev Path := List (Option Nat)
 
 /-- I3 (b) + P4 + K4: each anchor kind's path to its identifiers (Lean 4.35's parser layouts;
-`fvdep-dev profile tree` prints them). -/
-def anchors : List (List String × Path × IdRole) :=
-  [("Lean.Parser.Command.declId".splitOn ".", [some 0], .declName),
-    ("Lean.Parser.Command.ctor".splitOn ".", [some 3], .slot),
-    ("Lean.Parser.Command.structCtor".splitOn ".", [some 1], .slot),
-    ("Lean.Parser.Command.structSimpleBinder".splitOn ".", [some 1], .slot),
-    ("Lean.Parser.Command.structExplicitBinder".splitOn ".", [some 2, none], .slot),
-    ("Lean.Parser.Command.structImplicitBinder".splitOn ".", [some 2, none], .slot),
-    ("Lean.Parser.Command.structInstBinder".splitOn ".", [some 2, none], .slot),
-    ("Lean.Parser.Command.structParent".splitOn ".", [some 0, some 0], .slot),
-    ("Lean.Parser.Term.letRecDecl".splitOn ".", [some 2, some 0, some 0, some 0], .slot),
-    ("Lean.Parser.Command.derivingClass".splitOn ".", [some 1], .derivName),
-    ("Lean.Parser.Command.openSimple".splitOn ".", [some 0, none], .openName)]
+`fvdep-dev profile tree` prints them) + whether the slot is required (an optional one = an empty
+`null` when absent: `structParent`'s `toFoo :`, a `where` helper of another let form). -/
+def anchors : List (List String × Path × IdRole × Bool) :=
+  [("Lean.Parser.Command.declId".splitOn ".", [some 0], .declName, true),
+    ("Lean.Parser.Command.ctor".splitOn ".", [some 3], .slot, true),
+    ("Lean.Parser.Command.structCtor".splitOn ".", [some 1], .slot, true),
+    ("Lean.Parser.Command.structSimpleBinder".splitOn ".", [some 1], .slot, true),
+    ("Lean.Parser.Command.structExplicitBinder".splitOn ".", [some 2, none], .slot, true),
+    ("Lean.Parser.Command.structImplicitBinder".splitOn ".", [some 2, none], .slot, true),
+    ("Lean.Parser.Command.structInstBinder".splitOn ".", [some 2, none], .slot, true),
+    ("Lean.Parser.Command.structParent".splitOn ".", [some 0, some 0], .slot, false),
+    ("Lean.Parser.Term.letRecDecl".splitOn ".", [some 2, some 0, some 0, some 0], .slot, false),
+    ("Lean.Parser.Command.derivingClass".splitOn ".", [some 1], .derivName, true),
+    ("Lean.Parser.Command.openSimple".splitOn ".", [some 0, none], .openName, true)]
+
+/-- Fail closed: the occurrences `path` reaches from `kids` are identifiers; a required slot is
+present (an optional one may stop at an absent child). -/
+def slotOk (req : Bool) : Path → List Tree → Bool
+  | [], _ => true
+  | [some i], kids =>
+    match (kids[i]? : Option Tree) with
+    | some (.ident _ _) => true
+    | some _ => false
+    | none => !req
+  | [none], kids => (!req || !kids.isEmpty) && kids.all fun t => (t matches .ident _ _)
+  | some i :: p :: rest, kids =>
+    match (kids[i]? : Option Tree) with
+    | some (.node _ ks) => slotOk req (p :: rest) ks
+    | some _ => false
+    | none => !req
+  | none :: p :: rest, kids =>
+    (!req || !kids.isEmpty) &&
+      kids.all fun t =>
+        match t with
+        | .node _ ks => slotOk req (p :: rest) ks
+        | _ => false
+
+/-- I3 (b) + P4 + K4, fail closed: an anchor kind's declaring slots hold identifiers. -/
+def anchorOk (k : List String) (kids : List Tree) : Bool :=
+  match anchors.find? (·.1 == k) with
+  | some (_, p, _, req) => slotOk req p kids
+  | none => true
 
 /-- The pending path a node hands its `i`-th child: the node's own anchor, else the one it got. -/
 def childPending (k : List String) (got : Option (Path × IdRole)) (i : Nat) :
     Option (Path × IdRole) :=
-  match (anchors.find? (·.1 == k)).map (·.2) with
+  match (anchors.find? (·.1 == k)).map fun a => (a.2.1, a.2.2.1) with
   | some p => step p
   | none => step' got
 where
@@ -243,7 +286,8 @@ def walk (s : Subject) (ns : List String) (start : Pos) (owner : Option Rule)
       match lookupRule k with
       | none => found (locate start t anc) "kind" [dotted k]
       | some r =>
-        if !shapeOk r.shape kids then found (locate start t anc) "shape" [dotted k]
+        if !shapeOk r.shape kids || !anchorOk k kids then
+          found (locate start t anc) "shape" [dotted k]
         else
           match nodeFinding s ns k kids (locate start t anc) with
           | some f => some f
@@ -359,51 +403,63 @@ def importOk (role : Role) (lib batch : List String) (self m : String) : Bool :=
       batch.contains m &&
         (first m == "Fvdep" || (first self == "FvdepPreview" && first m == "FvdepPreview"))
 
-/-- One import's findings (I1: its modifier, then its name; then I3 (a) on the name). -/
-def importFinding (role : Role) (lib batch : List String) (self : String) (start : Pos) (t : Tree) :
-    Option Finding :=
-  match t with
-  | .node _ kids =>
-    let here := (t.firstPos).getD start
-    let modifier :=
-      [0, 1, 3].findSome? fun i =>
-        match (kids[i]? : Option Tree) with
-        | some (.node _ (.atom a _ :: _)) => some a
-        | _ => none
-    match modifier with
-    | some a => found here "header" ["modifier", a]
-    | none =>
-      match identAt kids 4 with
-      | some n =>
-        if !importOk role lib batch self (dotted n) then found here "header" ["import", dotted n]
-        else
-          match reservedComponent false n with
-          | some c =>
-            found
-              (match (kids[4]? : Option Tree) with
-              | some (.ident _ (some q)) => q
-              | _ => here)
-              "reserved" [c]
-          | none => none
-      | none => none
+/-- Lean's `optional p` slot (a `null` node): absent, its one tree, else malformed (`none`). -/
+def optSlot : Tree → Option (Option Tree)
+  | .node ["null"] [] => some none
+  | .node ["null"] [t] => some (some t)
   | _ => none
 
-/-- A module's header stage (C1 + I1 + I2): its name (`header name`, at 1:0), then `module`,
-`prelude`, then each import in source order. -/
+/-- An import modifier slot: absent, the modifier's keyword (`null [node [atom a]]`: Lean 4.35's
+`optional «public»`), else malformed (`none`). -/
+def modifierSlot : Tree → Option (Option String)
+  | .node ["null"] [] => some none
+  | .node ["null"] [.node _ [.atom a _]] => some (some a)
+  | _ => none
+
+/-- One header import in Lean 4.35's exact layout (`null` per modifier, `import`, `null` for `all`,
+the module's identifier, the empty tail of `identWithPartialTrailingDot`): its first present
+modifier + its name; another layout = `none` (I1 fails closed: a `shape` finding). -/
+def importParts : Tree → Option (Option String × List String)
+  |
+  .node ["Lean", "Parser", "Module", "import"]
+      [m0, m1, .atom "import" _, m3, .ident n _, .node ["null"] []] =>
+    match modifierSlot m0, modifierSlot m1, modifierSlot m3 with
+    | some a, some b, some c => some (a <|> b <|> c, n)
+    | _, _, _ => none
+  | _ => none
+
+/-- One import's findings (I1: its layout, its modifier, then its name; then I3 (a) on the name). -/
+def importFinding (role : Role) (lib batch : List String) (self : String) (start : Pos) (t : Tree) :
+    Option Finding :=
+  let here := (t.firstPos).getD start
+  match importParts t with
+  | none => found here "shape" ["Lean.Parser.Module.import"]
+  | some (some a, _) => found here "header" ["modifier", a]
+  | some (none, n) =>
+    if !importOk role lib batch self (dotted n) then found here "header" ["import", dotted n]
+    else
+      match reservedComponent false n with
+      | some c =>
+        found
+          (match t with
+          | .node _ [_, _, _, _, .ident _ (some q), _] => q
+          | _ => here)
+          "reserved" [c]
+      | none => none
+
+/-- A module's header stage (C1 + I1 + I2): its name (`header name`, at 1:0), then the header's
+layout (`shape`), `module`, `prelude`, then each import in source order. -/
 def header (role : Role) (lib batch : List String) (self : String) (h : Tree) : Option Finding :=
   if !nameOk role self then found ⟨1, 0⟩ "header" ["name", self]
   else
     match h with
-    | .node _ kids =>
-      let posAt := fun (i : Nat) => (kids[i]?.bind Tree.firstPos).getD ⟨1, 0⟩
-      if present kids 0 then found (posAt 0) "header" ["module"]
-      else
-        if present kids 1 then found (posAt 1) "header" ["prelude"]
-        else
-          match (kids[2]? : Option Tree) with
-          | some (.node _ imps) => imps.findSome? (importFinding role lib batch self ⟨1, 0⟩)
-          | _ => none
-    | _ => none
+    | .node ["Lean", "Parser", "Module", "header"] [m, p, .node ["null"] imps] =>
+      match optSlot m, optSlot p with
+      | some (some t), _ => found ((t.firstPos).getD ⟨1, 0⟩) "header" ["module"]
+      | some none, some (some t) => found ((t.firstPos).getD ⟨1, 0⟩) "header" ["prelude"]
+      | some none, some none => imps.findSome? (importFinding role lib batch self ⟨1, 0⟩)
+      | _, _ => found ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]
+    | _ => found ⟨1, 0⟩ "shape" ["Lean.Parser.Module.header"]
 
 /-! ## P3: a module's grammar -/
 
