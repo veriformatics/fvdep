@@ -19,6 +19,9 @@ inductive Tree where
   | missing
   deriving Repr, Inhabited
 
+/-- T's cap on one detail string, in UTF-8 bytes. -/
+def detailMax : Nat := 1024
+
 /-- P6's limits the child applies (`seconds` = the supervisor's step deadline). -/
 structure Limits where
   depth : Nat := 4096

@@ -3635,6 +3635,300 @@ def cases : List (String × (Unit → Bool)) :=
 
 end ProfileR
 
+namespace ProfileC
+
+open FvdepCore.Profile
+
+def ks (s : String) : List String := s.splitOn "."
+
+def A (s : String) (l c : Nat) : Tree := .atom s (some ⟨l, c⟩)
+
+def I (s : String) (l c : Nat) : Tree := .ident (s.splitOn ".") (some ⟨l, c⟩)
+
+def N (s : String) (kids : List Tree) : Tree := .node (ks s) kids
+
+def nul (kids : List Tree) : Tree := .node ["null"] kids
+
+def con : Subject := ⟨.consumer, "Impl"⟩
+
+def lib : Subject := ⟨.library, "Fvdep"⟩
+
+/-- `def a := <v>` at line 1 (v at column 9). -/
+def defA (v : Tree) : Tree :=
+  N "Lean.Parser.Command.declaration"
+    [N "Lean.Parser.Command.declModifiers" [nul [], nul [], nul [], nul [], nul [], nul [], nul []],
+      N "Lean.Parser.Command.definition"
+        [A "def" 1 0, N "Lean.Parser.Command.declId" [I "a" 1 4, nul []],
+          N "Lean.Parser.Command.optDeclSig" [nul [], nul []],
+          N "Lean.Parser.Command.declValSimple"
+            [A ":=" 1 6, v, N "Lean.Parser.Termination.suffix" [nul [], nul []], nul []],
+          nul []]]
+
+def num (n : String) (l c : Nat) : Tree := N "num" [A n l c]
+
+def run1 (s : Subject) (t : Tree) : Option Finding := body s [.tree t ⟨1, 0⟩]
+
+def is (f : Option Finding) (l c : Nat) (rule : String) (d : List String) : Bool :=
+  f == some ⟨⟨l, c⟩, rule, d⟩
+
+def nsCmd (n : String) (l : Nat) : Tree :=
+  N "Lean.Parser.Command.namespace" [A "namespace" l 0, I n l 10]
+
+def endCmd (n : Option String) (l : Nat) : Tree :=
+  N "Lean.Parser.Command.end"
+    [A "end" l 0,
+      nul
+        (match n with
+        | some x => [I x l 4]
+        | none => [])]
+
+def sectCmd (n : Option String) (l : Nat) : Tree :=
+  N "Lean.Parser.Command.section"
+    [N "Lean.Parser.Command.sectionHeader" [nul [], nul [], nul [], nul []], A "section" l 0,
+      nul
+        (match n with
+        | some x => [I x l 8]
+        | none => [])]
+
+def cases : List (String × (Unit → Bool)) :=
+  [("profile walk: every `choice` arm is walked in order (a refused kind in the second arm)",
+      fun _ =>
+      is (run1 con (defA (N "choice" [num "1" 1 9, N "Lean.Parser.Term.sorry" [A "sorry" 1 9]]))) 1
+          9 "kind" ["Lean.Parser.Term.sorry"] &&
+        run1 con (defA (N "choice" [num "1" 1 9, num "1" 1 9])) == none),
+    ("profile walk: doc + literal shapes (opener, payload, exact children)", fun _ =>
+      let doc := fun (kids : List Tree) => run1 con (N "Lean.Parser.Command.moduleDoc" kids)
+      doc [A "/-!" 1 0, A "any text -/" 1 4] == none &&
+        is (doc [A "/--" 1 0, A "x -/" 1 4]) 1 0 "shape" ["Lean.Parser.Command.moduleDoc"] &&
+        is (doc [A "/-!" 1 0]) 1 0 "shape" ["Lean.Parser.Command.moduleDoc"] &&
+        is (run1 con (defA (N "num" []))) 1 6 "shape" ["num"] &&
+        is (run1 con (defA (N "num" [A "1" 1 9, A "2" 1 10]))) 1 9 "shape" ["num"] &&
+        is (run1 con (defA (N "Lean.Parser.Term.quotedName" []))) 1 6 "shape"
+          ["Lean.Parser.Term.quotedName"] &&
+        run1 con (defA (N "Lean.Parser.Term.quotedName" [N "name" [A "`x" 1 9]])) == none &&
+        run1 con
+            (defA (N "Lean.Parser.Term.doubleQuotedName" [A "`" 1 9, A "`" 1 10, I "Nat" 1 11])) ==
+          none &&
+        is (run1 con (defA (N "Lean.Parser.Term.doubleQuotedName" [A "`" 1 9, I "Nat" 1 10]))) 1 9
+          "shape" ["Lean.Parser.Term.doubleQuotedName"]),
+    ("profile walk: an atom inside `null` + `group` belongs to the nearest other ancestor", fun _ =>
+      is (run1 con (defA (N "Lean.Parser.Term.paren" [nul [N "group" [A "deriving" 1 9]]]))) 1 9
+        "atom" ["Lean.Parser.Term.paren", "deriving"]),
+    ("profile walk: a leafless occurrence takes the nearest enclosing location, else the start",
+      fun _ =>
+      is (run1 con (defA (N "Lean.Parser.Term.unknown" []))) 1 6 "kind"
+          ["Lean.Parser.Term.unknown"] &&
+        is (body con [.tree (N "Lean.Parser.Command.eval" []) ⟨7, 2⟩]) 7 2 "kind"
+          ["Lean.Parser.Command.eval"]),
+    ("profile walk: the scope stack across commands (namespace, section, end, never below empty)",
+      fun _ =>
+      body con [.tree (nsCmd "A" 1) ⟨1, 0⟩, .tree (nsCmd "List" 2) ⟨2, 0⟩] == none &&
+        is (body con [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (nsCmd "Internal" 2) ⟨2, 0⟩]) 2 0
+          "scope" ["namespace", "String.Internal"] &&
+        body con
+            [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (endCmd (some "String") 2) ⟨2, 0⟩,
+              .tree (nsCmd "Internal" 3) ⟨3, 0⟩] ==
+          none &&
+        (body con
+            [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (sectCmd none 2) ⟨2, 0⟩,
+              .tree (nsCmd "Internal" 3) ⟨3, 0⟩]).isSome &&
+        body con
+            [.tree (endCmd none 1) ⟨1, 0⟩, .tree (endCmd (some "A.B") 2) ⟨2, 0⟩,
+              .tree (nsCmd "Internal" 3) ⟨3, 0⟩] ==
+          none),
+    ("profile walk: `next` — `namespace A.B` pushes 2, `section A.B` 2 unnamed, `end A.B` pops 2",
+      fun _ =>
+      next [] (nsCmd "A.B" 1) == [["A"], ["B"]] &&
+        next [["X"]] (sectCmd (some "A.B") 1) == [["X"], [], []] &&
+        next [["X"], ["A"], ["B"]] (endCmd (some "A.B") 1) == [["X"]] &&
+        next [] (endCmd none 1) == [] &&
+        (next [["X"]] (nsCmd "A.B" 1)).flatten == ["X", "A", "B"]),
+    ("profile walk: items in order — the first finding wins, a stop ends the body", fun _ =>
+      let f : Finding := ⟨⟨3, 1⟩, "parse", ["x"]⟩
+      body con [.stop f, .tree (N "Lean.Parser.Command.eval" []) ⟨1, 0⟩] == some f &&
+        body con [.tree (defA (num "1" 1 9)) ⟨1, 0⟩, .stop f] == some f &&
+        is (body con [.tree (N "Lean.Parser.Command.eval" [A "#eval" 1 0]) ⟨1, 0⟩, .stop f]) 1 0
+          "kind" ["Lean.Parser.Command.eval"]),
+    ("profile walk: T's detail cap (1,024 bytes kept, 1,025 → 1,021 + ..., a character boundary)",
+      fun _ =>
+      let a := String.ofList (List.replicate 1024 'a')
+      let b := String.ofList (List.replicate 1025 'a')
+      let e := String.ofList (List.replicate 1020 'a') ++ "éé"
+      let f := String.ofList (List.replicate 1020 'a') ++ "éé" ++ "a"
+      let g := String.ofList (List.replicate 1020 'a') ++ "é" ++ "aaaa"
+      cutDetail a == a && cutDetail b == String.ofList (List.replicate 1021 'a') ++ "..." &&
+        cutDetail e == e &&
+        cutDetail f == String.ofList (List.replicate 1020 'a') ++ "..." &&
+        cutDetail g == String.ofList (List.replicate 1020 'a') ++ "..." &&
+        (cutDetail f).utf8ByteSize ≤ 1024),
+    ("profile walk: reserved components (`_`-led everywhere, generated at slots, `main`)", fun _ =>
+      generated "rec" && generated "eq_1" && generated "match_12" && generated "proof_3" &&
+        !generated "eq_" &&
+        !generated "eq_a" &&
+        !generated "foo" &&
+        reservedComponent false ["Foo", "_x", "rec"] == some "_x" &&
+        reservedComponent true ["Foo", "rec", "_x"] == some "rec" &&
+        reservedComponent false ["Foo", "rec"] == none &&
+        identFinding [] .declName ["main"] ⟨1, 4⟩ == some ⟨⟨1, 4⟩, "reserved", ["main"]⟩ &&
+        identFinding ["Foo"] .declName ["main"] ⟨1, 4⟩ == none &&
+        identFinding [] .use ["Nat", "rec"] ⟨1, 4⟩ == none),
+    ("profile walk: deriving names, open scope suffixes, namespace prefixes", fun _ =>
+      identFinding [] .derivName ["Repr"] ⟨1, 0⟩ == none &&
+        identFinding [] .derivName ["Lean", "Repr"] ⟨1, 0⟩ ==
+          some ⟨⟨1, 0⟩, "name", ["deriving", "Lean.Repr"]⟩ &&
+        identFinding [] .openName ["Do"] ⟨1, 5⟩ == some ⟨⟨1, 5⟩, "scope", ["open", "Do"]⟩ &&
+        identFinding [] .openName ["Nat"] ⟨1, 5⟩ == none &&
+        identFinding [] .openName ["_root_", "Nat"] ⟨1, 5⟩ ==
+          some ⟨⟨1, 5⟩, "scope", ["open", "_root_.Nat"]⟩ &&
+        namespaceScope [] ["Lean", "Order"] == some ["Lean"] &&
+        namespaceScope ["A"] ["List"] == none &&
+        namespaceScope ["String"] ["Internal"] == some ["String", "Internal"] &&
+        namespaceScope [] ["_root_", "X"] == some ["_root_", "X"]),
+    ("profile walk: ownership by role (consumer roots, library root, an anonymous root instance)",
+      fun _ =>
+      let inst := fun (kids3 : List Tree) =>
+        N "Lean.Parser.Command.declaration"
+          [N "Lean.Parser.Command.declModifiers"
+              [nul [], nul [], nul [], nul [], nul [], nul [], nul []],
+            N "Lean.Parser.Command.instance"
+              [N "Lean.Parser.Term.attrKind" [nul []], A "instance" 1 0, nul [], nul kids3]]
+      ownershipBroken con ["Fvdep", "x"] && ownershipBroken con ["FvdepX"] &&
+        ownershipBroken con ["Lake"] &&
+        !ownershipBroken con ["Impl", "x"] &&
+        ownershipBroken lib ["Foo", "bar"] &&
+        !ownershipBroken lib ["Fvdep", "x"] &&
+        is (run1 lib (inst [])) 1 0 "ownership" ["instance"] &&
+        run1 con (inst []) == none &&
+        body lib [.tree (nsCmd "Fvdep" 1) ⟨1, 0⟩, .tree (inst []) ⟨2, 0⟩] == none),
+    ("profile header: the module's name first, then `module`, `prelude`, each import's modifier " ++
+        "+ name",
+      fun _ =>
+      let hdr := fun (m p : Bool) (imps : List Tree) =>
+        N "Lean.Parser.Module.header"
+          [nul (if m then [N "Lean.Parser.Module.moduleTk" [A "module" 1 0]] else []),
+            nul (if p then [N "Lean.Parser.Module.prelude" [A "prelude" 1 0]] else []), nul imps]
+      let imp := fun (mods : List String) (name : String) (l : Nat) =>
+        N "Lean.Parser.Module.import"
+          [nul (if mods.contains "public" then [A "public" l 0] else []),
+            nul (if mods.contains "meta" then [A "meta" l 0] else []), A "import" l 0,
+            nul (if mods.contains "all" then [A "all" l 0] else []), I name l 7]
+      is (header .consumer [] [] "Fvdep.X" (hdr false true [])) 1 0 "header" ["name", "Fvdep.X"] &&
+        is (header .consumer [] [] "Impl" (hdr true true [])) 1 0 "header" ["module"] &&
+        is (header .consumer [] [] "Impl" (hdr false false [imp ["all"] "Std" 1])) 1 0 "header"
+          ["modifier", "all"] &&
+        is (header .consumer [] [] "Impl" (hdr false false [imp [] "Std" 1, imp [] "Lean" 2])) 2 0
+          "header" ["import", "Lean"] &&
+        is (header .consumer [] ["Impl", "Impl._y"] "Impl" (hdr false false [imp [] "Impl._y" 1])) 1
+          7 "reserved" ["_y"] &&
+        header .consumer [] [] "Impl" (hdr false false [imp [] "Init" 1, imp [] "Std.Time" 2]) ==
+          none),
+    ("profile header: I1's import sets + I2's names, per role", fun _ =>
+      importOk .consumer [] [] "Impl" "Init" && !importOk .consumer [] [] "Impl" "Init.Core" &&
+        importOk .consumer [] [] "Impl" "Std" &&
+        importOk .consumer [] [] "Impl" "Std.Time" &&
+        !importOk .consumer [] [] "Impl" "Lean" &&
+        importOk .consumer ["Fvdep.X"] [] "Impl" "Fvdep.X" &&
+        !importOk .consumer ["FvdepPreview"] [] "Impl" "FvdepPreview" &&
+        !importOk .consumer [] [] "Impl" "Fvdep.X" &&
+        importOk .consumer [] ["Impl.B"] "Impl" "Impl.B" &&
+        importOk .library [] ["Fvdep.Y"] "Fvdep.X" "Fvdep.Y" &&
+        !importOk .library [] [] "Fvdep.X" "Fvdep.Y" &&
+        !importOk .library [] ["FvdepPreview.Y"] "Fvdep.X" "FvdepPreview.Y" &&
+        importOk .library [] ["FvdepPreview.Y"] "FvdepPreview.X" "FvdepPreview.Y" &&
+        nameOk .consumer "Impl" &&
+        !nameOk .consumer "Std.X" &&
+        !nameOk .consumer "FvdepX" &&
+        !nameOk .consumer "Impl._x" &&
+        nameOk .library "Fvdep.X" &&
+        nameOk .library "FvdepPreview" &&
+        !nameOk .library "Other.X"),
+    ("profile grammar: Init first, toolchain roots in depth-first order, each once", fun _ =>
+      let g := fun (pairs : List (String × List String)) (m : String) =>
+        grammar (fun x => (pairs.lookup x).getD []) 64 m
+      g [("M", ["L", "Std.Time"]), ("L", ["Std.Data.HashMap"])] "M" ==
+          ["Init", "Std.Data.HashMap", "Std.Time"] &&
+        g [("M", ["Std.Time", "L"]), ("L", ["Std.Data.HashMap"])] "M" ==
+          ["Init", "Std.Time", "Std.Data.HashMap"] &&
+        g [("M", ["Init", "Std", "Std"])] "M" == ["Init", "Std"] &&
+        g [("M", ["A"]), ("A", ["M", "Std"])] "M" == ["Init", "Std"] &&
+        g [] "M" == ["Init"])]
+
+/-- `fvdep-dev profile walk` over one module `Impl` holding `text`: its last output line. -/
+def walkLine (text : String) (extra : List String := []) : IO String := do
+  let d ← IO.FS.createTempDir
+  try
+    IO.FS.writeFile (d / "Impl.lean") text
+    let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+    let o ←
+      IO.Process.output
+          { cmd := dev.toString,
+            args := #["profile", "walk"] ++ extra.toArray ++ #[(d / "Impl.lean").toString] }
+    return ((o.stdout.splitOn "\n").filter (!·.isEmpty)).getLast?.getD s!"<rc {o.exitCode}>"
+  finally
+    IO.FS.removeDirAll d
+
+/-- R's expected findings on Lean's own trees (contract U6 R; tester-8's suite = the blind
+grader). -/
+def rCases : List (String × String) :=
+  [("def a := 1\n#eval a\n", "refused Impl 2:0 kind Lean.Parser.Command.eval"),
+    ("@[inline] def f := 1\n", "refused Impl 1:0 kind Lean.Parser.Term.attributes"),
+    ("instance (priority := low) : Inhabited Nat := ⟨0⟩\n",
+      "refused Impl 1:9 kind Lean.Parser.Command.namedPrio"),
+    ("def T := Nat\nderiving Repr\n",
+      "refused Impl 2:0 atom Lean.Parser.Command.definition deriving"),
+    ("def x := let +nondep n := 1; n\n", "refused Impl 1:13 kind Lean.Parser.Term.letPosOpt"),
+    ("def f (n : Nat) : Nat := f n\ndecreasing_by decide +native\n",
+      "refused Impl 2:21 kind Lean.Parser.Tactic.configItem"),
+    ("noncomputable section\nend\n",
+      "refused Impl 1:0 atom Lean.Parser.Command.sectionHeader noncomputable"),
+    ("structure S where\n  a : Nat\n  deriving @[expose] Repr\n",
+      "refused Impl 3:11 atom Lean.Parser.Command.derivingClass @["),
+    ("structure S where\n  a : Nat\n  deriving Repr, ToJson\n",
+      "refused Impl 3:17 name deriving ToJson"),
+    ("structure S where\n  a : Nat\n  deriving Repr (x := 1)\n",
+      "refused Impl 3:11 shape Lean.Parser.Command.derivingClass"),
+    ("namespace String\nnamespace Internal\nend Internal\nend String\n",
+      "refused Impl 2:0 scope namespace String.Internal"),
+    ("open Nat Array List\n", "refused Impl 1:9 scope open Array"),
+    ("public import Std\n", "refused Impl 1:0 parse cannot use `public import` without `module`"),
+    ("import Lean.Elab.Command\n", "refused Impl 1:0 header import Lean.Elab.Command"),
+    ("def Std.foo := 1\n", "refused Impl 1:4 ownership Std.foo"),
+    ("def f (_x : Nat) := 1\n", "refused Impl 1:7 reserved _x"),
+    ("inductive T where\n  | rec\n", "refused Impl 2:4 reserved rec"),
+    ("structure Parent where\n  a : Nat\nstructure Child extends rec : Parent\n",
+      "refused Impl 3:24 reserved rec"),
+    ("def main := 1\n", "refused Impl 1:4 reserved main"),
+    ("def a := (1\n", "refused Impl 2:0 parse unexpected end of input; expected ')', ',' or ':'"),
+    ("def a := 1\n#exit\ndef b := 2\n", "refused Impl 2:0 kind Lean.Parser.Command.exit"),
+    ("def «é» := sorry\n", "refused Impl 1:11 kind Lean.Parser.Term.sorry"),
+    ("def a := 1\r\ndef b := sorry\r\n", "refused Impl 2:9 kind Lean.Parser.Term.sorry"),
+    ("namespace Foo\ndef main := 1\nend Foo\n", "accepted"),
+    ("structure Parent where\n  a : Nat\nstructure Child extends toParent : Parent\n", "accepted"),
+    ("def a : IO Nat := do\n  let mut s := 0\n  for x in [1, 2] do\n    s := s + x\n  return s\n",
+      "accepted"),
+    ("def f (n : Nat) : Nat := if h : n = 0 then 0 else f (n - 1)\ndecreasing_by omega\n",
+      "accepted"),
+    ("open Array (push)\n", "accepted")]
+
+def ioCases : List (String × IO Bool) :=
+  [(s!"profile walk: {rCases.length} of R's expected findings + twins on Lean's own trees",
+      rCases.allM fun (text, want) => return (← walkLine text) == want),
+    ("profile walk: the library role refuses a declaration outside the module's root", do
+      let d ← IO.FS.createTempDir
+      try
+        IO.FS.writeFile (d / "Fvdep.X.lean") "def Foo.bar := 1\n"
+        let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+        let o ←
+          IO.Process.output
+              { cmd := dev.toString,
+                args := #["profile", "walk", "--library", (d / "Fvdep.X.lean").toString] }
+        return o.stdout == "grammar Fvdep.X Init\nrefused Fvdep.X 1:4 ownership Foo.bar\n" &&
+            o.exitCode == 1
+      finally
+        IO.FS.removeDirAll d)]
+
+end ProfileC
+
 def main : IO UInt32 := do
   let seed : UInt64 ←
     do
@@ -3684,7 +3978,8 @@ def main : IO UInt32 := do
                   LibraryR.cases seed ++
                   WireT.cases seed ++
                   OracleT.cases ++
-                  ProfileR.cases).map
+                  ProfileR.cases ++
+                  ProfileC.cases).map
               fun c => check c.1 c.2).mapM
         id
   let ioResults ←
@@ -3692,7 +3987,8 @@ def main : IO UInt32 := do
             PhaseIO.ioCases ++
             LibraryT.ioCases ++
             LibraryR.ioCases ++
-            OracleT.ioCases).mapM
+            OracleT.ioCases ++
+            ProfileC.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults
   let slowest := results.foldl (fun a r => if r.ms > a.ms then r else a) ⟨"none", true, 0⟩

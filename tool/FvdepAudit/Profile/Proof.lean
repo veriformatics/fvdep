@@ -3,6 +3,7 @@ import FvdepAudit.Doc.Proof.Rules
 import FvdepAudit.Doc.Proof.Valid
 import FvdepAudit.Json.Proof.Corollaries
 import FvdepAudit.Profile.Spec
+import FvdepCore.Profile.Check
 
 /-! U6 P5a + P5b (contract `docs/contracts/U6-profile.md`): the request + the record read back
 exactly (canonical texts of well-formed values alone); the intake = the spec's first failing
@@ -342,5 +343,53 @@ theorem intake_exact (profile : String) (req : Request) (digest : String) (b : B
         · simp [h1, h2, h3, throw, throwThe, MonadExceptOf.throw, bind, Except.bind]
       · simp [h1, h2, throw, throwThe, MonadExceptOf.throw, bind, Except.bind]
     · simp [h1, throw, throwThe, MonadExceptOf.throw, bind, Except.bind]
+
+/-! ## The walk's small claims (U6-B2; the walk's C2 claims = U6-D) -/
+
+theorem go_head (imports : String → List String) :
+    ∀ (n : Nat) (frames : List (List String)) (seen acc : List String),
+      acc.head? = some "Init" → (grammar.go imports n frames seen acc).head? = some "Init"
+  | 0, _, _, _, h => by simpa [grammar.go] using h
+  | n + 1, [], _, _, h => by simpa [grammar.go] using h
+  | n + 1, [] :: frames, seen, acc, h => by
+    simp only [grammar.go]
+    exact go_head imports n frames seen acc h
+  | n + 1, (i :: is) :: frames, seen, acc, h => by
+    simp only [grammar.go]
+    split
+    · apply go_head imports n
+      split
+      · exact h
+      · cases acc with
+        | nil => simp at h
+        | cons a as => simpa using h
+    · split
+      · exact go_head imports n _ _ _ h
+      · exact go_head imports n _ _ _ h
+
+/-- P3 `GrammarInit`. -/
+theorem grammar_init (imports : String → List String) (fuel : Nat) (m : String) :
+    (grammar imports fuel m).head? = some "Init" := go_head imports fuel _ _ _ rfl
+
+theorem takeBytes_sum : ∀ (n : Nat) (cs : List Char), ((takeBytes n cs).map Char.utf8Size).sum ≤ n
+  | _, [] => by simp [takeBytes]
+  | n, c :: cs => by
+    unfold takeBytes
+    split
+    · have := takeBytes_sum (n - c.utf8Size) cs
+      simp only [List.map_cons, List.sum_cons]
+      omega
+    · simp
+
+/-- T `DetailBytes`. -/
+theorem detail_bytes (s : String) : (cutDetail s).utf8ByteSize ≤ detailMax := by
+  unfold cutDetail
+  split
+  · assumption
+  · rw [String.utf8ByteSize_append, FvdepAudit.Doc.Proof.bytes_ofList]
+    have := takeBytes_sum (detailMax - 3) s.toList
+    have h3 : "...".utf8ByteSize = 3 := by decide
+    simp only [detailMax] at this ⊢
+    omega
 
 end FvdepAudit.Profile.Proof

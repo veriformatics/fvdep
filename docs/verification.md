@@ -3773,9 +3773,51 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Profile.Table`
+
+- Contract: U6 K, P4, I3, K4
+- Claim: The v1 table: K's admitted kinds + the atoms each may own + its slot rule, S, Lean's generated declaration names, the admitted deriving classes (reviewed data: contract U6's layer 2).
+- Subject: `FvdepCore.Profile.table`
+- Path: none yet (wired by U6)
+- Uninterpreted: none
+- Residue: none
+- Unproven: `profile-table` (the implementation profile's v1 table (`FvdepCore.Profile.Table`: K's kinds + their atom sets + slot rules, S, the generated declaration names, the deriving classes))
+
+## `FvdepCore.Profile.Check`
+
+- Contract: U6 P3
+- Claim: `grammar`: a module's grammar list opens with `Init` (`grammarInit`); its depth-first first-meeting order + one listing per module = `lake test` ProfileC (the walk's C2 claims = U6-D).
+- Subject: `FvdepCore.Profile.grammar`
+- Path: none yet (wired by U6)
+- Statement `FvdepLedger.Rows.ProfileClaims.grammarInit` (hash 0xf77219d8), proved by `FvdepAudit.Profile.Proof.grammar_init`:
+
+  ```lean
+  ∀ (imports : String → List String) (fuel : Nat) (m : String),
+    (FvdepCore.Profile.grammar imports fuel m).head? = some "Init"
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Profile.Check`
+
+- Contract: U6 T
+- Claim: `cutDetail`: every detail string stays within 1,024 UTF-8 bytes (`detailBytes`); the cut = the longest prefix within 1,021 bytes + `...` (`lake test` ProfileC).
+- Subject: `FvdepCore.Profile.cutDetail`
+- Path: none yet (wired by U6)
+- Statement `FvdepLedger.Rows.ProfileClaims.detailBytes` (hash 0xa69a436), proved by `FvdepAudit.Profile.Proof.detail_bytes`:
+
+  ```lean
+  ∀ (s : String), (FvdepCore.Profile.cutDetail s).utf8ByteSize ≤ FvdepCore.Profile.detailMax
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## Trusted residue
 
 - `interpreter` — the IO interpreter's effect → primitive mapping (`FvdepIO.Run`): an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the output mapping (full device, broken pipe) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
+- `profile-table` — the implementation profile's v1 table (`FvdepCore.Profile.Table`: K's kinds + their atom sets + slot rules, S, the generated declaration names, the deriving classes): data has no behaviour to prove; contract U6's layer 2: reviewed against researcher-16's lists + each kind's parser tokens (every leftover token classed), pinned by R's planted modules (`lake test` ProfileC; tester-8's suite from U6-C) + U6-D's freeze probe (ruling: "the v1 table = reviewed kernel data (residue `profile-table`)")
 - `runtime` — Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives): the toolchain is trusted (Decisions `Self-verification scope`) (ruling: "Lean compiler + runtime")
 - `os` — OS, filesystem + process semantics: outside Lean; fvdep's effects reach them through the interpreter (ruling: "OS, filesystem + process semantics")
 - `hacl-sha256` — SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`): C has no Lean semantics: HACL*'s proof = upstream evidence (no collision-resistance claim); the shim + orchestration are small, reviewed + tested: `lake test` (FIPS 180-4 examples incl. 10^6 × `a`, chunked `update` = one-shot, shared-state branching) + S5's blind suite (stage `codec-suite`, 1,212 cases: NIST CAVP short, long + Monte vectors, `sha256sum` differentials, update splits, chunk arithmetic + the total limit at lowered ceilings, `ofReader`, `sha256File`, concurrent Tasks; the C core under gcc ASan + UBSan, zero leaks) (ruling: "HACL* (verified upstream) + FFI wrapper (tested)")

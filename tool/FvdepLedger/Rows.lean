@@ -2092,6 +2092,16 @@ def intakeExact : Prop :=
   ∀ (profile : String) (req : Request) (digest : String) (b : ByteArray),
     intake profile req digest b = FvdepAudit.Profile.Spec.intake profile req digest b
 
+/-- P3: every module's grammar list opens with `Init` (the implicit import, whatever the
+closure). -/
+def grammarInit : Prop :=
+  ∀ (imports : String → List String) (fuel : Nat) (m : String),
+    (grammar imports fuel m).head? = some "Init"
+
+/-- T: every detail string a finding carries stays within 1,024 UTF-8 bytes (the record within J's
+string cap). -/
+def detailBytes : Prop := ∀ (s : String), (cutDetail s).utf8ByteSize ≤ detailMax
+
 end FvdepLedger.Rows.ProfileClaims
 
 namespace FvdepLedger.Rows
@@ -2105,6 +2115,17 @@ def residue : List Residue :=
         "an IO primitive has no Lean semantics to prove against; the U1 K2 smoke cases test the " ++
           "output mapping (full device, broken pipe)"
       ruling := "the IO interpreter's effect → primitive mapping (tested)"
+      boundary := [] },
+    { id := "profile-table"
+      what :=
+        "the implementation profile's v1 table (`FvdepCore.Profile.Table`: K's kinds + their " ++
+          "atom sets + slot rules, S, the generated declaration names, the deriving classes)"
+      reason :=
+        "data has no behaviour to prove; contract U6's layer 2: reviewed against " ++
+          "researcher-16's lists + each kind's parser tokens (every leftover token classed), " ++
+          "pinned by R's planted modules (`lake test` ProfileC; tester-8's suite from U6-C) + " ++
+          "U6-D's freeze probe"
+      ruling := "the v1 table = reviewed kernel data (residue `profile-table`)"
       boundary := [] },
     { id := "runtime"
       what :=
@@ -4411,6 +4432,50 @@ def profileTypesRow : Row :=
     residue := []
     unproven := ["runtime"] }
 
+/-- U6 K + P4 + I3 + K4: the v1 table (reviewed data). -/
+def profileTableRow : Row :=
+  { component := `FvdepCore.Profile.Table
+    contract := "U6 K, P4, I3, K4"
+    claim :=
+      "The v1 table: K's admitted kinds + the atoms each may own + its slot rule, S, Lean's " ++
+        "generated declaration names, the admitted deriving classes (reviewed data: contract " ++
+        "U6's layer 2)."
+    claims := []
+    subject := ``FvdepCore.Profile.table
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := ["profile-table"] }
+
+/-- U6 P3: a module's grammar list. -/
+def profileGrammarRow : Row :=
+  { component := `FvdepCore.Profile.Check
+    contract := "U6 P3"
+    claim :=
+      "`grammar`: a module's grammar list opens with `Init` (`grammarInit`); its depth-first " ++
+        "first-meeting order + one listing per module = `lake test` ProfileC (the walk's C2 " ++
+        "claims = U6-D)."
+    claims := [(``ProfileClaims.grammarInit, ``FvdepAudit.Profile.Proof.grammar_init)]
+    subject := ``FvdepCore.Profile.grammar
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := [] }
+
+/-- U6 T: a finding's detail cap. -/
+def profileDetailRow : Row :=
+  { component := `FvdepCore.Profile.Check
+    contract := "U6 T"
+    claim :=
+      "`cutDetail`: every detail string stays within 1,024 UTF-8 bytes (`detailBytes`); the " ++
+        "cut = the longest prefix within 1,021 bytes + `...` (`lake test` ProfileC)."
+    claims := [(``ProfileClaims.detailBytes, ``FvdepAudit.Profile.Proof.detail_bytes)]
+    subject := ``FvdepCore.Profile.cutDetail
+    path := []
+    noCaller := "U6"
+    residue := []
+    unproven := [] }
+
 def ledger : Ledger :=
   { main := ``main
     interpreter := ``FvdepIO.execute
@@ -4438,7 +4503,8 @@ def ledger : Ledger :=
         snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
-        profileTypesRow, profileRecordRow, profileRequestRow]
+        profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
+        profileDetailRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

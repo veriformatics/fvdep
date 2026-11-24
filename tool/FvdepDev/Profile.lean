@@ -1,4 +1,5 @@
 import FvdepDev.Parse
+import FvdepDev.Walk
 
 /-! Never shipped. The residue dumps (contract U6 D4: a test reads kinds, atoms + positions from
 them, never a verdict): each file parsed in the trusted grammar (`Init` + `Std`; the variable
@@ -15,8 +16,9 @@ namespace FvdepDev.Profile
 open FvdepDev.ProfileTree
 
 def usage : String :=
-  "usage: fvdep-dev profile (kinds|idents|parse|owned|positions|stats) <file>..." ++
-    " | profile scoped | profile (grammar|modules) <module>...\n"
+  "usage: fvdep-dev profile (kinds|idents|parse|owned|positions|stats|tree) <file>..." ++
+    " | profile scoped | profile (grammar|modules) <module>... | profile tokens <kind>...\n" ++
+    "  | profile walk [--library] [--lib=<M>=<I>,...]... <file>...\n"
 
 def dotted (xs : List String) : String := ".".intercalate xs
 
@@ -108,6 +110,164 @@ partial def size : Tree → Nat × Nat
     (n + 1, d + 1)
   | _ => (1, 1)
 
+/-- The builtin parsers among K's kinds: compiled into this binary, absent from the trusted
+grammar's environment (`mkParserOfConstant` resolves `ParserDescr` notations alone). -/
+def builtinParsers : List (Lean.Name × Lean.Parser.Parser) :=
+  [(``«Lean».«Parser».«Command».«moduleDoc», «Lean».«Parser».«Command».«moduleDoc»),
+    (``«Lean».«Parser».«Command».«docComment», «Lean».«Parser».«Command».«docComment»),
+    (``«Lean».«Parser».«Command».«namespace», «Lean».«Parser».«Command».«namespace»),
+    (``«Lean».«Parser».«Command».«section», «Lean».«Parser».«Command».«section»),
+    (``«Lean».«Parser».«Command».«sectionHeader», «Lean».«Parser».«Command».«sectionHeader»),
+    (``«Lean».«Parser».«Command».«end», «Lean».«Parser».«Command».«end»),
+    (``«Lean».«Parser».«Command».«open», «Lean».«Parser».«Command».«open»),
+    (``«Lean».«Parser».«Command».«openSimple», «Lean».«Parser».«Command».«openSimple»),
+    (``«Lean».«Parser».«Command».«openOnly», «Lean».«Parser».«Command».«openOnly»),
+    (``«Lean».«Parser».«Command».«variable», «Lean».«Parser».«Command».«variable»),
+    (``«Lean».«Parser».«Command».«universe», «Lean».«Parser».«Command».«universe»),
+    (``«Lean».«Parser».«Command».«declaration», «Lean».«Parser».«Command».«declaration»),
+    (``«Lean».«Parser».«Command».«private», «Lean».«Parser».«Command».«private»),
+    (``«Lean».«Parser».«Command».«protected», «Lean».«Parser».«Command».«protected»),
+    (``«Lean».«Parser».«Command».«definition», «Lean».«Parser».«Command».«definition»),
+    (``«Lean».«Parser».«Command».«abbrev», «Lean».«Parser».«Command».«abbrev»),
+    (``«Lean».«Parser».«Command».«instance», «Lean».«Parser».«Command».«instance»),
+    (``«Lean».«Parser».«Command».«structure», «Lean».«Parser».«Command».«structure»),
+    (``«Lean».«Parser».«Command».«structureTk», «Lean».«Parser».«Command».«structureTk»),
+    (``«Lean».«Parser».«Command».«classTk», «Lean».«Parser».«Command».«classTk»),
+    (``«Lean».«Parser».«Command».«extends», «Lean».«Parser».«Command».«extends»),
+    (``«Lean».«Parser».«Command».«structParent», «Lean».«Parser».«Command».«structParent»),
+    (``«Lean».«Parser».«Command».«structCtor», «Lean».«Parser».«Command».«structCtor»),
+    (``«Lean».«Parser».«Command».«structFields», «Lean».«Parser».«Command».«structFields»),
+    (``«Lean».«Parser».«Command».«structSimpleBinder»,
+      «Lean».«Parser».«Command».«structSimpleBinder»),
+    (``«Lean».«Parser».«Command».«structExplicitBinder»,
+      «Lean».«Parser».«Command».«structExplicitBinder»),
+    (``«Lean».«Parser».«Command».«structImplicitBinder»,
+      «Lean».«Parser».«Command».«structImplicitBinder»),
+    (``«Lean».«Parser».«Command».«structInstBinder», «Lean».«Parser».«Command».«structInstBinder»),
+    (``«Lean».«Parser».«Command».«inductive», «Lean».«Parser».«Command».«inductive»),
+    (``«Lean».«Parser».«Command».«ctor», «Lean».«Parser».«Command».«ctor»),
+    (``«Lean».«Parser».«Command».«mutual», «Lean».«Parser».«Command».«mutual»),
+    (``«Lean».«Parser».«Command».«declId», «Lean».«Parser».«Command».«declId»),
+    (``«Lean».«Parser».«Command».«declSig», «Lean».«Parser».«Command».«declSig»),
+    (``«Lean».«Parser».«Command».«optDeclSig», «Lean».«Parser».«Command».«optDeclSig»),
+    (``«Lean».«Parser».«Command».«declValSimple», «Lean».«Parser».«Command».«declValSimple»),
+    (``«Lean».«Parser».«Command».«declValEqns», «Lean».«Parser».«Command».«declValEqns»),
+    (``«Lean».«Parser».«Command».«whereStructInst», «Lean».«Parser».«Command».«whereStructInst»),
+    (``«Lean».«Parser».«Command».«optDeriving», «Lean».«Parser».«Command».«optDeriving»),
+    (``«Lean».«Parser».«Command».«derivingClass», «Lean».«Parser».«Command».«derivingClass»),
+    (``Lean.Parser.Command.declModifiers, Lean.Parser.Command.declModifiers false),
+    (``«Lean».«Parser».«Term».«attrKind», «Lean».«Parser».«Term».«attrKind»),
+    (``«Lean».«Parser».«Term».«whereDecls», «Lean».«Parser».«Term».«whereDecls»),
+    (``«Lean».«Parser».«Term».«letRecDecl», «Lean».«Parser».«Term».«letRecDecl»),
+    (``«Lean».«Parser».«Term».«app», «Lean».«Parser».«Term».«app»),
+    (``«Lean».«Parser».«Term».«paren», «Lean».«Parser».«Term».«paren»),
+    (``«Lean».«Parser».«Term».«hygienicLParen», «Lean».«Parser».«Term».«hygienicLParen»),
+    (``«Lean».«Parser».«Term».«tuple», «Lean».«Parser».«Term».«tuple»),
+    (``«Lean».«Parser».«Term».«typeAscription», «Lean».«Parser».«Term».«typeAscription»),
+    (``«Lean».«Parser».«Term».«anonymousCtor», «Lean».«Parser».«Term».«anonymousCtor»),
+    (``«Lean».«Parser».«Term».«hole», «Lean».«Parser».«Term».«hole»),
+    (``«Lean».«Parser».«Term».«cdot», «Lean».«Parser».«Term».«cdot»),
+    (``«Lean».«Parser».«Term».«proj», «Lean».«Parser».«Term».«proj»),
+    (``«Lean».«Parser».«Term».«dotIdent», «Lean».«Parser».«Term».«dotIdent»),
+    (``«Lean».«Parser».«Term».«pipeProj», «Lean».«Parser».«Term».«pipeProj»),
+    (``«Lean».«Parser».«Term».«explicit», «Lean».«Parser».«Term».«explicit»),
+    (``«Lean».«Parser».«Term».«namedArgument», «Lean».«Parser».«Term».«namedArgument»),
+    (``«Lean».«Parser».«Term».«typeSpec», «Lean».«Parser».«Term».«typeSpec»),
+    (``«Lean».«Parser».«Term».«explicitBinder», «Lean».«Parser».«Term».«explicitBinder»),
+    (``«Lean».«Parser».«Term».«implicitBinder», «Lean».«Parser».«Term».«implicitBinder»),
+    (``«Lean».«Parser».«Term».«instBinder», «Lean».«Parser».«Term».«instBinder»),
+    (``«Lean».«Parser».«Term».«strictImplicitBinder»,
+      «Lean».«Parser».«Term».«strictImplicitBinder»),
+    (``«Lean».«Parser».«Term».«binderDefault», «Lean».«Parser».«Term».«binderDefault»),
+    (``«Lean».«Parser».«Term».«type», «Lean».«Parser».«Term».«type»),
+    (``«Lean».«Parser».«Term».«sort», «Lean».«Parser».«Term».«sort»),
+    (``«Lean».«Parser».«Term».«prop», «Lean».«Parser».«Term».«prop»),
+    (``«Lean».«Parser».«Term».«fun», «Lean».«Parser».«Term».«fun»),
+    (``«Lean».«Parser».«Term».«basicFun», «Lean».«Parser».«Term».«basicFun»),
+    (``«Lean».«Parser».«Term».«arrow», «Lean».«Parser».«Term».«arrow»),
+    (``«Lean».«Parser».«Term».«depArrow», «Lean».«Parser».«Term».«depArrow»),
+    (``«Lean».«Parser».«Term».«forall», «Lean».«Parser».«Term».«forall»),
+    (``«Lean».«Parser».«Term».«let», «Lean».«Parser».«Term».«let»),
+    (``«Lean».«Parser».«Term».«have», «Lean».«Parser».«Term».«have»),
+    (``«Lean».«Parser».«Term».«letConfig», «Lean».«Parser».«Term».«letConfig»),
+    (``«Lean».«Parser».«Term».«letDecl», «Lean».«Parser».«Term».«letDecl»),
+    (``«Lean».«Parser».«Term».«letIdDecl», «Lean».«Parser».«Term».«letIdDecl»),
+    (``«Lean».«Parser».«Term».«letPatDecl», «Lean».«Parser».«Term».«letPatDecl»),
+    (``«Lean».«Parser».«Term».«letId», «Lean».«Parser».«Term».«letId»),
+    (``«Lean».«Parser».«Term».«match», «Lean».«Parser».«Term».«match»),
+    (``«Lean».«Parser».«Term».«matchDiscr», «Lean».«Parser».«Term».«matchDiscr»),
+    (``«Lean».«Parser».«Term».«matchAlts», «Lean».«Parser».«Term».«matchAlts»),
+    (``«Lean».«Parser».«Term».«matchAlt», «Lean».«Parser».«Term».«matchAlt»),
+    (``«Lean».«Parser».«Term».«matchAltsWhereDecls», «Lean».«Parser».«Term».«matchAltsWhereDecls»),
+    (``«Lean».«Parser».«Term».«structInst», «Lean».«Parser».«Term».«structInst»),
+    (``«Lean».«Parser».«Term».«structInstFields»,
+      «Lean».«Parser».«Term».«structInstFields» Lean.Parser.Term.structInstField),
+    (``«Lean».«Parser».«Term».«structInstField», «Lean».«Parser».«Term».«structInstField»),
+    (``«Lean».«Parser».«Term».«structInstLVal», «Lean».«Parser».«Term».«structInstLVal»),
+    (``«Lean».«Parser».«Term».«structInstFieldDef», «Lean».«Parser».«Term».«structInstFieldDef»),
+    (``«Lean».«Parser».«Term».«optEllipsis», «Lean».«Parser».«Term».«optEllipsis»),
+    (``«Lean».«Parser».«Term».«quotedName», «Lean».«Parser».«Term».«quotedName»),
+    (``«Lean».«Parser».«Term».«doubleQuotedName», «Lean».«Parser».«Term».«doubleQuotedName»),
+    (``«Lean».«Parser».«Term».«do», «Lean».«Parser».«Term».«do»),
+    (``«Lean».«Parser».«Term».«doSeqIndent», «Lean».«Parser».«Term».«doSeqIndent»),
+    (``«Lean».«Parser».«Term».«doSeqItem», «Lean».«Parser».«Term».«doSeqItem»),
+    (``«Lean».«Parser».«Term».«doExpr», «Lean».«Parser».«Term».«doExpr»),
+    (``«Lean».«Parser».«Term».«doNested», «Lean».«Parser».«Term».«doNested»),
+    (``«Lean».«Parser».«Term».«doLet», «Lean».«Parser».«Term».«doLet»),
+    (``«Lean».«Parser».«Term».«doLetArrow», «Lean».«Parser».«Term».«doLetArrow»),
+    (``«Lean».«Parser».«Term».«doIdDecl», «Lean».«Parser».«Term».«doIdDecl»),
+    (``«Lean».«Parser».«Term».«doPatDecl», «Lean».«Parser».«Term».«doPatDecl»),
+    (``«Lean».«Parser».«Term».«doLetElse», «Lean».«Parser».«Term».«doLetElse»),
+    (``«Lean».«Parser».«Term».«doHave», «Lean».«Parser».«Term».«doHave»),
+    (``«Lean».«Parser».«Term».«doReassign», «Lean».«Parser».«Term».«doReassign»),
+    (``«Lean».«Parser».«Term».«letIdDeclNoBinders», «Lean».«Parser».«Term».«letIdDeclNoBinders»),
+    (``«Lean».«Parser».«Term».«doReassignArrow», «Lean».«Parser».«Term».«doReassignArrow»),
+    (``«Lean».«Parser».«Term».«doIf», «Lean».«Parser».«Term».«doIf»),
+    (``«Lean».«Parser».«Term».«doIfProp», «Lean».«Parser».«Term».«doIfProp»),
+    (``«Lean».«Parser».«Term».«doIfLet», «Lean».«Parser».«Term».«doIfLet»),
+    (``«Lean».«Parser».«Term».«doIfLetPure», «Lean».«Parser».«Term».«doIfLetPure»),
+    (``«Lean».«Parser».«Term».«doMatch», «Lean».«Parser».«Term».«doMatch»),
+    (``«Lean».«Parser».«Term».«doFor», «Lean».«Parser».«Term».«doFor»),
+    (``«Lean».«Parser».«Term».«doForDecl», «Lean».«Parser».«Term».«doForDecl»),
+    (``«Lean».«Parser».«Term».«doUnless», «Lean».«Parser».«Term».«doUnless»),
+    (``«Lean».«Parser».«Term».«doBreak», «Lean».«Parser».«Term».«doBreak»),
+    (``«Lean».«Parser».«Term».«doContinue», «Lean».«Parser».«Term».«doContinue»),
+    (``«Lean».«Parser».«Term».«doReturn», «Lean».«Parser».«Term».«doReturn»),
+    (``«Lean».«Parser».«Term».«nestedAction», «Lean».«Parser».«Term».«nestedAction»),
+    (``«Lean».«Parser».«Level».«num», «Lean».«Parser».«Level».«num»),
+    (``«Lean».«Parser».«Level».«ident», «Lean».«Parser».«Level».«ident»),
+    (``«Lean».«Parser».«Level».«addLit», «Lean».«Parser».«Level».«addLit»),
+    (``«Lean».«Parser».«Level».«max», «Lean».«Parser».«Level».«max»),
+    (``«Lean».«Parser».«Level».«imax», «Lean».«Parser».«Level».«imax»),
+    (``«Lean».«Parser».«Level».«paren», «Lean».«Parser».«Level».«paren»),
+    (``«Lean».«Parser».«Level».«hole», «Lean».«Parser».«Level».«hole»),
+    (``«Lean».«Parser».«Termination».«suffix», «Lean».«Parser».«Termination».«suffix»),
+    (``«Lean».«Parser».«Termination».«terminationBy»,
+      «Lean».«Parser».«Termination».«terminationBy»),
+    (``«Lean».«Parser».«Termination».«decreasingBy», «Lean».«Parser».«Termination».«decreasingBy»),
+    (``«Lean».«Parser».«Tactic».«tacticSeq», «Lean».«Parser».«Tactic».«tacticSeq»),
+    (``«Lean».«Parser».«Tactic».«tacticSeq1Indented»,
+      «Lean».«Parser».«Tactic».«tacticSeq1Indented»)]
+
+/-- A kind's name from its printed spelling (`String.toName` drops `term_+_`). -/
+def kindName (k : String) : Lean.Name := (k.splitOn ".").foldl Lean.Name.mkStr .anonymous
+
+def posText : Option Pos → String
+  | some q => s!"{q.line}:{q.col}"
+  | none => "-"
+
+/-- `t` as lines with each occurrence's child-index path from the command root (U6 I3's declaring
+slots + C1's walk read children by position): `<path> node <kind>` | `<path> atom <text> <l:c>` |
+`<path> ident <name> <l:c>` | `<path> missing`. -/
+partial def treeLines (path : List Nat) : Tree → List String
+  | .node k _ kids =>
+    let here := ".".intercalate (path.reverse.map toString)
+    s!"{here}\tnode\t{dotted k}" :: (kids.zipIdx.flatMap fun (c, i) => treeLines (i :: path) c)
+  | .atom t q => [s!"{".".intercalate (path.reverse.map toString)}\tatom\t{t}\t{posText q}"]
+  | .ident n q =>
+    [s!"{".".intercalate (path.reverse.map toString)}\tident\t{dotted n}\t{posText q}"]
+  | .missing => [s!"{".".intercalate (path.reverse.map toString)}\tmissing"]
+
 def run : List String → IO UInt32
   | "kinds" :: files@(_ :: _) => do
     let env ← devGrammar
@@ -157,6 +317,42 @@ def run : List String → IO UInt32
         IO.println s!"refused\t{why}"
         rc := 1
     return rc
+  | "walk" :: args@(_ :: _) => FvdepDev.Walk.run args
+  | "tokens" :: kinds@(_ :: _) => do
+    -- K's worklist (contract U6 K0): each kind's parser (builtin `Parser` + `ParserDescr` alike,
+    -- as the parser extension compiles them) → its `collectTokens`, sorted; nonreserved symbols
+    -- (`max`, `structural`) are no tokens, so the owned-atom dumps stay the table.
+    let env ← devGrammar
+    let cats := (Lean.Parser.parserExtension.getState env).categories
+    let mut rc : UInt32 := 0
+    for k in kinds do
+      try
+        let p ←
+          match builtinParsers.lookup (kindName k) with
+          | some p =>
+            pure p
+          | none =>
+            pure (← (Lean.Parser.mkParserOfConstant cats (kindName k)).run { env, opts := {} }).2
+        let ts := (p.info.collectTokens []).toArray.qsort (· < ·)
+        let ks := (p.info.collectKinds {}).toList.map (·.1.toString) |>.toArray.qsort (· < ·)
+        IO.println s!"{k}\t{" ".intercalate ts.toList}\t{" ".intercalate ks.toList}"
+      catch e =>
+        IO.println s!"{k}\t<{e}>"
+        rc := 1
+    return rc
+  | "tree" :: files@(_ :: _) => do
+    let env ← devGrammar
+    for f in files do
+      IO.println s!"file\t{f}"
+      match ← FvdepDev.Parse.parseModule env {} f (← IO.FS.readFile f) with
+      | .ok ts =>
+        for (t, i) in ts.zipIdx do
+          IO.println s!"command\t{i}"
+          for l in treeLines [] t do
+            IO.println l
+      | .error why =>
+        IO.println s!"refused\t{why}"
+    return 0
   | "positions" :: files@(_ :: _) => do
     let env ← devGrammar
     for f in files do

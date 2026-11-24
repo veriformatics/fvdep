@@ -17,9 +17,6 @@ def isModule (s : String) : Bool :=
 /-- A request or record label (a profile or recipe id): 1–256 UTF-8 bytes. -/
 def isLabel (s : String) : Bool := 1 ≤ s.utf8ByteSize && s.utf8ByteSize ≤ 256
 
-/-- T's cap on one detail string, in UTF-8 bytes. -/
-def detailMax : Nat := 1024
-
 def isDetail (s : String) : Bool := s.utf8ByteSize ≤ detailMax
 
 /-- A canonical decimal ≥ 1 (no leading zero). -/
