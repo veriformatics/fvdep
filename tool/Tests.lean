@@ -4078,7 +4078,10 @@ def ioCases : List (String × IO Bool) :=
       return ok),
     ("profile walk: a 20,000-term left-nested chain stops at `cap depth 4096` on a 256 KiB stack",
       do
-      -- The chain is as deep as its length; the converter's loop bounds the work at the cap.
+      -- The chain is as deep as its length; the converter's loop bounds the work at the cap. Lean
+      -- runs `main` on its own thread (`lean_run_main`, 1 GiB by default): `LEAN_STACK_SIZE_KB`
+      -- sizes it, `ulimit -s` binds only the initial thread. A recursive traversal of the chain
+      -- crashes at 256 KiB (mutants M24, M25).
       let d ← IO.FS.createTempDir
       try
         IO.FS.writeFile (d / "Impl.lean")
@@ -4086,10 +4089,9 @@ def ioCases : List (String × IO Bool) :=
         let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
         let o ←
           IO.Process.output
-              { cmd := "bash"
-                args :=
-                  #["-c", "ulimit -s 256 && exec \"$0\" profile walk \"$1\"", dev.toString,
-                    (d / "Impl.lean").toString] }
+              { cmd := dev.toString
+                args := #["profile", "walk", (d / "Impl.lean").toString]
+                env := #[("LEAN_STACK_SIZE_KB", some "256")] }
         return o.stdout == "grammar Impl Init\nrefused Impl 1:20 cap depth 4096\n" &&
             o.exitCode == 1
       finally
