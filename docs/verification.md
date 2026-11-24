@@ -3815,6 +3815,34 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Profile.Check`
+
+- Contract: U6 C1, C2, K0, K0', P4, I2, I3, K4
+- Claim: `walk`: a command's first finding = the head of the spec's findings in C1's total order, every rule restated over the occurrence's ancestor chain (`walkFirst`); a clean command = no rule fires at any occurrence (`walkAccepts`); the layouts (`shapeOk`) = spec text shared with the implementation, their match to Lean's parser = residue.
+- Subject: `FvdepCore.Profile.walk`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ProfileClaims.walkFirst` (hash 0xd474a8bc), proved by `FvdepAudit.Profile.Walk.Proof.walk_first`:
+
+  ```lean
+  ∀ (s : FvdepCore.Profile.Subject) (ns : List String) (start : FvdepCore.Profile.Pos)
+    (t : FvdepCore.Profile.Tree),
+    FvdepCore.Profile.walk s ns start none none [] t =
+      (FvdepAudit.Profile.Walk.Spec.findings s ns start t).head?
+  ```
+- Statement `FvdepLedger.Rows.ProfileClaims.walkAccepts` (hash 0xde9b2e4a), proved by `FvdepAudit.Profile.Walk.Proof.walk_accepts`:
+
+  ```lean
+  ∀ (s : FvdepCore.Profile.Subject) (ns : List String) (start : FvdepCore.Profile.Pos)
+    (t : FvdepCore.Profile.Tree),
+    FvdepCore.Profile.walk s ns start none none [] t = none ↔
+      ∀ (o : FvdepAudit.Profile.Walk.Spec.Occ),
+        o ∈ FvdepAudit.Profile.Walk.Spec.occsOf [] t →
+          FvdepAudit.Profile.Walk.Spec.findingsAt s ns start o = []
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: `lean-parser` (the profile's parse: `fvdep-parse` (`FvdepIO.Parse`: the request + sources read at `/fvdep/src`, the digests compared, Lean's `parseHeader` + `parseCommand` under each module's grammar — `importModules (loadExts := true)` over the toolchain's modules at `/fvdep/sysroot` alone —, P5's failures read from the message log, the `Syntax` → tree conversion under P6's caps + C1's cap location, the record written) + the supervisor's in-process header reads of trusted library modules (`FvdepIO.Profile.headerImports`))
+
 ## `FvdepCore.Profile.Batch`
 
 - Contract: U6 C1, P3, P5, P5b

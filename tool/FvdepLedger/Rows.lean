@@ -23,6 +23,7 @@ import FvdepAudit.Oracle.Wire.Serve
 import FvdepAudit.Phase.Proof
 import FvdepAudit.Profile.Batch
 import FvdepAudit.Profile.Proof
+import FvdepAudit.Profile.Walk.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
 import FvdepAudit.Protocol.Proof.Sig
@@ -2128,6 +2129,21 @@ def judgeAccepts : Prop :=
       ∃ b,
         disposition seconds frameBytes run = .ok b ∧
           intake profileId req digest b = .ok r ∧ r.outcome = .accepted
+
+/-- C1 + K0 + K0' + P4 + I2 + I3 + K4: a command's first finding = the head of the spec's findings
+in C1's total order (pre-order over the tree's occurrences, then rule order at each: node rules,
+the atom rule, the identifier rules), each rule restated from the contract over the occurrence's
+ancestor chain (owner, identifier role, location). -/
+def walkFirst : Prop :=
+  ∀ (s : Subject) (ns : List String) (start : Pos) (t : Tree),
+    walk s ns start none none [] t = (FvdepAudit.Profile.Walk.Spec.findings s ns start t).head?
+
+/-- C1: the walk accepts a command exactly when no rule fires at any occurrence of its tree. -/
+def walkAccepts : Prop :=
+  ∀ (s : Subject) (ns : List String) (start : Pos) (t : Tree),
+    walk s ns start none none [] t = none ↔
+      ∀ o ∈ FvdepAudit.Profile.Walk.Spec.occsOf [] t,
+        FvdepAudit.Profile.Walk.Spec.findingsAt s ns start o = []
 
 end FvdepLedger.Rows.ProfileClaims
 
@@ -4525,6 +4541,24 @@ def profileDetailRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U6 C1, C2, K0, K0', P4, I2, I3, K4: the walk over one command's tree. -/
+def profileWalkRow : Row :=
+  { component := `FvdepCore.Profile.Check
+    contract := "U6 C1, C2, K0, K0', P4, I2, I3, K4"
+    claim :=
+      "`walk`: a command's first finding = the head of the spec's findings in C1's total order, " ++
+        "every rule restated over the occurrence's ancestor chain (`walkFirst`); a clean " ++
+        "command = no rule fires at any occurrence (`walkAccepts`); the layouts (`shapeOk`) = " ++
+        "spec text shared with the implementation, their match to Lean's parser = residue."
+    claims :=
+      [(``ProfileClaims.walkFirst, ``FvdepAudit.Profile.Walk.Proof.walk_first),
+        (``ProfileClaims.walkAccepts, ``FvdepAudit.Profile.Walk.Proof.walk_accepts)]
+    subject := ``FvdepCore.Profile.walk
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := ["lean-parser"] }
+
 /-- U6 C1, P3, P5, P5b: the child's batch (`fvdep-parse` reaches it through `execute`). -/
 def profileConcludeRow : Row :=
   { component := `FvdepCore.Profile.Batch
@@ -4636,8 +4670,8 @@ def ledger : Ledger :=
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
         profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
-        profileDetailRow, profileConcludeRow, profileJudgeRow, parseExecuteRow, parsePlanRow,
-        profileStepRow]
+        profileDetailRow, profileWalkRow, profileConcludeRow, profileJudgeRow, parseExecuteRow,
+        parsePlanRow, profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main
