@@ -276,7 +276,8 @@ def Scopes.ns (sc : Scopes) : List String := sc.flatten
 /-- The scope stack after the top-level command `t` (applied once its walk is clean): `namespace
 A.B` pushes one scope per component, `section` one unnamed scope (`section A.B` one per component),
 `end` pops one (`end A.B` one per component, never below empty); `mutual … end` holds its own
-`end`. -/
+`end`. A name = the first child of the optional node (Lean 4.35: `end A.B`'s holds the name + an
+empty node, `section A.B`'s the name alone). -/
 def next (sc : Scopes) : Tree → Scopes
   | .node k kids =>
     if k == kindNamespace then
@@ -286,46 +287,55 @@ def next (sc : Scopes) : Tree → Scopes
     else
       if k == kindSection then
         match (kids[2]? : Option Tree) with
-        | some (.node _ [.ident n _]) => sc ++ n.map fun _ => []
+        | some (.node _ (.ident n _ :: _)) => sc ++ n.map fun _ => []
         | _ => sc ++ [[]]
       else
         if k == kindEnd then
           match (kids[1]? : Option Tree) with
-          | some (.node _ [.ident n _]) => sc.take (sc.length - n.length)
+          | some (.node _ (.ident n _ :: _)) => sc.take (sc.length - n.length)
           | _ => sc.take (sc.length - 1)
         else sc
   | _ => sc
 
 /-! ## One module (C1's command order) -/
 
-/-- One item of a module's body stage, in source order (P5): a command's tree + its start, or the
-first parse or cap finding the child met there. -/
+/-- The first event a stage meets (C1): a finding, or P6's `batchNodes` passed (infrastructure:
+P5b's `over`). -/
+inductive Event where
+  | finding (f : Finding)
+  | over
+  deriving DecidableEq, Repr
+
+/-- One item of a module's stage, in source order (P5): a command's tree + its start, or the first
+parse or cap event the child met there. -/
 inductive Item where
   | tree (t : Tree) (start : Pos)
-  | stop (f : Finding)
+  | stop (e : Event)
 
-/-- The body stage's state: the scope stack + the first finding so far. -/
+/-- The body stage's state: the scope stack + the first event so far. -/
 structure State where
   scopes : Scopes
-  finding : Option Finding
+  event : Option Event
 
-/-- One item into the state: a finding stays; a clean command moves the scope stack. -/
+/-- One item into the state: an event stays; a clean command moves the scope stack. -/
 def step (s : Subject) (st : State) : Item → State
   | .tree t start =>
-    match st.finding with
+    match st.event with
     | some _ => st
     | none =>
       match walk s st.scopes.ns start none none [] t with
-      | some f => { st with finding := some f }
+      | some f => { st with event := some (.finding f) }
       | none => { st with scopes := next st.scopes t }
-  | .stop f =>
-    match st.finding with
+  | .stop e =>
+    match st.event with
     | some _ => st
-    | none => { st with finding := some f }
+    | none => { st with event := some e }
 
-/-- A module's body stage: its first finding in C1's order. -/
-def body (s : Subject) (items : List Item) : Option Finding :=
-  (items.foldl (step s) ⟨[], none⟩).finding
+/-- The body stage's state before a module's first command. -/
+def State.init : State := ⟨[], none⟩
+
+/-- A module's body stage: its first event in C1's order. -/
+def body (s : Subject) (items : List Item) : Option Event := (items.foldl (step s) State.init).event
 
 /-! ## The header stage (I1, I2, I3 (a)) -/
 

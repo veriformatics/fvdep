@@ -3666,7 +3666,12 @@ def defA (v : Tree) : Tree :=
 
 def num (n : String) (l c : Nat) : Tree := N "num" [A n l c]
 
-def run1 (s : Subject) (t : Tree) : Option Finding := body s [.tree t ⟨1, 0⟩]
+/-- A stage's event as its finding (`over` = none). -/
+def found? : Option Event → Option Finding
+  | some (.finding f) => some f
+  | _ => none
+
+def run1 (s : Subject) (t : Tree) : Option Finding := found? (body s [.tree t ⟨1, 0⟩])
 
 def is (f : Option Finding) (l c : Nat) (rule : String) (d : List String) : Bool :=
   f == some ⟨⟨l, c⟩, rule, d⟩
@@ -3679,7 +3684,7 @@ def endCmd (n : Option String) (l : Nat) : Tree :=
     [A "end" l 0,
       nul
         (match n with
-        | some x => [I x l 4]
+        | some x => [I x l 4, nul []]
         | none => [])]
 
 def sectCmd (n : Option String) (l : Nat) : Tree :=
@@ -3690,8 +3695,71 @@ def sectCmd (n : Option String) (l : Nat) : Tree :=
         | some x => [I x l 8]
         | none => [])]
 
+/-- A clean empty header (no `module`, `prelude` or import). -/
+def hdr0 : Item := .tree (N "Lean.Parser.Module.header" [nul [], nul [], nul []]) ⟨1, 0⟩
+
+def obsOf (m : String) (head : Option Item) (ev : Option Event) (ended : Bool) : Observed :=
+  ⟨m, head, ⟨[], ev⟩, ended⟩
+
+def reqAB : Request := requestOf .consumer [] {} [("B", ""), ("A", "")] ""
+
+/-- P5c's result as text (`Except` has no `BEq`). -/
+def dispText : Except (FvdepCore.Evidence.Infra × String) ByteArray → String
+  | .error (c, d) => s!"{repr c} {d}"
+  | .ok b => s!"ok {b.size}"
+
+def outOf (c : FvdepCore.Phase.Child) (files : List (String × ByteArray)) (work : Bool := false) :
+    FvdepCore.Step.Output := ⟨⟨c, work, false⟩, files⟩
+
 def cases : List (String × (Unit → Bool)) :=
-  [("profile walk: every `choice` arm is walked in order (a refused kind in the second arm)",
+  [("profile batch: `conclude` — the request's modules in order, every head observed, every body \
+      ended clean; the first event in C1's order",
+      fun _ =>
+      let f : Finding := ⟨⟨2, 0⟩, "kind", ["k"]⟩
+      let clean := [obsOf "A" (some hdr0) none true, obsOf "B" (some hdr0) none true]
+      (conclude reqAB clean).map (·.1) == some .accepted &&
+        (conclude reqAB clean).map (·.2) == some [["Init"], ["Init"]] &&
+        conclude reqAB [obsOf "A" (some hdr0) none true, obsOf "B" (some hdr0) none false] ==
+          none &&
+        conclude reqAB [obsOf "A" (some hdr0) none true] == none &&
+        conclude reqAB [obsOf "A" (some hdr0) none true, obsOf "B" none none true] == none &&
+        conclude reqAB [obsOf "B" (some hdr0) none true, obsOf "A" (some hdr0) none true] == none &&
+        (conclude reqAB
+                [obsOf "A" (some hdr0) (some (.finding f)) false,
+                  obsOf "B" (some hdr0) (some .over) false]).map
+            (·.1) ==
+          some (.refused ⟨"A", 2, 0, "kind", ["k"]⟩) &&
+        conclude reqAB [obsOf "A" (some (.stop .over)) none false, obsOf "B" none none false] ==
+          some (.over, [[], []]) &&
+        (conclude reqAB
+                [obsOf "A" (some hdr0) (some (.finding f)) false,
+                  obsOf "B" (some (.stop (.finding f))) none false]).map
+            (·.1) ==
+          some (.refused ⟨"B", 2, 0, "kind", ["k"]⟩)),
+    ("profile step: P5c's order + texts, exactly `results.json` = the record's bytes", fun _ =>
+      let rec_ := "{}".toUTF8
+      let d := fun r => dispText (disposition 120 64 r)
+      d (.setup "e") == "FvdepCore.Evidence.Infra.sandboxSetup profile, e" &&
+        d .timedOut ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step timed out after 120 s" &&
+        d .overflow ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step's frame passed frameBytes 64" &&
+        d .invalid == "FvdepCore.Evidence.Infra.io profile, the parse step's frame is invalid" &&
+        d (.framed 0 (outOf (.signaled 9) [])) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step's frame is invalid" &&
+        d (.framed 137 (outOf (.signaled 9) [("results.json", rec_)])) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step died by signal 9" &&
+        d (.framed 3 (outOf (.exited 3) [("results.json", rec_)] true)) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step exceeded a size cap" &&
+        d (.framed 3 (outOf (.exited 3) [("results.json", rec_)])) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step exited with code 3" &&
+        d (.framed 0 (outOf (.exited 0) [("z", rec_)])) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step wrote no result record" &&
+        d (.framed 0 (outOf (.exited 0) [("results.json", rec_), ("z", rec_), ("b/a", rec_)])) ==
+          "FvdepCore.Evidence.Infra.io profile, the parse step wrote b/a beside the result " ++
+            "record" &&
+        d (.framed 0 (outOf (.exited 0) [("results.json", rec_)])) == "ok 2"),
+    ("profile walk: every `choice` arm is walked in order (a refused kind in the second arm)",
       fun _ =>
       is (run1 con (defA (N "choice" [num "1" 1 9, N "Lean.Parser.Term.sorry" [A "sorry" 1 9]]))) 1
           9 "kind" ["Lean.Parser.Term.sorry"] &&
@@ -3718,13 +3786,13 @@ def cases : List (String × (Unit → Bool)) :=
       fun _ =>
       is (run1 con (defA (N "Lean.Parser.Term.unknown" []))) 1 6 "kind"
           ["Lean.Parser.Term.unknown"] &&
-        is (body con [.tree (N "Lean.Parser.Command.eval" []) ⟨7, 2⟩]) 7 2 "kind"
+        is (found? (body con [.tree (N "Lean.Parser.Command.eval" []) ⟨7, 2⟩])) 7 2 "kind"
           ["Lean.Parser.Command.eval"]),
     ("profile walk: the scope stack across commands (namespace, section, end, never below empty)",
       fun _ =>
       body con [.tree (nsCmd "A" 1) ⟨1, 0⟩, .tree (nsCmd "List" 2) ⟨2, 0⟩] == none &&
-        is (body con [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (nsCmd "Internal" 2) ⟨2, 0⟩]) 2 0
-          "scope" ["namespace", "String.Internal"] &&
+        is (found? (body con [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (nsCmd "Internal" 2) ⟨2, 0⟩]))
+          2 0 "scope" ["namespace", "String.Internal"] &&
         body con
             [.tree (nsCmd "String" 1) ⟨1, 0⟩, .tree (endCmd (some "String") 2) ⟨2, 0⟩,
               .tree (nsCmd "Internal" 3) ⟨3, 0⟩] ==
@@ -3745,10 +3813,14 @@ def cases : List (String × (Unit → Bool)) :=
         (next [["X"]] (nsCmd "A.B" 1)).flatten == ["X", "A", "B"]),
     ("profile walk: items in order — the first finding wins, a stop ends the body", fun _ =>
       let f : Finding := ⟨⟨3, 1⟩, "parse", ["x"]⟩
-      body con [.stop f, .tree (N "Lean.Parser.Command.eval" []) ⟨1, 0⟩] == some f &&
-        body con [.tree (defA (num "1" 1 9)) ⟨1, 0⟩, .stop f] == some f &&
-        is (body con [.tree (N "Lean.Parser.Command.eval" [A "#eval" 1 0]) ⟨1, 0⟩, .stop f]) 1 0
-          "kind" ["Lean.Parser.Command.eval"]),
+      body con [.stop (.finding f), .tree (N "Lean.Parser.Command.eval" []) ⟨1, 0⟩] ==
+          some (.finding f) &&
+        body con [.tree (defA (num "1" 1 9)) ⟨1, 0⟩, .stop .over] == some .over &&
+        is
+          (found?
+            (body con
+              [.tree (N "Lean.Parser.Command.eval" [A "#eval" 1 0]) ⟨1, 0⟩, .stop (.finding f)]))
+          1 0 "kind" ["Lean.Parser.Command.eval"]),
     ("profile walk: T's detail cap (1,024 bytes kept, 1,025 → 1,021 + ..., a character boundary)",
       fun _ =>
       let a := String.ofList (List.replicate 1024 'a')
@@ -3910,9 +3982,74 @@ def rCases : List (String × String) :=
       "accepted"),
     ("open Array (push)\n", "accepted")]
 
+/-- U6-C's regressions on Lean's own trees: K's own tokens the probe corpus missed (each admitted
+form accepted), `end A.B` popping one scope per component. -/
+def cCases : List (String × String) :=
+  [("def p : Prop := ∃ n : Nat, n = n\n", "accepted"),
+    ("def p : Prop := ∃ (n : Nat), n = n\n", "accepted"),
+    ("def a : IO Unit := do\n  if h : 1 = 1 then pure () else pure ()\n", "accepted"),
+    ("def a : IO Unit := do\n  for h : x in [1, 2] do\n    pure ()\n", "accepted"),
+    ("def a : IO Unit := do\n  for x in [1, 2], y in [3, 4] do\n    pure ()\n", "accepted"),
+    ("def a (x y : Nat) : IO Unit := do\n  match x, y with\n  | _, _ => pure ()\n", "accepted"),
+    ("structure Q where\n  p : Nat × Nat\ndef q (x : Q) : Q := { x with p.1 := 1 }\n", "accepted"),
+    ("def f := g where\n  g := 1; h := 2\n", "accepted"),
+    ("structure P where\n  a : Nat\n  b : Nat\ndef p : P where\n  a := 1; b := 2\n", "accepted"),
+    ("def f.{u, v} (α : Sort u) (β : Sort v) := 1\n", "accepted"),
+    ("structure P where\n  a : Nat\n  b : Nat\ndef p : P := { a := 1, b := 2 : P }\n", "accepted"),
+    ("structure P where\n  a : Nat\ndef p (x y : P) : P := { x, y with a := 1 }\n", "accepted"),
+    ("def f : Nat → Nat := (. + 1)\n", "accepted"), ("structure S :=\n  a : Nat\n", "accepted"),
+    ("inductive T :=\n  | a\n", "accepted"),
+    ("namespace Trial.Nested\nend Trial.Nested\nnamespace List\n",
+      "refused Impl 3:0 scope namespace List"),
+    ("namespace A.B\nend A.B\ndef Fvdep.foo := 1\n", "refused Impl 3:4 ownership Fvdep.foo")]
+
 def ioCases : List (String × IO Bool) :=
   [(s!"profile walk: {rCases.length} of R's expected findings + twins on Lean's own trees",
       rCases.allM fun (text, want) => return (← walkLine text) == want),
+    (s!"profile walk: {cCases.length} of U6-C's table + scope regressions", do
+      let mut ok := true
+      for (text, want) in cCases do
+        let got ← walkLine text
+        unless got == want do
+          IO.eprintln s!"  {String.ofList (text.toList.take 60)}: got {got}, want {want}"
+          ok := false
+      return ok),
+    ("profile walk: a 20,000-term left-nested chain stops at `cap depth 4096` on a 256 KiB stack",
+      do
+      -- The chain is as deep as its length; the converter's loop bounds the work at the cap.
+      let d ← IO.FS.createTempDir
+      try
+        IO.FS.writeFile (d / "Impl.lean")
+            ("def a : List Nat := " ++ " ++ ".intercalate (List.replicate 20000 "[1]") ++ "\n")
+        let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+        let o ←
+          IO.Process.output
+              { cmd := "bash"
+                args :=
+                  #["-c", "ulimit -s 256 && exec \"$0\" profile walk \"$1\"", dev.toString,
+                    (d / "Impl.lean").toString] }
+        return o.stdout == "grammar Impl Init\nrefused Impl 1:20 cap depth 4096\n" &&
+            o.exitCode == 1
+      finally
+        IO.FS.removeDirAll d),
+    ("profile walk: a cap at a leafless occurrence = its nearest enclosing occurrence's location",
+      do
+      -- `def a := 1`: occurrence 29 = `declValSimple`'s empty last child ⇒ `:=` @ 1:6 (not `def`).
+      return (← walkLine "def a := 1\n" ["--limit=nodes=28"]) == "refused Impl 1:6 cap nodes 28" &&
+          (← walkLine "def a := 1\n" ["--limit=nodes=29"]) == "refused Impl 1:0 cap nodes 29" &&
+          (← walkLine "def a := 1\n" ["--limit=nodes=30"]) == "accepted" &&
+          (← walkLine "def a := 1\n" ["--limit=batchNodes=29"]) == "over"),
+    ("profile walk: bytes that are not UTF-8 refuse at the module's header", do
+      let d ← IO.FS.createTempDir
+      try
+        IO.FS.writeBinFile (d / "Impl.lean") ⟨#[100, 101, 102, 32, 255, 10]⟩
+        let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+        let o ←
+          IO.Process.output
+              { cmd := dev.toString, args := #["profile", "walk", (d / "Impl.lean").toString] }
+        return o.stdout == "refused Impl 1:0 parse the source is not UTF-8\n" && o.exitCode == 1
+      finally
+        IO.FS.removeDirAll d),
     ("profile walk: the library role refuses a declaration outside the module's root", do
       let d ← IO.FS.createTempDir
       try

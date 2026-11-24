@@ -1,0 +1,421 @@
+id	part	clause	expected
+command.eval	command	R/K7	1; refused Impl 2:0 kind Lean.Parser.Command.eval
+command.run-cmd	command	R/K7	1; refused Impl 1:0 kind Lean.runCmd
+command.macro	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.macro
+command.syntax	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.syntax
+command.notation	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.notation
+command.macro-rules	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.macro_rules
+command.elab	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.elab
+command.initialize	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.initialize
+command.example	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.example
+command.check	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.check
+command.deriving	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.deriving
+command.option	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.set_option
+command.option-in	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.in
+command.open-in	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.in
+command.theorem	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.theorem
+command.opaque	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.opaque
+command.axiom	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.axiom
+command.attribute	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.attribute
+command.export	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.export
+command.include	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.include
+command.omit	command	R/K7	1; refused Impl 1:0 kind Lean.Parser.Command.omit
+decl.modifier.noncomputable	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.noncomputable
+decl.modifier.partial	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.partial
+decl.modifier.unsafe	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.unsafe
+decl.modifier.nonrec	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.nonrec
+decl.modifier.public	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.public
+decl.modifier.meta	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Command.meta
+decl.attribute.inline	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.attribute.implemented_by	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.attribute.extern	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.attribute.export	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.attribute.csimp	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.attribute.simp	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.attributes
+decl.instance.scoped	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.scoped
+decl.instance.local	decl	R/K4	1; refused Impl 1:0 kind Lean.Parser.Term.local
+decl.instance.named-priority	decl	R/K4	1; refused Impl 1:9 kind Lean.Parser.Command.namedPrio
+decl.def-deriving	decl	R/K4	1; refused Impl 2:0 atom Lean.Parser.Command.definition deriving
+term.sorry	term	R/K6	1; refused Impl 1:9 kind Lean.Parser.Term.sorry
+term.unsafe	term	R/K6	1; refused Impl 1:9 kind Lean.Parser.Term.unsafe
+term.by	term	R/K6	1; refused Impl 1:9 kind Lean.Parser.Term.byTactic
+term.include-str	term	R/K6	1; refused Impl 1:9 kind Lean.includeStr
+term.interpolation	term	R/K6	1; refused Impl 1:9 kind termS!_
+term.interpolation-hole	term	R/K6	1; refused Impl 1:9 kind termS!_
+term.dbg-trace	term	R/K6	1; refused Impl 1:9 kind Lean.Parser.Term.dbgTrace
+term.quotation	term	R/K6	1; refused Impl 1:9 kind Lean.Parser.Term.quot
+term.by-elab	term	R/K6	1; refused Impl 1:9 kind Lean.byElab
+term.while	term	R/K6	1; refused Impl 1:12 kind Lean.Parser.Term.doWhile
+term.let-config.positive	term	R/K6	1; refused Impl 1:13 kind Lean.Parser.Term.letPosOpt
+term.let-config.eq	term	R/K6	1; refused Impl 1:13 kind Lean.Parser.Term.letOptEq
+term.let-config.negative	term	R/K6	1; refused Impl 1:14 kind Lean.Parser.Term.letNegOpt
+termination.decide-native	termination	R/K5	1; refused Impl 2:21 kind Lean.Parser.Tactic.configItem
+termination.decide-kernel	termination	R/K5	1; refused Impl 2:21 kind Lean.Parser.Tactic.configItem
+termination.omega-config	termination	R/K5	1; refused Impl 2:20 kind Lean.Parser.Tactic.configItem
+termination.partial-fixpoint	termination	R/K5	1; refused Impl 2:0 kind Lean.Parser.Termination.partialFixpoint
+termination.inductive-fixpoint	termination	R/K5	1; refused Impl 2:0 kind Lean.Parser.Termination.inductiveFixpoint
+termination.by-query	termination	R/K5	1; refused Impl 2:0 kind Lean.Parser.Termination.terminationBy?
+termination.simp-wf	termination	R/K5	1; refused Impl 2:14 kind tacticSimp_wf
+decl.section.noncomputable	decl	R/K3	1; refused Impl 1:0 atom Lean.Parser.Command.sectionHeader noncomputable
+decl.section.attribute	decl	R/K3	1; refused Impl 1:0 atom Lean.Parser.Command.sectionHeader @[
+decl.section.public	decl	R/K3	1; refused Impl 1:0 atom Lean.Parser.Command.sectionHeader public
+decl.deriving.attribute	decl	R/K4	1; refused Impl 3:11 atom Lean.Parser.Command.derivingClass @[
+decl.deriving.name	decl	R/K4	1; refused Impl 3:17 name deriving ToJson
+decl.deriving.shape	decl	R/K4	1; refused Impl 3:11 shape Lean.Parser.Command.derivingClass
+decl.class-inductive	decl	K4	1; refused Impl 1:0 kind Lean.Parser.Command.classInductive
+command.open-scoped	command	K7/P4	1; refused Impl 1:5 kind Lean.Parser.Command.openScoped
+command.open-hiding	command	K7/P4	1; refused Impl 1:5 kind Lean.Parser.Command.openHiding
+command.open-renaming	command	K7/P4	1; refused Impl 1:5 kind Lean.Parser.Command.openRenaming
+accept.private	accept	R/K4	0; accepted
+accept.protected	accept	K4	0; accepted
+accept.abbrev	accept	K4	0; accepted
+accept.instance	accept	K4	0; accepted
+accept.class	accept	K4	0; accepted
+accept.def-equations	accept	K4	0; accepted
+accept.inductive	accept	K4	0; accepted
+accept.mutual	accept	K4/C1	0; accepted
+accept.deriving-two	accept	R/K4	0; accepted
+accept.extends	accept	R/I3b	0; accepted
+accept.docs	accept	K2	0; accepted
+accept.scope-kinds	accept	R/K3	0; accepted
+accept.binders	accept	K6	0; accepted
+accept.sorts	accept	K6	0; accepted
+accept.choice	accept	K1/K6	0; accepted
+accept.wildcard	accept	R/I3a/K6	0; accepted
+accept.escaped-ident	accept	R/I3/K0	0; accepted
+accept.literals	accept	K6	0; accepted
+accept.ascii-aliases	accept	K0/K6	0; accepted
+accept.let-have	accept	K6	0; accepted
+accept.notations	accept	R/K6	0; accepted
+accept.do	accept	R/K6	0; accepted
+accept.do-arrow	accept	K0/K6	0; accepted
+accept.termination-omega	accept	R/K5	0; accepted
+accept.termination-decide	accept	R/K5	0; accepted
+accept.termination-wrappers	accept	K5	0; accepted
+accept.deriving.DecidableEq	accept	K4/Q1	0; accepted
+accept.deriving-recursive.DecidableEq	accept	K4/Q1	0; accepted
+accept.deriving.Repr	accept	K4/Q1	0; accepted
+accept.deriving-recursive.Repr	accept	K4/Q1	0; accepted
+accept.deriving.BEq	accept	K4/Q1	0; accepted
+accept.deriving-recursive.BEq	accept	K4/Q1	0; accepted
+accept.deriving.Hashable	accept	K4/Q1	0; accepted
+accept.deriving-recursive.Hashable	accept	K4/Q1	0; accepted
+accept.deriving.Ord	accept	K4/Q1	0; accepted
+accept.deriving-recursive.Ord	accept	K4/Q1	0; accepted
+accept.deriving.Inhabited	accept	K4/Q1	0; accepted
+accept.deriving-recursive.Inhabited	accept	K4/Q1	0; accepted
+accept.generated	accept	K1/K3/K4/K6/C1	0; generated admitted programs accepted as one batch
+term.extra.panic	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.panic
+term.extra.assert	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.assert
+term.extra.unreachable	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.unreachable
+term.extra.angle	term	K6/C1	1; refused Impl 1:9 kind term‹_›
+term.extra.subst	term	K6/C1	1; refused Impl 1:21 kind Lean.Parser.Term.subst
+term.extra.nomatch	term	K6/C1	1; refused Impl 1:21 kind Lean.Parser.Term.nomatch
+term.extra.nofun	term	K6/C1	1; refused Impl 1:23 kind Lean.Parser.Term.nofun
+term.extra.show	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.show
+term.extra.suffices	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.suffices
+term.extra.calc	term	K6/C1	1; refused Impl 1:9 kind Lean.calc
+term.extra.let-rec	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.letrec
+term.extra.open	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.open
+term.extra.set-option	term	K6/C1	1; refused Impl 1:9 kind Lean.Parser.Term.set_option
+term.extra.sigma	term	K6/C1	1; refused Impl 1:9 kind termΣ_,_
+term.extra.repeat	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doRepeat
+term.extra.repeat-until	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doRepeatUntil
+term.extra.try	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doTry
+term.extra.do-let-rec	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doLetRec
+term.extra.do-trace	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doDbgTrace
+term.extra.do-assert	term	K6/C1	1; refused Impl 2:2 kind Lean.Parser.Term.doAssert
+term.extra.range	term	K6/C1	1; refused Impl 2:9 kind Std.term_..._
+term.extra.closed-range	term	K6/C1	1; refused Impl 2:9 kind Std.term_...=_
+term.extra.legacy-range	term	K6/C1	1; refused Impl 2:9 kind Std.Legacy.Range.term[_:_]
+header.module	header	R/I1	1; refused Impl 1:0 header module
+header.prelude	header	R/I1	1; refused Impl 1:0 header prelude
+header.public	header	R/I1	1; refused Impl 1:0 parse cannot use `public import` without `module`
+header.module-before-modifier	header	R/I1	1; refused Impl 1:0 header module
+header.import.Lean.Elab.Command	header	R/I1/P5a	1; refused Impl 1:0 header import Lean.Elab.Command
+header.import.Lake	header	R/I1/P5a	1; refused Impl 1:0 header import Lake
+header.import.FvdepPreview	header	R/I1/P5a	1; refused Impl 1:0 header import FvdepPreview
+header.import.FvdepProofs.Registry	header	R/I1/P5a	1; refused Impl 1:0 header import FvdepProofs.Registry
+header.import.Init.Core	header	R/I1/P5a	1; refused Impl 1:0 header import Init.Core
+header.import.FVdep.Trial	header	R/I1/P5a	1; refused Impl 1:0 header import FVdep.Trial
+header.import.Fvdep.Missing	header	R/I1/P5a	1; refused Impl 1:0 header import Fvdep.Missing
+header.import.AnotherImpl	header	R/I1/P5a	1; refused Impl 1:0 header import AnotherImpl
+header.name.Fvdep.Impl	header	R/I2	1; refused Fvdep.Impl 1:0 header name Fvdep.Impl
+header.name.Lean.Impl	header	R/I2	1; refused Lean.Impl 1:0 header name Lean.Impl
+header.name.Std.Impl	header	R/I2	1; refused Std.Impl 1:0 header name Std.Impl
+header.name.Init.Impl	header	R/I2	1; refused Init.Impl 1:0 header name Init.Impl
+header.name.Lake.Impl	header	R/I2	1; refused Lake.Impl 1:0 header name Lake.Impl
+header.name.FvdepX.Impl	header	R/I2	1; refused FvdepX.Impl 1:0 header name FvdepX.Impl
+header.name.Impl._x	header	R/I2	1; refused Impl._x 1:0 header name Impl._x
+header.name._Impl	header	R/I2	1; refused _Impl 1:0 header name _Impl
+header.library-name.FvdepExtra.X	header	I2	1; refused FvdepExtra.X 1:0 header name FvdepExtra.X
+header.library-name.FvdepProofs.X	header	I2	1; refused FvdepProofs.X 1:0 header name FvdepProofs.X
+header.library-name.Fvdep._A	header	I2	1; refused Fvdep._A 1:0 header name Fvdep._A
+header.library-name.Other	header	I2	1; refused Other 1:0 header name Other
+header.library-to-preview	header	R/I1	1; refused Fvdep.X 1:0 header import FvdepPreview
+header.library-to-phase2	header	I1	1; refused Fvdep.X 1:0 header import FvdepProofs
+header.library-init-submodule	header	I1	1; refused Fvdep.X 1:0 header import Init.Core
+header.consumer-batch	header	I1/P3	0; accepted
+header.consumer-library	header	I1/P5a	0; accepted
+header.library-preview	header	I1/P3	0; accepted
+header.library-to-batch	header	I1	0; accepted
+ownership.namespace	ownership	R/I2/C1	1; refused Impl 1:0 ownership Fvdep
+ownership.def	ownership	R/I2/C1	1; refused Impl 1:4 ownership Std.foo
+ownership.any-fvdep-prefix	ownership	R/I2/C1	1; refused Impl 1:0 ownership FvdepCustom.X
+ownership.decl-before-leaf	ownership	R/I2/C1	1; refused Impl 1:4 ownership Lean._x
+ownership.scope-before-ownership	ownership	R/I2/C1	1; refused Impl 1:0 scope namespace Lean
+ownership.library-foreign	ownership	R/I2	1; refused Fvdep.X 1:4 ownership Foo.bar
+ownership.preview-foreign	ownership	I2	1; refused FvdepPreview.X 1:0 ownership Fvdep
+ownership.nested-reserved-root	ownership	I2/C1	0; accepted
+scope.ns-exact	scope	R/P4/C1	1; refused Impl 1:0 scope namespace List
+scope.ns-prefix	scope	R/P4/C1	1; refused Impl 1:0 scope namespace List
+scope.ns-lean-prefix	scope	R/P4/C1	1; refused Impl 1:0 scope namespace Lean
+scope.ns-nested	scope	R/P4/C1	1; refused Impl 2:0 scope namespace String.Internal
+scope.ns-root	scope	R/P4/C1	1; refused Impl 1:0 scope namespace _root_.Array
+scope.open-array	scope	R/P4/C1	1; refused Impl 1:5 scope open Array
+scope.open-suffix	scope	R/P4/C1	1; refused Impl 1:5 scope open Do
+scope.open-qualified	scope	R/P4/C1	1; refused Impl 1:5 scope open Std.Do
+scope.open-root	scope	R/P4/C1	1; refused Impl 1:5 scope open _root_.Array
+scope.open-order	scope	R/P4/C1	1; refused Impl 1:9 scope open Array
+scope.section-keeps-ns	scope	R/P4/C1	1; refused Impl 3:0 scope namespace String.Internal
+scope.pop-qualified-ns	scope	R/P4/C1	1; refused Impl 3:0 scope namespace List
+scope.pop-section-then-ns	scope	R/P4/C1	1; refused Impl 5:0 scope namespace List
+scope.mutual-keeps-ns	scope	R/P4/C1	1; refused Impl 6:0 scope namespace String.Internal
+scope.accept.dotted-declaration	scope	R/P4/C1	0; accepted
+scope.accept.dotted-ns	scope	R/P4/C1	0; accepted
+scope.accept.nested-ns	scope	R/P4/C1	0; accepted
+scope.accept.popped	scope	R/P4/C1	0; accepted
+scope.accept.open-nat	scope	R/P4/C1	0; accepted
+scope.accept.open-only	scope	R/P4/C1	0; accepted
+reserved.compiler	reserved	R/I3/T	1; refused Impl 1:4 reserved _unsafe_rec
+reserved.compiler-in-ns	reserved	R/I3/T	1; refused Impl 2:4 reserved _unsafe_rec
+reserved.root	reserved	R/I3/T	1; refused Impl 1:4 reserved _root_
+reserved.hygiene	reserved	R/I3/T	1; refused Impl 1:9 reserved _@
+reserved.binder	reserved	R/I3/T	1; refused Impl 1:7 reserved _x
+reserved.field	reserved	R/I3/T	1; refused Impl 2:2 reserved _a
+reserved.cases-on	reserved	R/I3/T	1; refused Impl 1:4 reserved casesOn
+reserved.inductive-ctor	reserved	R/I3/T	1; refused Impl 2:4 reserved rec
+reserved.extends-projection	reserved	R/I3/T	1; refused Impl 3:24 reserved rec
+reserved.main	reserved	R/I3/T	1; refused Impl 1:4 reserved main
+reserved.detail-cap-ascii	reserved	R/I3/T	1; refused Impl 1:4 reserved _aaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaaa...
+reserved.detail-cap-unicode	reserved	R/I3/T	1; refused Impl 1:4 reserved _aééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééééé...
+reserved.generated-field	reserved	R/I3/T	1; refused Impl 2:2 reserved proof_0
+reserved.generated-explicit-field	reserved	R/I3/T	1; refused Impl 2:3 reserved eq_1
+reserved.generated-implicit-field	reserved	R/I3/T	1; refused Impl 2:3 reserved match_2
+reserved.generated-instance-field	reserved	R/I3/T	1; refused Impl 2:3 reserved recOn
+reserved.generated-structure-ctor	reserved	R/I3/T	1; refused Impl 2:2 reserved noConfusion
+reserved.generated-where-helper	reserved	R/I3/T	1; refused Impl 2:2 reserved fun_cases
+reserved.accept.main-nested	reserved	R/I3	0; accepted
+reserved.accept.main-qualified	reserved	R/I3	0; accepted
+reserved.accept.rec-use	reserved	R/I3	0; accepted
+reserved.accept.uses	reserved	R/I3	0; accepted
+reserved.accept.quoted-dot	reserved	R/I3	0; accepted
+reserved.accept.generated-use	reserved	R/I3	0; accepted
+reserved.accept.not-numeric-suffix	reserved	R/I3	0; accepted
+reserved.accept.universe-parameter	reserved	R/I3	0; accepted
+reserved.accept.enclosing-generated-name	reserved	R/I3	0; accepted
+reserved.generated.00	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.01	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.02	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.03	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.04	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.05	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.06	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.07	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.08	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.09	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.10	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.11	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.12	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.13	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.14	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.15	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.16	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+reserved.generated.17	reserved	I3a/C1 property	1; any _-led parsed component refused at the identifier start
+parse.eof	parse	R/P5	1; refused Impl 2:0 parse unexpected end of input; expected ')', ',' or ':'
+parse.exit-mid	parse	R/P5	1; refused Impl 2:0 kind Lean.Parser.Command.exit
+parse.exit-last	parse	R/P5	1; refused Impl 2:0 kind Lean.Parser.Command.exit
+parse.body-import	parse	R/P5	1; refused Impl 2:0 kind Lean.Parser.Command.import
+parse.crlf	parse	R/P5/C1	1; refused Impl 2:9 kind Lean.Parser.Term.sorry
+parse.lf-twin	parse	R/P5/C1	1; refused Impl 2:9 kind Lean.Parser.Term.sorry
+parse.unicode-column	parse	R/P5/C1	1; refused Impl 1:11 kind Lean.Parser.Term.sorry
+parse.crlf-accepted	parse	R/C1	0; accepted
+parse.lf-accepted	parse	R/C1	0; accepted
+grammar.init	grammar	R/P3	1; refused A 1:35 parse unexpected token '('; expected command
+grammar.time	grammar	R/P3	1; refused B 2:31 kind Std.Time.termDate(_)
+grammar.sibling	grammar	R/P3/C1	1; refused A 1:35 parse unexpected token '('; expected command
+grammar.with-space	grammar	R/P3	0; accepted
+grammar.batch-transitive	grammar	P3/I1	1; refused A 2:31 kind Std.Time.termDate(_)
+grammar.library-transitive	grammar	P3/I1/P5a	1; refused Impl 2:31 kind Std.Time.termDate(_)
+grammar.ordered-explicit	grammar	P3/I1	0; accepted
+grammar.reverse-explicit	grammar	P3/I1	0; accepted
+grammar.std	grammar	P3/I1	0; accepted
+order.header-before-body	order	B1/C1/I1	1; refused Z 1:0 header import Lean
+order.header-module	order	C1/I1	1; refused A 1:0 header import Lean
+order.body-module	order	C1	1; refused A 1:9 kind Lean.Parser.Term.sorry
+order.import	order	C1/I1	1; refused Impl 1:0 header import Lean
+order.command	order	C1/P5	1; refused Impl 1:0 kind Lean.Parser.Command.eval
+order.parse-before-walk	order	C1/P5	1; refused Impl 2:0 parse unexpected end of input; expected ')', ',' or ':'
+order.ancestor-first	order	C1/K0/I3	1; refused Impl 1:0 kind Lean.Parser.Command.eval
+order.siblings-left-first	order	C1/K0/I3	1; refused Impl 1:10 reserved _x
+order.choice-contents	order	C1/K1	1; refused Impl 1:29 kind Lean.Parser.Term.sorry
+usage.module-max	usage	D1/U3 T3	0; 256-byte module name accepted
+usage.empty	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.repeat	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.bad-name	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.bad-component	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.module-over	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.role-other	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.role-missing	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.library-option	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.two-seams	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.bad-limit	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.bad-limit-number	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.bad-limit-pair	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-depth	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-nodes	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-batchNodes	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-seconds	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-frameBytes	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+usage.zero-fileBytes	usage	D1/U3 T3	2; profile check usage on stderr, no launch
+snapshot.missing	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.link	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.link-dir	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.not-dir	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.is-dir	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.fifo	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.file-over	snapshot	D1/P6/U5 S1	2; S1 refusal alone, no launch
+snapshot.batch-over	snapshot	D1/P6/U5 S1	2; 16 MiB + 1 refused without launch
+corpus.library	corpus	R/Q1/I1/I3	0; all phase-1 library modules accepted under library/1
+corpus.launch	corpus	R/Q1/I1/I3	0; all three launch example modules accepted under consumer/1
+corpus.model	corpus	Q1/K3/K4/K6	0; accepted
+corpus.termination	corpus	Q1/K5	0; accepted
+record.accepted	record	R/P5b/D1	0; canonical matching record, grammar in module order, no parse launch
+record.refused	record	P5b/T/D1/interface §1	1; refusal uses the typed cause, codepoints and Cc line escaping
+record.detail-limit	record	P5b/T	1; detail of exactly 1024 UTF-8 bytes fits, not clipped at intake
+record.over	record	P5b/P6/D1	2; a valid over outcome → batch cap, no grammar lines or launch
+record.malformed.json	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.scalar	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.trailing-lf	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.leading-space	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.escaped-key	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.duplicate	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.root-missing	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.root-extra	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.root-mistyped	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.schema	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.request-syntax	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.digest-uppercase	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.grammar-type	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.grammar-name	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.module-extra	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.outcome-kind	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.outcome-extra	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.limit	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.rule	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.arity	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.detail-type	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.detail-bytes	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.line-zero	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.col-negative	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.line-unsafe-int	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.cap-invalid-decimal	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.header-invalid-modifier	record	R/P5b/U3 J	2; result record is malformed
+record.malformed.scope-invalid-slot	record	R/P5b/U3 J	2; result record is malformed
+record.binding.profile	record	R/P5b/D1	2; first binding reason names profile
+record.binding.request	record	R/P5b/D1	2; first binding reason names request
+record.binding.recipe	record	R/P5b/D1	2; first binding reason names recipe
+record.binding.missing	record	R/P5b/D1	2; first binding reason names missing
+record.binding.extra	record	R/P5b/D1	2; first binding reason names extra
+record.binding.names	record	R/P5b/D1	2; first binding reason names names
+record.binding.digest	record	R/P5b/D1	2; first binding reason names digest
+record.binding.outside	record	R/P5b/D1	2; first binding reason names outside
+record.request-input.library-header	record	R/P5a/P5b/B2	2; request digest binds library-header
+record.request-input.library-header-order	record	R/P5a/P5b/B2	2; request digest binds library-header-order
+record.request-input.depth	record	R/P5a/P5b/B2	2; request digest binds depth
+record.request-input.toolchain	record	R/P5a/P5b/B2	2; request digest binds toolchain
+record.request-input.source-bytes	record	R/P5a/P5b/B2	2; request digest binds source-bytes
+record.generated.00	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.01	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.02	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.03	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.04	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.05	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.06	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.07	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.08	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.09	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.10	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.11	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.12	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.13	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.14	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.15	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.16	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.17	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.18	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.19	record	P5b property	2; generated malformed or mis-bound record: first failure only
+record.generated.20	record	P5b property	2; generated malformed or mis-bound record: first failure only
+snapshot.at-file-and-batch-cap	snapshot	D1/P6/U5 S1/P5b	0; 16 × 1 MiB sources accepted at both inclusive caps
+cap.depth-at	cap	R/P6/C1	0; accepted
+cap.depth-over	cap	R/P6/C1	1; refused Impl 1:15 cap depth 8
+cap.nodes-at	cap	R/P6/C1	0; accepted
+cap.nodes-over	cap	R/P6/C1	1; refused Impl 1:0 cap nodes 29
+cap.batch-at	cap	R/P6/C1	0; accepted
+cap.batch-over	cap	R/P6/C1	2; infra io: profile, the batch passed batchNodes 29
+cap.batch-first	cap	R/P6/C1	2; infra io: profile, the batch passed batchNodes 29
+cap.depth-before-nodes	cap	R/P6/C1	1; refused Impl 1:15 cap depth 8
+cap.batch-before-depth	cap	R/P6/C1	2; infra io: profile, the batch passed batchNodes 37
+cap.cap-before-walk	cap	R/P6/C1	1; refused Impl 1:9 cap depth 5
+cap.file-bytes	cap	R/P6/C1	2; infra io: profile, the parse step died by signal 25
+cap.deadline	cap	R/P6/C1	2; infra io: profile, the parse step timed out after 1 s
+cap.nodes-reset	cap	P6/C1	0; nodes resets per module; exactly 60 batch occurrences fit
+cap.batch-across-modules	cap	P6/C1	2; batchNodes counts both modules, not their separate maxima
+step.no-record	step	R/P5c/P6/D1	2; child no-record disposition
+step.extra-file	step	R/P5c/P6/D1	2; child extra-file disposition
+step.exit	step	R/P5c/P6/D1	2; child exit disposition
+step.signal	step	R/P5c/P6/D1	2; child signal disposition
+step.timeout	step	R/P5c/P6/D1	2; child timeout disposition
+step.frame-over	step	R/P5c/P6/D1	2; child frame-over disposition
+step.file-over	step	R/P5c/P6/D1	2; child file-over disposition
+step.frame-at	step	R/P5c/P6/D1	0; child frame-at disposition
+step.file-at	step	R/P5c/P6/D1	0; child file-at disposition
+phase.accepted	phase	R/D2/D3/B1/U5 D1/K7	0; parse first, one cold library fill, phase1 + phase2 build and export
+phase.frozen-source	phase	B2/D2/D3/U5 S2	0; both phases use the frozen implementation despite a later live-file edit
+phase.no-profile-reuse	phase	P5b/B2/D1	0 twice; identical inputs each launch a new parser, never compile
+phase.refuse.parse	phase	R/D2/D3/B1	1; refused Impl 2:0 parse unexpected end of input; expected ')', ',' or ':'; no compile
+phase.refuse.scope	phase	R/D2/D3/B1	1; refused Impl 1:5 scope open Array; no compile
+phase.refuse.ownership	phase	R/D2/D3/B1	1; refused Impl 1:4 ownership Std.foo; no compile
+phase.refuse.kind	phase	R/D2/D3/B1	1; refused Impl 1:9 kind Lean.Parser.Term.sorry; no compile
+phase.refuse.shape	phase	R/D2/D3/B1	1; refused Impl 3:11 shape Lean.Parser.Command.derivingClass; no compile
+phase.refuse.atom	phase	R/D2/D3/B1	1; refused Impl 1:0 atom Lean.Parser.Command.sectionHeader noncomputable; no compile
+phase.refuse.reserved	phase	R/D2/D3/B1	1; refused Impl 1:7 reserved _x; no compile
+phase.refuse.name	phase	R/D2/D3/B1	1; refused Impl 3:17 name deriving ToJson; no compile
+phase.refuse.import	phase	R/D2/D3/B1	1; refused Impl 1:0 header import Lean; no compile
+phase.refuse.header-parse	phase	R/D2/D3/B1	1; refused Impl 1:0 parse cannot use `public import` without `module`; no compile
+phase.refuse.header-name	phase	R/D2/D3/B1	1; refused Impl._x 1:0 header name Impl._x; no compile
+phase.refuse.depth	phase	R/D2/D3/B1	1; refused Impl 1:15 cap depth 8; no compile
+phase.refuse.nodes	phase	R/D2/D3/B1	1; refused Impl 1:0 cap nodes 29; no compile
+phase.refuse.batch	phase	R/D2/D3/B1	2; infra io: profile, the batch passed batchNodes 29; no compile
+phase.refuse.deadline	phase	R/D2/D3/B1	2; infra io: profile, the parse step timed out after 1 s; no compile
+phase.refuse.file-bytes	phase	R/D2/D3/B1	2; infra io: profile, the parse step died by signal 25; no compile
+phase.record.malformed	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.profile	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.request	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.recipe	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.missing	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.extra	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.names	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.digest	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.record.outside	phase	R/P5b/D2/D3	2; exact record refusal without a sandbox launch or compile
+phase.step.no-record	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.extra-file	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.exit	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.signal	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.timeout	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.frame-over	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.file-over	phase	R/P5c/D2/D3	2; exact child fault, one parse launch, no compile
+phase.step.setup	phase	P5c/D2/D3/interface §1	2; bwrap setup failure, control-free line, no compile
+phase.step.old-bwrap	phase	P5c/D2/D3/U5 T1	2; tool_missing names bwrap; version query only
+phase.snapshot.link	phase	R/D2/D3/U5 S1	2; S1 symbolic-link refusal before source digests or launch
+phase.manifest.reserved	phase	R/D2/D3/U3 T3	2; schema names impl_modules; no launch

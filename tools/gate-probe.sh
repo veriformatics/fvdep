@@ -562,7 +562,7 @@ plant_extra_reach() {
     printf '\n%s\n\n%s\n' 'def probePlan (args : List String) := FvdepCore.Cli.plan ("probe" :: args)' \
         'def probeMain (args : List String) : IO UInt32 := FvdepIO.execute (probePlan args)' \
         >>tool/Main.lean
-    sed -i 's/^          plan := ``FvdepIO.Step.plan }]$/          plan := ``FvdepIO.Step.plan },\n        { main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }]/' \
+    sed -i 's/^          plan := ``FvdepIO.Parse.plan }]$/          plan := ``FvdepIO.Parse.plan },\n        { main := ``probeMain, interpreter := ``FvdepIO.execute, plan := ``probePlan }]/' \
         tool/FvdepLedger/Rows.lean
 }
 probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
@@ -687,6 +687,13 @@ plant_oracle_case() {
 }
 probe oracle-suite plant_oracle_case "FAIL O.help" \
     env FVDEP_ORACLE_CASE=O.help bash -c 'source tools/gate.sh; oracle_suite'
+
+# profile-suite: a usage case expecting the outcome of a run fails, named (one case, no launch).
+plant_profile_case() {
+    sed -i 's/        r.usage("profile check", "--role")/        r.code(0)/' tests/profile/boundary_cases.py
+}
+probe profile-suite plant_profile_case "FAIL usage.empty" \
+    env FVDEP_PROFILE_CASE=usage.empty bash -c 'source tools/gate.sh; profile_suite'
 
 # isolation: a case expecting another environment inside the step fails, named (one case).
 plant_isolation_case() { sed -i 's/"HOME,LC_ALL,PATH,PWD,TMPDIR"/"HOME,LC_ALL,PATH,TMPDIR"/' tests/isolation/run.py; }

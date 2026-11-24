@@ -1,4 +1,5 @@
 import FvdepDev.Parse
+import FvdepDev.ProfileCheck
 import FvdepDev.Walk
 
 /-! Never shipped. The residue dumps (contract U6 D4: a test reads kinds, atoms + positions from
@@ -18,7 +19,9 @@ open FvdepDev.ProfileTree
 def usage : String :=
   "usage: fvdep-dev profile (kinds|idents|parse|owned|positions|stats|tree) <file>..." ++
     " | profile scoped | profile (grammar|modules) <module>... | profile tokens <kind>...\n" ++
-    "  | profile walk [--library] [--lib=<M>=<I>,...]... <file>...\n"
+    "  | profile walk [--library] [--lib=<M>=<I>,...]... [--limit=<name>=<n>]... <file>...\n" ++
+    "  | profile check --role consumer|library [--library <dir>] [--limit <name>=<n>]... " ++
+    "[--results <file> | --child <file>] <src dir> <module>...\n"
 
 def dotted (xs : List String) : String := ".".intercalate xs
 
@@ -269,6 +272,7 @@ partial def treeLines (path : List Nat) : Tree → List String
   | .missing => [s!"{".".intercalate (path.reverse.map toString)}\tmissing"]
 
 def run : List String → IO UInt32
+  | "check" :: rest => FvdepDev.ProfileCheck.run rest
   | "kinds" :: files@(_ :: _) => do
     let env ← devGrammar
     let mut rc : UInt32 := 0

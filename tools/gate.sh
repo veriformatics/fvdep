@@ -106,6 +106,7 @@ sys-suite   suites
 sandbox-suite lean
 isolation   lean
 oracle-suite lean
+profile-suite lean
 acceptance  suites
 index       lean
 index-history lean
@@ -130,16 +131,16 @@ tree-clean  lean suites probes checks
 # Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
 # registry order; a stage's weight = its peak memory alone (GiB, anon + tmpfs, rounded up; unlisted
 # = 1). Both from `tools/vflab-run bash tools/gate-measure.sh [STAGE…]` (vflab, no other fvdep job).
-GATE_FIRST='index-suite acceptance sandbox-suite oracle-suite sys-suite coverage'
+GATE_FIRST='index-suite acceptance sandbox-suite oracle-suite sys-suite profile-suite coverage'
 GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle-suite=4 ledger-suite=3 sys-suite=3'
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite acceptance index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite acceptance index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
-TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-step» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit
+TOOL_TARGETS=(FvdepCore FvdepIO «fvdep-cli» «fvdep-step» «fvdep-parse» «fvdep-tests» FvdepDev «fvdep-dev» FvdepFuzz FvdepAudit
     FvdepLedger «fvdep-ledger» FvdepLedgerFixtures)
 
 # Every shard STAGES names, once each, in first-use order.
@@ -341,6 +342,19 @@ oracle_suite() {
         bash tests/oracle/run.sh ${FVDEP_ORACLE_CASE:+--case "$FVDEP_ORACLE_CASE"}
 }
 
+# The blind profile suite (tester-8; U6 P, C, I, K, R, D1): `fvdep-dev profile check` over planted
+# modules, records + child faults, each case on its own FVDEP_CACHE (a toolchain record seeded once
+# per run). Its steps run fvdep-step + fvdep-parse ⇒ tests/profile/run.sh refuses outside a PID
+# namespace of the job's own. Every case but `phase.` (D2's barrier = U6-C2).
+profile_suite() {
+    local p cases=()
+    for p in accept cap command corpus decl grammar header order ownership parse record reserved \
+        scope snapshot step term termination usage; do cases+=(--case "$p."); done
+    [[ -z "${FVDEP_PROFILE_CASE:-}" ]] || cases=(--case "$FVDEP_PROFILE_CASE")
+    suite profile-suite "$(stage_key profile-suite)" "${FVDEP_PROFILE_CASE:-}" \
+        bash tests/profile/run.sh "${cases[@]}"
+}
+
 # The blind acceptance suite (tester-1; Intent + Decisions + interface): the cases merged into the
 # gate (MANIFEST status `merged`) through the built `fvdep`; the rest wait for their units.
 acceptance() {
@@ -356,7 +370,7 @@ index_key() { shipped_closure index.json tool/Main.lean; }
 
 # Each keyed stage's input-closure key (its `suite` mark holds it): one place, read by the stage +
 # by `marks`.
-KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite acceptance index'
+KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite acceptance index'
 stage_key() { # NAME
     case "$1" in
     lean-style) closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt ;;
@@ -376,6 +390,7 @@ stage_key() { # NAME
     sandbox-suite) sandbox_closure tests/sandbox ;;
     isolation) sandbox_closure tests/isolation ;;
     oracle-suite) sandbox_closure tests/oracle tool/Main.lean ;;
+    profile-suite) sandbox_closure tests/profile tool/Main.lean tool/ParseMain.lean ;;
     acceptance) shipped_closure tests/acceptance tool/Main.lean ;;
     index) index_key ;;
     *)

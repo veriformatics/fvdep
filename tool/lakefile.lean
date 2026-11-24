@@ -139,6 +139,14 @@ that runs the step; `StepMain.main` = `FvdepIO.Step.main`. Every script that run
 by name (`extraDepTargets` on the runner's executable left a stale helper in place). -/
 lean_exe «fvdep-step» where root := `StepMain
 
+/-- The profile's parse child (contract U6 P1): the one program of the profile step, staged beside
+the step helper from the executable that runs the step; every script that runs a profile step
+builds it by name. `supportInterpreter`: loading the toolchain's parser extensions runs their code
+through the interpreter. -/
+lean_exe «fvdep-parse» where
+  root := `ParseMain
+  supportInterpreter := true
+
 /-- Fuzz targets (contract U3 "Fuzz"; `tools/fuzz.sh`): one `@[export]` entry per module, its IR C
 + import closure compiled into the engine + replay builds; never shipped (gate stage `imports`). -/
 lean_lib FvdepFuzz

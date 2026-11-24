@@ -21,6 +21,7 @@ import FvdepAudit.Oracle.Proof
 import FvdepAudit.Oracle.Resolve.Proof
 import FvdepAudit.Oracle.Wire.Serve
 import FvdepAudit.Phase.Proof
+import FvdepAudit.Profile.Batch
 import FvdepAudit.Profile.Proof
 import FvdepAudit.Protocol.Proof.Lines
 import FvdepAudit.Protocol.Proof.Request
@@ -29,6 +30,7 @@ import FvdepAudit.Sandbox.Proof
 import FvdepAudit.Step.Proof
 import FvdepAudit.Sys.Proof.Claims
 import FvdepIO.Library
+import FvdepIO.Profile
 import FvdepIO.Project
 import FvdepLedger.Types
 import Main
@@ -2102,6 +2104,31 @@ def grammarInit : Prop :=
 string cap). -/
 def detailBytes : Prop := ∀ (s : String), (cutDetail s).utf8ByteSize ≤ detailMax
 
+/-- C1 + P5: the batch concludes `accepted` only when its observations name the request's modules in
+order + every header was observed with no event + every body met its input's end with no event (an
+unobserved module or a stage stopped short never reads as clean). -/
+def concludeAccepts : Prop :=
+  ∀ (req : Request) (obs : List Observed) (gs : List (List String))
+    (_h : conclude req obs = some (.accepted, gs)),
+    obs.map (·.module) = req.modules.map (·.module) ∧
+      ∀ o ∈ obs,
+        (∃ i,
+            o.head = some i ∧
+              headEvent req.role (req.library.map (·.module)) (req.modules.map (·.module)) o.module
+                  i =
+                none) ∧
+          o.state.event = none ∧ o.ended = true
+
+/-- P5c + P5b + B3: the supervisor's verdict is `accepted r` exactly when P5c's disposition yields
+the record's bytes, P5b's intake under this profile binds them to the request as `r` + `r`'s outcome
+is accepted. -/
+def judgeAccepts : Prop :=
+  ∀ (req : Request) (digest : String) (seconds frameBytes : Nat) (run : Run) (r : Record),
+    judge req digest seconds frameBytes run = .accepted r ↔
+      ∃ b,
+        disposition seconds frameBytes run = .ok b ∧
+          intake profileId req digest b = .ok r ∧ r.outcome = .accepted
+
 end FvdepLedger.Rows.ProfileClaims
 
 namespace FvdepLedger.Rows
@@ -2127,6 +2154,28 @@ def residue : List Residue :=
           "U6-D's freeze probe"
       ruling := "the v1 table = reviewed kernel data (residue `profile-table`)"
       boundary := [] },
+    { id := "lean-parser"
+      what :=
+        "the profile's parse: `fvdep-parse` (`FvdepIO.Parse`: the request + sources read at " ++
+          "`/fvdep/src`, the digests compared, Lean's `parseHeader` + `parseCommand` under each " ++
+          "module's grammar — `importModules (loadExts := true)` over the toolchain's " ++
+          "modules at `/fvdep/sysroot` alone —, P5's failures read from the message log, the " ++
+          "`Syntax` → tree " ++
+          "conversion under P6's caps + C1's cap location, the record written) + the " ++
+          "supervisor's in-process header reads of trusted library modules " ++
+          "(`FvdepIO.Profile.headerImports`)"
+      reason :=
+        "Lean's parser + the `Syntax` projection have no fvdep-owned semantics to prove against " ++
+          "(contract U6 N): that the checked tree = the tree the build elaborates is the " ++
+          "residue; " ++
+          "the walk + the batch's conclusion over the observed trees are claimed (rows " ++
+          "`FvdepCore.Profile.*`); tested by tester-8's blind suite (stage `profile-suite`: R's " ++
+          "planted modules, the caps at their limits + one over, the step faults, the " ++
+          "records) + " ++
+          "`lake test` ProfileC (a 20,000-term left-nested chain past `depth`, non-UTF-8 bytes, " ++
+          "each table form on Lean's own trees)"
+      ruling := "the Lean parser + the `Syntax` projection (residue `lean-parser`)"
+      boundary := [``FvdepIO.Parse.load] },
     { id := "runtime"
       what :=
         "Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives)"
@@ -4396,7 +4445,7 @@ def profileRecordRow : Row :=
         (``ProfileClaims.intakeExact, ``FvdepAudit.Profile.Proof.intake_exact)]
     subject := ``FvdepCore.Profile.intake
     path := []
-    noCaller := "U6"
+    noCaller := "U8"
     residue := []
     unproven := [] }
 
@@ -4413,7 +4462,7 @@ def profileRequestRow : Row :=
         (``ProfileClaims.requestExact, ``FvdepAudit.Profile.Proof.request_exact)]
     subject := ``FvdepCore.Profile.readRequest
     path := []
-    noCaller := "U6"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -4428,7 +4477,7 @@ def profileTypesRow : Row :=
     claims := []
     subject := ``FvdepCore.Profile.Role.text
     path := []
-    noCaller := "U6"
+    noCaller := "support"
     residue := []
     unproven := ["runtime"] }
 
@@ -4443,7 +4492,7 @@ def profileTableRow : Row :=
     claims := []
     subject := ``FvdepCore.Profile.table
     path := []
-    noCaller := "U6"
+    noCaller := "support"
     residue := []
     unproven := ["profile-table"] }
 
@@ -4458,7 +4507,7 @@ def profileGrammarRow : Row :=
     claims := [(``ProfileClaims.grammarInit, ``FvdepAudit.Profile.Proof.grammar_init)]
     subject := ``FvdepCore.Profile.grammar
     path := []
-    noCaller := "U6"
+    noCaller := "support"
     residue := []
     unproven := [] }
 
@@ -4472,9 +4521,92 @@ def profileDetailRow : Row :=
     claims := [(``ProfileClaims.detailBytes, ``FvdepAudit.Profile.Proof.detail_bytes)]
     subject := ``FvdepCore.Profile.cutDetail
     path := []
-    noCaller := "U6"
+    noCaller := "support"
     residue := []
     unproven := [] }
+
+/-- U6 C1, P3, P5, P5b: the child's batch (`fvdep-parse` reaches it through `execute`). -/
+def profileConcludeRow : Row :=
+  { component := `FvdepCore.Profile.Batch
+    contract := "U6 C1, P3, P5, P5b"
+    claim :=
+      "`conclude`: the batch's outcome + each module's grammar from the child's observations in " ++
+        "C1's order (the header stage over every module, then the body stage); `accepted` only " ++
+        "when the observations name the request's modules in order, every header was observed " ++
+        "with no event + every body met its input's end with no event (`concludeAccepts`); " ++
+        "exactness against C1's spec = U6-D."
+    claims := [(``ProfileClaims.concludeAccepts, ``FvdepAudit.Profile.Batch.conclude_accepts)]
+    subject := ``FvdepCore.Profile.conclude
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
+/-- U6 P5a, P5c, P5b, B3: the supervisor's verdict on the parse step (U7's admission + U8's `check`
+call it before any compile, fill or view). -/
+def profileJudgeRow : Row :=
+  { component := `FvdepCore.Profile.Barrier
+    contract := "U6 P5a, P5c, P5b, B3"
+    claim :=
+      "`judge`: P5c's disposition of the parse step, then P5b's intake + B3's outcome; " ++
+        "`accepted r` exactly when the disposition yields the record's bytes + the intake binds " ++
+        "them to the request as `r` + `r` is accepted (`judgeAccepts`); P5c's order + B's " ++
+        "attribution = U6-D."
+    claims := [(``ProfileClaims.judgeAccepts, ``FvdepAudit.Profile.Batch.judge_accepts)]
+    subject := ``FvdepCore.Profile.judge
+    path := []
+    noCaller := "U8"
+    residue := []
+    unproven := [] }
+
+/-- U6 P1–P6: `fvdep-parse`'s IO (its root = `FvdepIO.Parse.main`). -/
+def parseExecuteRow : Row :=
+  { component := `FvdepIO.Parse
+    contract := "U6 P1–P6"
+    claim :=
+      "The parse child performs P5a → P5b on the step's layout: the request read canonical-only " ++
+        "(`readRequest`), each source's digest = the request's, each module's header + commands " ++
+        "parsed by Lean's parser under its grammar (P3: the toolchain's modules at " ++
+        "`/fvdep/sysroot` alone), each command converted under P6's caps + folded into the walk " ++
+        "(`step`), stopping at the batch's first event, the batch concluded (`conclude`) + its " ++
+        "record written (`assemble`)."
+    claims := []
+    subject := ``FvdepIO.Parse.execute
+    path := [``FvdepIO.Parse.main, ``FvdepIO.Parse.execute]
+    noCaller := ""
+    residue := ["os", "runtime"]
+    unproven := ["lean-parser"] }
+
+/-- U6 P1: `fvdep-parse`'s arguments. -/
+def parsePlanRow : Row :=
+  { component := `FvdepIO.Parse
+    contract := "U6 P1"
+    claim :=
+      "`fvdep-parse` takes no argument (its inputs + output are the step's layout); any " ++
+        "argument = a usage error (exit 2)."
+    claims := []
+    subject := ``FvdepIO.Parse.plan
+    path := [``FvdepIO.Parse.main, ``FvdepIO.Parse.plan]
+    noCaller := ""
+    residue := []
+    unproven := ["lean-parser"] }
+
+/-- U6 P1 + P5a: the profile step's supervisor IO (U7's admission + U8's `check` call it). -/
+def profileStepRow : Row :=
+  { component := `FvdepIO.Profile
+    contract := "U6 P1, P5a"
+    claim :=
+      "The supervisor stages the request + the frozen batch + the parse child beside the step " ++
+        "helper, runs the parse step through U5's runner (its deadline = P6's `seconds`) + " ++
+        "hands " ++
+        "its observation to `judge` as P5c's `Run`; a library's rows = each trusted header's " ++
+        "explicit imports in source order."
+    claims := []
+    subject := ``FvdepIO.Profile.runStep
+    path := []
+    noCaller := "U8"
+    residue := ["os", "runtime"]
+    unproven := ["sandbox-spawn", "lean-parser"] }
 
 def ledger : Ledger :=
   { main := ``main
@@ -4504,12 +4636,16 @@ def ledger : Ledger :=
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
         profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
-        profileDetailRow]
+        profileDetailRow, profileConcludeRow, profileJudgeRow, parseExecuteRow, parsePlanRow,
+        profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main
           interpreter := ``FvdepIO.Step.execute
-          plan := ``FvdepIO.Step.plan }]
+          plan := ``FvdepIO.Step.plan },
+        { main := ``FvdepIO.Parse.main
+          interpreter := ``FvdepIO.Parse.execute
+          plan := ``FvdepIO.Parse.plan }]
     steps :=
       [{  driver := ``FvdepCore.Oracle.Driver.driverText
           embedded := ``FvdepCore.Oracle.Driver.embedded
