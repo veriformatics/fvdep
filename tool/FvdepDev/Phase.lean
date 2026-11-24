@@ -1,11 +1,15 @@
 import FvdepDev.Cache
+import FvdepDev.ProfileCheck
 import FvdepIO.Bundle
 import FvdepIO.Snapshot
 import FvdepIO.Toml
 
 /-! `fvdep-dev phase check` (contract `docs/contracts/U5-sandbox.md` D1; never shipped): a
 manifest entry's two phases over a library working copy — S's snapshot, K's views, P's steps, B2's
-bundle on a failure — reported line by line (interface §1's line rule). -/
+bundle on a failure — reported line by line (interface §1's line rule). `--profile` (contract
+`docs/contracts/U6-profile.md` D2) = B1's barrier: after S1 + T1 the profile step over the
+implementation modules (consumer role, the working copy's library rows), the phases only after
+`accepted`. -/
 
 namespace FvdepDev.Phase
 
@@ -15,7 +19,8 @@ def usage : String :=
   "usage: fvdep-dev phase check <project dir> <id> --library <library dir> --spec-module <M> " ++
     "--spec <constant> [--abi-module <M> --abi <constant>] [--roots1 <c>…] [--roots2 <c>…] " ++
     "[--deadline <s>] [--work-bytes <n>] [--frame-bytes <n>] [--export-bytes <n>] " ++
-    "[--artifacts <dir>]\n       fvdep-dev phase rerun <bundle dir>\n"
+    "[--artifacts <dir>] [--profile [--limit <name>=<n>]... [--results <file> | --child <file>]]" ++
+    "\n       fvdep-dev phase rerun <bundle dir>\n"
 
 structure Options where
   project : String := ""
@@ -29,6 +34,9 @@ structure Options where
   roots2 : Option (List String) := none
   limits : Limits := {}
   artifacts : Option String := none
+  profile : Bool := false
+  prof : FvdepDev.ProfileCheck.Options := {}
+  profOptions : Bool := false
 
 /-- The values after a list option, up to the next option. -/
 def values (args : List String) : List String × List String :=
@@ -42,6 +50,25 @@ partial def parse (o : Options) : List String → Except String Options
   | "--abi-module" :: v :: rest => parse { o with abiModule := some v } rest
   | "--abi" :: v :: rest => parse { o with abi := some v } rest
   | "--artifacts" :: v :: rest => parse { o with artifacts := some v } rest
+  | "--profile" :: rest => parse { o with profile := true } rest
+  | "--limit" :: v :: rest =>
+    match FvdepDev.ProfileCheck.setLimit o.prof v with
+    | .ok p =>
+      parse
+        { o with
+          prof := p, profOptions := true }
+        rest
+    | .error e => .error e
+  | "--results" :: f :: rest =>
+    parse
+      { o with
+        prof := { o.prof with results := some f }, profOptions := true }
+      rest
+  | "--child" :: f :: rest =>
+    parse
+      { o with
+        prof := { o.prof with child := some f }, profOptions := true }
+      rest
   | "--roots1" :: rest =>
     match values rest with
     | ([], _) => .error "--roots1 takes at least one constant"
@@ -114,6 +141,12 @@ def check (o : Options) : IO UInt32 := do
     return ← usageError "missing arguments"
   if o.abiModule.isSome != o.abi.isSome then
     return ← usageError "--abi-module and --abi go together"
+  if o.profOptions && !o.profile then
+    return ← usageError "--limit, --results and --child go with --profile"
+  if o.prof.results.isSome && o.prof.child.isSome then
+    return ← usageError "--results and --child exclude each other"
+  if let some why := ({ fileBytes := o.prof.fileBytes } : Limits).check then
+    return ← usageError why
   if let some why := o.limits.check then
     return ← usageError why
   let some r ← FvdepIO.Tools.cacheRoot |
@@ -142,7 +175,7 @@ def check (o : Options) : IO UInt32 := do
     | .ok m =>
       pure m
     | .error e =>
-      say [s!"infra io: fvdep.toml: {e.detail}"]
+      say [s!"infra {e.code.spelling}: fvdep.toml: {e.detail}"]
       return 2
   let some entry := mf.modules.find? fun e => toString e.decl.module == o.id |
     do
@@ -176,6 +209,29 @@ def check (o : Options) : IO UInt32 := do
         say [s!"infra tool_missing: {e}"]
         return 2
     let e ← FvdepIO.Tools.env r run { cacheBytes := t } bwrap sys (run / "step") fp
+    -- U6 B1 (D2): the profile step before any graph, fill, view or compile.
+    let mut head : List String := []
+    if o.profile then
+      let frozen := src.impl.mergeSort fun a b => Decidable.decide (a.1 ≤ b.1)
+      head :=
+        [s!"impl_sources {FvdepIO.Hash.digest .implSources (FvdepCore.Phase.sourceFiles src.impl)}",
+            s!"proof_sources " ++
+              FvdepIO.Hash.digest .proofSources (FvdepCore.Phase.sourceFiles src.proof)] ++
+          FvdepDev.ProfileCheck.moduleLines frozen
+      let rows ←
+        match ← FvdepIO.Profile.libraryRows lib with
+        | .ok rs =>
+          pure rs
+        | .error why =>
+          say (head ++ [s!"infra io: {why}"])
+          return 2
+      let (digest, verdict) ←
+        FvdepDev.ProfileCheck.runProfile o.prof .consumer rows frozen bwrap sys run fp
+      let (ls, rc) := FvdepDev.ProfileCheck.report verdict
+      head := head ++ s!"request {digest}" :: ls
+      unless verdict matches .accepted _ do
+        say head
+        return rc
     let abi :=
       match o.abiModule, o.abi with
       | some m, some c => some (m, c)
@@ -217,7 +273,8 @@ def check (o : Options) : IO UInt32 := do
             s!"{f.size} {f.sha256}"
         else s!"artifact {phase} {f.path} {f.size} {f.sha256}"
     say
-        ([s!"impl_sources {rep.implSources}", s!"proof_sources {rep.proofSources}"] ++
+        ((if o.profile then head
+          else [s!"impl_sources {rep.implSources}", s!"proof_sources {rep.proofSources}"]) ++
           obs.map obsLine ++
           fileLines ++
           bundleLines.toList)

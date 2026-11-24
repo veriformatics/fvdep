@@ -87,6 +87,37 @@ def report : Verdict → List String × UInt32
       1)
   | .infra c d => ([s!"infra {FvdepIO.Cache.infraText c}: {d}"], 2)
 
+/-- D1 + D2's profile step once T1 ran: P5a's request over the frozen batch + the library rows, the
+step (or `--results`: the record's bytes, no spawn) → the request's digest + the verdict. -/
+def runProfile (o : Options) (role : Role) (rows : List LibModule)
+    (frozen : List (String × ByteArray)) (bwrap : String) (sys run : System.FilePath)
+    (fp : String) : IO (String × Verdict) := do
+  let req := requestOf role rows o.limits (frozen.map fun x => (x.1, FvdepIO.Hash.sha256Hex x.2)) fp
+  let reqBytes := FvdepCore.Json.print req.toJson
+  let digest := FvdepIO.Hash.sha256Hex reqBytes
+  let lim : FvdepCore.Sandbox.Limits :=
+    { deadline := o.seconds
+      frameBytes := o.frameBytes.getD ({} : FvdepCore.Sandbox.Limits).frameBytes
+      fileBytes := o.fileBytes }
+  match o.results with
+  | some f =>
+    match ← (IO.FS.readBinFile f).toBaseIO with
+    | .ok b =>
+      return (digest, verdictOf req digest b)
+    | .error e =>
+      return (digest, .infra .io s!"the record {f} could not be read: {e}")
+  | none =>
+    match ← FvdepIO.Profile.installParse run (o.child.map System.FilePath.mk) with
+    | .error e =>
+      return (digest, .infra .toolMissing e)
+    | .ok () =>
+      let r ← FvdepIO.Profile.runStep bwrap sys run reqBytes frozen lim
+      return (digest, judge req digest o.seconds lim.frameBytes r)
+
+/-- D1's `module` lines: each frozen module + its SHA-256, in batch order. -/
+def moduleLines (frozen : List (String × ByteArray)) : List String :=
+  frozen.map fun x => s!"module {x.1} {FvdepIO.Hash.sha256Hex x.2}"
+
 def check (o : Options) (role : Role) (src : String) (mods : List String) : IO UInt32 := do
   let ms := mods.mergeSort fun a b => decide (a ≤ b)
   let frozen ←
@@ -96,8 +127,7 @@ def check (o : Options) (role : Role) (src : String) (mods : List String) : IO U
     | .error d =>
       say [s!"infra io: {d}"]
       return 2
-  let digests := frozen.map fun x => (x.1, FvdepIO.Hash.sha256Hex x.2)
-  say (digests.map fun x => s!"module {x.1} {x.2}")
+  say (moduleLines frozen)
   let some root ← FvdepIO.Tools.cacheRoot |
     do
       say ["infra io: no cache directory (FVDEP_CACHE, XDG_CACHE_HOME + HOME unset)"]
@@ -129,31 +159,9 @@ def check (o : Options) (role : Role) (src : String) (mods : List String) : IO U
         | .error e =>
           say [s!"infra io: {e}"]
           return 2
-    let req := requestOf role rows o.limits digests fp
-    let reqBytes := FvdepCore.Json.print req.toJson
-    let digest := FvdepIO.Hash.sha256Hex reqBytes
-    say [s!"request {digest}"]
-    let lim : FvdepCore.Sandbox.Limits :=
-      { deadline := o.seconds
-        frameBytes := o.frameBytes.getD ({} : FvdepCore.Sandbox.Limits).frameBytes
-        fileBytes := o.fileBytes }
-    let verdict ←
-      match o.results with
-      | some f =>
-        match ← (IO.FS.readBinFile f).toBaseIO with
-        | .ok b =>
-          pure (verdictOf req digest b)
-        | .error e =>
-          pure (.infra .io s!"the record {f} could not be read: {e}")
-      | none =>
-        match ← FvdepIO.Profile.installParse run (o.child.map System.FilePath.mk) with
-        | .error e =>
-          pure (.infra .toolMissing e)
-        | .ok () =>
-          let r ← FvdepIO.Profile.runStep bwrap sys run reqBytes frozen lim
-          pure (judge req digest o.seconds lim.frameBytes r)
+    let (digest, verdict) ← runProfile o role rows frozen bwrap sys run fp
     let (ls, rc) := report verdict
-    say ls
+    say (s!"request {digest}" :: ls)
     return rc
   finally
     try

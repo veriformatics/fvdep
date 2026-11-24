@@ -342,14 +342,12 @@ oracle_suite() {
         bash tests/oracle/run.sh ${FVDEP_ORACLE_CASE:+--case "$FVDEP_ORACLE_CASE"}
 }
 
-# The blind profile suite (tester-8; U6 P, C, I, K, R, D1): `fvdep-dev profile check` over planted
-# modules, records + child faults, each case on its own FVDEP_CACHE (a toolchain record seeded once
-# per run). Its steps run fvdep-step + fvdep-parse ⇒ tests/profile/run.sh refuses outside a PID
-# namespace of the job's own. Every case but `phase.` (D2's barrier = U6-C2).
+# The blind profile suite (tester-8; U6 P, C, I, K, R, B, D1–D3): `fvdep-dev profile check` +
+# `fvdep-dev phase check … --profile` over planted modules, records + child faults, each case on its
+# own FVDEP_CACHE (a toolchain record seeded once per run). Its steps run fvdep-step + fvdep-parse ⇒
+# tests/profile/run.sh refuses outside a PID namespace of the job's own.
 profile_suite() {
-    local p cases=()
-    for p in accept cap command corpus decl grammar header order ownership parse record reserved \
-        scope snapshot step term termination usage; do cases+=(--case "$p."); done
+    local cases=()
     [[ -z "${FVDEP_PROFILE_CASE:-}" ]] || cases=(--case "$FVDEP_PROFILE_CASE")
     suite profile-suite "$(stage_key profile-suite)" "${FVDEP_PROFILE_CASE:-}" \
         bash tests/profile/run.sh "${cases[@]}"
