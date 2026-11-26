@@ -2502,6 +2502,177 @@ def cases : List (String × (Unit → Bool)) :=
           some .differ &&
         cmpDecl (some every) (vary 28 "\"value\":7" "\"value\":2") 3 == some .differ)]
 
+/-! ## S (statement) fixtures: name 1 = Eq, 2 = T, 3 = spec, 4 = impl, 5 = proof, 6 = shape,
+7 = v; level 1 = succ 0; expr 0 = Sort 1, 1 = T, 2 = bvar 0, 3 = T → T, 4–9 = the template. -/
+
+def sNames : List String :=
+  ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"Eq\"}}", "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"T\"}}",
+    "{\"in\":3,\"str\":{\"pre\":0,\"str\":\"spec\"}}",
+    "{\"in\":4,\"str\":{\"pre\":0,\"str\":\"impl\"}}",
+    "{\"in\":5,\"str\":{\"pre\":0,\"str\":\"proof\"}}",
+    "{\"in\":6,\"str\":{\"pre\":0,\"str\":\"shape\"}}",
+    "{\"in\":7,\"str\":{\"pre\":0,\"str\":\"v\"}}", "{\"il\":1,\"succ\":0}",
+    "{\"ie\":0,\"sort\":1}", "{\"const\":{\"name\":2,\"us\":[]},\"ie\":1}", "{\"bvar\":0,\"ie\":2}",
+    "{\"forallE\":{\"binderInfo\":\"default\",\"body\":1,\"name\":7,\"type\":1},\"ie\":3}"]
+
+/-- `@Eq.{1} T impl rhs`: exprs 4–7, then `rhs`'s records (from 8), then the type at `final`. -/
+def sTemplate (rhs : List String) (r final : Nat) : List String :=
+  ["{\"const\":{\"name\":1,\"us\":[1]},\"ie\":4}", "{\"app\":{\"arg\":1,\"fn\":4},\"ie\":5}",
+      "{\"const\":{\"name\":4,\"us\":[]},\"ie\":6}", "{\"app\":{\"arg\":6,\"fn\":5},\"ie\":7}"] ++
+    rhs ++
+    ["{\"app\":{\"arg\":" ++ toString r ++ ",\"fn\":7},\"ie\":" ++ toString final ++ "}"]
+
+def sDef (name type : Nat) (safety : String := "safe") (lps : String := "[]") : String :=
+  "{\"def\":{\"all\":[" ++ toString name ++ "],\"hints\":\"abbrev\",\"levelParams\":" ++ lps ++
+    ",\"name\":" ++
+    toString name ++
+    ",\"safety\":\"" ++
+    safety ++
+    "\",\"type\":" ++
+    toString type ++
+    ",\"value\":1}}"
+
+def sAxiom (name type : Nat) : String :=
+  "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[],\"name\":" ++ toString name ++ ",\"type\":" ++
+    toString type ++
+    "}}"
+
+def sThm (name type : Nat) (lps : String := "[]") : String :=
+  "{\"thm\":{\"all\":[" ++ toString name ++ "],\"levelParams\":" ++ lps ++ ",\"name\":" ++
+    toString name ++
+    ",\"type\":" ++
+    toString type ++
+    ",\"value\":1}}"
+
+/-- fn: `@Eq T impl spec` (rhs = expr 8 = `spec`, the type at 9). -/
+def sFnRhs : List String := ["{\"const\":{\"name\":3,\"us\":[]},\"ie\":8}"]
+
+def e1Fn : List String := sNames ++ sTemplate sFnRhs 8 9 ++ [sAxiom 2 0, sDef 3 1, sDef 4 1]
+
+def e2Fn : List String := e1Fn ++ [sThm 5 9]
+
+/-- abi: `@Eq T impl (shape spec)` (8 = shape, 9 = spec, 10 = `shape spec`, the type at 11); the
+shape's type = expr 3 = `T → T`. -/
+def sAbiRhs : List String :=
+  ["{\"const\":{\"name\":6,\"us\":[]},\"ie\":8}", "{\"const\":{\"name\":3,\"us\":[]},\"ie\":9}",
+    "{\"app\":{\"arg\":9,\"fn\":8},\"ie\":10}"]
+
+def e1Abi : List String :=
+  sNames ++ sTemplate sAbiRhs 10 11 ++ [sAxiom 2 0, sDef 3 1, sDef 4 1, sDef 6 3]
+
+def e2Abi : List String := e1Abi ++ [sThm 5 11]
+
+/-- abi with a shape type `(∀ x : Sort 1, x) → T` (expr 12 + 13: a binder inside A, closed). -/
+def e1AbiNested : List String :=
+  sNames ++ sTemplate sAbiRhs 10 11 ++
+    ["{\"forallE\":{\"binderInfo\":\"default\",\"body\":2,\"name\":7,\"type\":0},\"ie\":12}",
+      "{\"forallE\":{\"binderInfo\":\"default\",\"body\":1,\"name\":7,\"type\":12},\"ie\":13}"] ++
+    [sAxiom 2 0, sDef 3 1, sDef 4 1, sDef 6 13]
+
+/-- abi with a shape type `x → T`, A = a loose bound variable (expr 12). -/
+def e1AbiLoose : List String :=
+  sNames ++ sTemplate sAbiRhs 10 11 ++
+    ["{\"forallE\":{\"binderInfo\":\"default\",\"body\":1,\"name\":7,\"type\":2},\"ie\":12}"] ++
+    [sAxiom 2 0, sDef 3 1, sDef 4 1, sDef 6 12]
+
+def reqFn : FvdepCore.Judge.Request :=
+  { impl := `impl, spec := `spec, proof := `proof, abi := none }
+
+def reqAbi : FvdepCore.Judge.Request := { reqFn with abi := some `shape }
+
+/-- S over two hand-made exports (`none` = one refused by the reader). -/
+def stmt (a b : List String) (r : FvdepCore.Judge.Request := reqFn) (fuel : Nat := 1000) :
+    Option FvdepCore.Judge.Outcome := do
+  let t1 ← tbl a
+  let t2 ← tbl b
+  return (FvdepCore.Judge.statement (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2) r fuel
+        {}).1
+
+def edit (ls : List String) (i : Nat) (old new : String) : List String :=
+  ls.set i ((ls[i]!).replace old new)
+
+def isInfra : Option FvdepCore.Judge.Outcome → Bool
+  | some (.infra _) => true
+  | _ => false
+
+def isMismatch (why : String) : Option FvdepCore.Judge.Outcome → Bool
+  | some (.mismatch w) => w == why
+  | _ => false
+
+def sCases : List (String × (Unit → Bool)) :=
+  [("judge S: an fn proof of `@Eq T impl spec` + an abi proof of `@Eq T impl (shape spec)` match",
+      fun _ =>
+      stmt e1Fn e2Fn == some .matched && stmt e1Abi e2Abi reqAbi == some .matched &&
+        isMismatch "the proof does not prove the required statement" (stmt e1Abi e2Abi)),
+    ("judge S: a closed binder inside the shape's domain is fine; abi's rhs = `shape spec` exactly",
+      fun _ =>
+      stmt e1AbiNested (e1AbiNested ++ [sThm 5 11]) reqAbi == some .matched &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Abi (edit e2Abi 16 "\"name\":6" "\"name\":2") reqAbi) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Abi (edit e2Abi 17 "\"name\":3" "\"name\":4") reqAbi)),
+    ("judge S: an ABI shape whose domain is not closed → infrastructure", fun _ =>
+      isInfra (stmt e1AbiLoose (e1AbiLoose ++ [sThm 5 11]) reqAbi)),
+    ("judge S: an ABI shape missing, not an arrow or a dependent arrow → infrastructure", fun _ =>
+      isInfra (stmt e1Fn e2Fn reqAbi) &&
+        isInfra (stmt (e1Abi.dropLast ++ [sDef 6 1]) e2Abi reqAbi) &&
+        isInfra
+          (stmt (edit e1Abi 11 "\"body\":1" "\"body\":2") (edit e2Abi 11 "\"body\":1" "\"body\":2")
+            reqAbi)),
+    ("judge S: the trusted side breaks first — spec missing, unsafe, polymorphic → infrastructure",
+      fun _ =>
+      isInfra (stmt (e1Fn.take (e1Fn.length - 2) ++ [sDef 4 1]) e2Fn) &&
+        isInfra
+          (stmt (sNames ++ sTemplate sFnRhs 8 9 ++ [sAxiom 2 0, sDef 3 1 "partial", sDef 4 1])
+            e2Fn) &&
+        isInfra
+          (stmt (sNames ++ sTemplate sFnRhs 8 9 ++ [sAxiom 2 0, sDef 3 1 "safe" "[7]", sDef 4 1])
+            e2Fn)),
+    ("judge S: the implementation missing or unsafe, the proof missing, not a theorem, " ++
+        "polymorphic or named like a trusted constant → mismatch",
+      fun _ =>
+      isMismatch "the implementation impl is missing" (stmt (e1Fn.dropLast) e2Fn) &&
+        isMismatch "the implementation impl is not a safe definition without level parameters"
+          (stmt (e1Fn.dropLast ++ [sDef 4 1 "partial"]) e2Fn) &&
+        isMismatch "the solution lacks proof" (stmt e1Fn e1Fn) &&
+        isMismatch "the proof proof is not a theorem" (stmt e1Fn (e1Fn ++ [sDef 5 9])) &&
+        isMismatch "the proof proof has level parameters" (stmt e1Fn (e1Fn ++ [sThm 5 9 "[7]"])) &&
+        isMismatch "the proof's name proof is a trusted constant" (stmt e2Fn e2Fn)),
+    ("judge S: a type that is not `@Eq.{u} _ _ _`, the wrong impl or spec, another T → mismatch",
+      fun _ =>
+      isMismatch "the proof's type is not an equation" (stmt e1Fn (e1Fn ++ [sThm 5 1])) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Fn (edit e2Fn 14 "\"name\":4" "\"name\":3")) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Fn (edit e2Fn 16 "\"name\":3" "\"name\":4")) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Fn (edit e2Fn 13 "\"arg\":1" "\"arg\":0")) &&
+        isMismatch "the proof's type is not an equation"
+          (stmt e1Fn (edit e2Fn 12 "\"us\":[1]" "\"us\":[]")) &&
+        isMismatch "the proof's type is not an equation"
+          (stmt e1Fn (edit e2Fn 12 "\"name\":1" "\"name\":2")) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Fn (edit e2Fn 14 "\"us\":[]" "\"us\":[1]"))),
+    ("judge S: a budget too small for the template's type = mismatch, never a pass", fun _ =>
+      isMismatch "the comparison passes its work budget" (stmt e1Fn e2Fn reqFn 0) &&
+        stmt e1Fn e2Fn reqFn 3 == some .matched),
+    ("judge S0: the template's bytes = the canonical J text over the names as written; distinct " ++
+        "requests → distinct bytes",
+      fun _ =>
+      let x : FvdepCore.Judge.Template :=
+        { shape := .fn, impl := "impl", spec := "spec", proof := "proof", abi := none }
+      let y :=
+        { x with
+          shape := .abi, abi := some "Fvdep.Abi.V1_0_0.encoder" }
+      String.fromUTF8? (FvdepCore.Judge.templateBytes x) ==
+          some
+            ("{\"abi\":null,\"form\":\"fvdep/statement/1\",\"impl\":\"impl\",\"proof\":" ++
+              "\"proof\",\"shape\":\"fn\",\"spec\":\"spec\"}") &&
+        FvdepCore.Judge.templateBytes x != FvdepCore.Judge.templateBytes y &&
+        FvdepCore.Judge.templateBytes x != FvdepCore.Judge.templateBytes { x with shape := .abi } &&
+        FvdepCore.Judge.templateBytes x !=
+          FvdepCore.Judge.templateBytes { x with impl := "impl2" })]
+
 def ioCases : List (String × IO Bool) :=
   [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
         "export-decode corpus input, every field (U7 X9)",
@@ -4477,6 +4648,7 @@ def main : IO UInt32 := do
                   PhaseD.cases ++
                   ExportR.cases ++
                   JudgeX.cases ++
+                  JudgeX.sCases ++
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
                   WireT.cases seed ++

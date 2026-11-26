@@ -12,6 +12,8 @@ import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Judge.Proof
+import FvdepAudit.Judge.Statement.Proof
+import FvdepAudit.Judge.Template.Proof
 import FvdepAudit.Library.Proof.Batch
 import FvdepAudit.Library.Proof.Plan
 import FvdepAudit.Manifest.Proof.Denote
@@ -1726,6 +1728,45 @@ def declEqExact : Prop :=
         (r.1 = .differ → ¬EntryEq t1 t2 e e')
 
 end FvdepLedger.Rows.JudgeClaims
+
+namespace FvdepLedger.Rows.StatementClaims
+
+open FvdepCore.Export FvdepCore.Judge FvdepAudit.Judge.Spec FvdepAudit.Judge.Statement.Spec
+
+/-- U7 X6 + X8: on an export the reader accepts, the name index finds exactly the constant of a
+name. -/
+def viewLookup : Prop :=
+  ∀ (githash version : String) (b : ByteArray) (t : Tables) (n : Lean.Name) (e : Entry),
+    readTables githash version b = .ok t → ((viewOf t).byName[n]? = some e ↔ Named t n e)
+
+/-- U7 S1–S4: on two exports the reader accepts, a sound memo in: `statement` reports
+infrastructure exactly when the trusted side lacks the target type; `.matched` ⇒ the template
+holds (the memo out sound); when it holds, the step fails only by exhausting its budget. -/
+def statementExact : Prop :=
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tables) (r : Request) (fuel : Nat)
+    (seen : Std.HashSet Pair) (o : Outcome × Nat × Std.HashSet Pair),
+    readTables githash version b1 = .ok t1 →
+      readTables githash version b2 = .ok t2 →
+      (∀ p, seen.contains p = true → PairEq t1 t2 p) →
+      statement (viewOf t1) (viewOf t2) r fuel seen = o →
+      ((∃ c, o.1 = .infra c) ↔ ¬∃ T, Target t1 r T) ∧
+        (o.1 = .matched → Holds t1 t2 r ∧ ∀ p, o.2.2.contains p = true → PairEq t1 t2 p) ∧
+        (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget")
+
+/-- U7 S0: the challenge key's statement digest hashes exactly the template's bytes (its
+separation = the hash's collision resistance over them, never premised). -/
+def statementDigestExact : Prop :=
+  ∀ (h : ByteArray → String) (x : Template), statementDigest h x = h (templateBytes x)
+
+/-- U7 S0: on names within J's string bound, the template's canonical bytes determine the request
+(shape, names, ABI shape). -/
+def templateInjective : Prop :=
+  ∀ (x y : Template),
+    (∀ s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof], s.utf8ByteSize ≤ 65536) →
+      (∀ s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof], s.utf8ByteSize ≤ 65536) →
+      templateBytes x = templateBytes y → x = y
+
+end FvdepLedger.Rows.StatementClaims
 
 namespace FvdepLedger.Rows.LibraryClaims
 
@@ -3754,6 +3795,58 @@ def judgeDeclRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 X6 + X8: one export's constants by name. -/
+def judgeViewRow : Row :=
+  { component := `FvdepCore.Judge.View
+    contract := "U7 X6, X8"
+    claim :=
+      "`viewOf`: the reader's tables + an index of their constants (X6's per-constant records) " ++
+        "by denoted name: on an export the reader accepts, a name finds exactly its constant " ++
+        "(`viewLookup`; X8: one declaration per name)."
+    claims := [(``StatementClaims.viewLookup, ``FvdepAudit.Judge.Proof.view_lookup)]
+    subject := ``FvdepCore.Judge.viewOf
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
+/-- U7 S: the statement step. -/
+def judgeStatementRow : Row :=
+  { component := `FvdepCore.Judge.Statement
+    contract := "U7 S1–S4"
+    claim :=
+      "`statement`: e2's proof constant vs the template over e1's trusted constants — fn " ++
+        "`@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` " ++
+        "(T = the codomain of the shape's closed nondependent arrow type), u = the proof's own " ++
+        "`Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks " ++
+        "T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or the budget's " ++
+        "mismatch (`statementExact`); the causes' texts = J4's tested detail lines."
+    claims := [(``StatementClaims.statementExact, ``FvdepAudit.Judge.Proof.statement_exact)]
+    subject := ``FvdepCore.Judge.statement
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
+/-- U7 S0: the challenge key's statement digest. -/
+def judgeTemplateRow : Row :=
+  { component := `FvdepCore.Judge.Template
+    contract := "U7 S0"
+    claim :=
+      "`statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the " ++
+        "request's names as written (shape, impl, spec, proof, ABI shape: " ++
+        "`statementDigestExact`); on names within J's string bound the bytes determine the " ++
+        "request (`templateInjective`); the digest's separation = SHA-256's collision " ++
+        "resistance over those bytes (never premised)."
+    claims :=
+      [(``StatementClaims.statementDigestExact, ``FvdepAudit.Judge.Proof.statementDigest_exact),
+        (``StatementClaims.templateInjective, ``FvdepAudit.Judge.Proof.template_injective)]
+    subject := ``FvdepCore.Judge.statementDigest
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U5b P3: project selection (U8 reuses it). -/
 def projectSelectRow : Row :=
   { component := `FvdepCore.Project
@@ -4847,21 +4940,21 @@ def ledger : Ledger :=
         historyRow, indexCommandRow, indexFillerRow, sandboxArgsRow, sandboxOutcomeRow,
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
-        exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, projectSelectRow,
-        librarySourceRow, libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow,
-        libraryStartRow, libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow,
-        wireArgsRow, wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow,
-        wireNativeUtf16Row, wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow,
-        wireNativeVersionRow, wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow,
-        wireResultServeRow, wireArgServeRow, oracleMergeRow, gitRunRow, librarySnapshotRow,
-        projectReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
-        runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow,
-        bundleWriteRow, oracleTargetRow, oracleIndexRow, oracleCoherenceRow, oracleEntryRow,
-        oracleSigRow, oracleCommandRow, oracleDriverRow, oracleEffectsRow, toolsRow,
-        manifestTreeRow, libraryLimitsRow, versionTypeRow, profileTypesRow, profileRecordRow,
-        profileRequestRow, profileTableRow, profileGrammarRow, profileDetailRow, profileWalkRow,
-        profileBodyRow, profileHeaderRow, profileConcludeRow, profileJudgeRow, parseExecuteRow,
-        parsePlanRow, profileStepRow]
+        exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
+        judgeTemplateRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
+        libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
+        libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
+        wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow,
+        wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow,
+        wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
+        oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
+        stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
+        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
+        oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
+        oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
+        profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
+        profileDetailRow, profileWalkRow, profileBodyRow, profileHeaderRow, profileConcludeRow,
+        profileJudgeRow, parseExecuteRow, parsePlanRow, profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

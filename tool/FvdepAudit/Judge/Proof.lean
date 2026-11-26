@@ -11,7 +11,7 @@ open FvdepCore.Export FvdepCore.Judge FvdepCore.Index.Rules FvdepAudit.Export.Sp
 
 /-- The walk's invariant: each accepted pair is equal, or its kids are accepted or still to
 come. -/
-def Closed (t1 t2 : Tables) (S : Std.HashSet Pair) (wl : List Pair) : Prop :=
+def WalkOk (t1 t2 : Tables) (S : Std.HashSet Pair) (wl : List Pair) : Prop :=
   ∀ p,
     S.contains p = true →
       PairEq t1 t2 p ∨ ∃ kids, heads t1 t2 p = some kids ∧ ∀ k ∈ kids, S.contains k = true ∨ k ∈ wl
@@ -19,7 +19,7 @@ def Closed (t1 t2 : Tables) (S : Std.HashSet Pair) (wl : List Pair) : Prop :=
 /-- With nothing left to come, every accepted pair is equal (by rank: a kid ranks below its
 pair). -/
 theorem closed_sound {t1 t2 : Tables} (h1 : RawOk t1) (h2 : RawOk t2) {S : Std.HashSet Pair}
-    (hc : Closed t1 t2 S []) : ∀ p, S.contains p = true → PairEq t1 t2 p := by
+    (hc : WalkOk t1 t2 S []) : ∀ p, S.contains p = true → PairEq t1 t2 p := by
   have key : ∀ n p, rank t1 p = n → S.contains p = true → PairEq t1 t2 p := by
     intro n
     induction n using Nat.strongRecOn with
@@ -38,7 +38,7 @@ theorem closed_sound {t1 t2 : Tables} (h1 : RawOk t1) (h2 : RawOk t2) {S : Std.H
 
 theorem walk_spec {t1 t2 : Tables} (h1 : RawOk t1) (h2 : RawOk t2) (targets : List Pair) :
     ∀ (fuel : Nat) (wl : List Pair) (S : Std.HashSet Pair),
-      Closed t1 t2 S wl →
+      WalkOk t1 t2 S wl →
         (∀ p ∈ targets, S.contains p = true ∨ p ∈ wl) →
         (∀ p ∈ wl, ¬PairEq t1 t2 p → ∃ q ∈ targets, ¬PairEq t1 t2 q) →
         ∀ r,

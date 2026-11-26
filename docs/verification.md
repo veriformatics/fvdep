@@ -2786,6 +2786,81 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Judge.View`
+
+- Contract: U7 X6, X8
+- Claim: `viewOf`: the reader's tables + an index of their constants (X6's per-constant records) by denoted name: on an export the reader accepts, a name finds exactly its constant (`viewLookup`; X8: one declaration per name).
+- Subject: `FvdepCore.Judge.viewOf`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.StatementClaims.viewLookup` (hash 0x16dc7a93), proved by `FvdepAudit.Judge.Proof.view_lookup`:
+
+  ```lean
+  ∀ (githash version : String) (b : ByteArray) (t : FvdepCore.Export.Tables) (n : Lean.Name)
+    (e : FvdepCore.Judge.Entry),
+    FvdepCore.Export.readTables githash version b = Except.ok t →
+      ((FvdepCore.Judge.viewOf t).byName[n]? = some e ↔ FvdepAudit.Judge.Statement.Spec.Named t n e)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Statement`
+
+- Contract: U7 S1–S4
+- Claim: `statement`: e2's proof constant vs the template over e1's trusted constants — fn `@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` (T = the codomain of the shape's closed nondependent arrow type), u = the proof's own `Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or the budget's mismatch (`statementExact`); the causes' texts = J4's tested detail lines.
+- Subject: `FvdepCore.Judge.statement`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.StatementClaims.statementExact` (hash 0x4ce8ebf2), proved by `FvdepAudit.Judge.Proof.statement_exact`:
+
+  ```lean
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
+    (r : FvdepCore.Judge.Request) (fuel : Nat) (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (o : FvdepCore.Judge.Outcome × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        (∀ (p : FvdepCore.Judge.Pair),
+            seen.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) →
+          FvdepCore.Judge.statement (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2) r fuel
+                seen =
+              o →
+            ((∃ c, o.fst = FvdepCore.Judge.Outcome.infra c) ↔
+                ¬∃ T, FvdepAudit.Judge.Statement.Spec.Target t1 r T) ∧
+              (o.fst = FvdepCore.Judge.Outcome.matched →
+                  FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r ∧
+                    ∀ (p : FvdepCore.Judge.Pair),
+                      o.snd.snd.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) ∧
+                (FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r →
+                  o.fst = FvdepCore.Judge.Outcome.matched ∨
+                    o.fst = FvdepCore.Judge.Outcome.mismatch "the comparison passes its work budget")
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Template`
+
+- Contract: U7 S0
+- Claim: `statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the request's names as written (shape, impl, spec, proof, ABI shape: `statementDigestExact`); on names within J's string bound the bytes determine the request (`templateInjective`); the digest's separation = SHA-256's collision resistance over those bytes (never premised).
+- Subject: `FvdepCore.Judge.statementDigest`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.StatementClaims.statementDigestExact` (hash 0x725535fa), proved by `FvdepAudit.Judge.Proof.statementDigest_exact`:
+
+  ```lean
+  ∀ (h : ByteArray → String) (x : FvdepCore.Judge.Template),
+    FvdepCore.Judge.statementDigest h x = h (FvdepCore.Judge.templateBytes x)
+  ```
+- Statement `FvdepLedger.Rows.StatementClaims.templateInjective` (hash 0x1d8947f0), proved by `FvdepAudit.Judge.Proof.template_injective`:
+
+  ```lean
+  ∀ (x y : FvdepCore.Judge.Template),
+    (∀ (s : String), s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof] → s.utf8ByteSize ≤ 65536) →
+      (∀ (s : String), s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof] → s.utf8ByteSize ≤ 65536) →
+        FvdepCore.Judge.templateBytes x = FvdepCore.Judge.templateBytes y → x = y
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Project`
 
 - Contract: U5b P1–P3
