@@ -174,32 +174,51 @@ theorem fresh_ok (tbl : String) (n i : Nat) : fresh tbl n i = .ok () ↔ i = n :
   · simp [h, pure, Except.pure]
   · simp [h, outside]
 
-theorem addNames_ok (seen : List Lean.Name) (ds : List Decl) (s' : List Lean.Name) :
+/-- U7 X8: the index of declared names = the names of the declarations so far. -/
+def DeclaredIndex (t : Tables) : Prop :=
+  ∀ n, t.declared.contains n = true ↔ n ∈ t.decls.toList.map (·.name)
+
+theorem contains_foldl_insert (ns : List Lean.Name) (s : Std.HashSet Lean.Name) (n : Lean.Name) :
+    (ns.foldl (fun s n => s.insert n) s).contains n = true ↔ s.contains n = true ∨ n ∈ ns := by
+  induction ns generalizing s with
+  | nil => simp
+  | cons m ms ih =>
+    rw [List.foldl_cons, ih, Std.HashSet.contains_insert]
+    simp only [Bool.or_eq_true, beq_iff_eq, List.mem_cons]
+    constructor
+    · rintro ((rfl | h) | h)
+      · exact Or.inr (Or.inl rfl)
+      · exact Or.inl h
+      · exact Or.inr (Or.inr h)
+    · rintro (h | rfl | h)
+      · exact Or.inl (Or.inr h)
+      · exact Or.inl (Or.inl rfl)
+      · exact Or.inr h
+
+theorem addNames_ok (seen : Std.HashSet Lean.Name) (ds : List Decl) (s' : Std.HashSet Lean.Name) :
     addNames seen ds = .ok s' ↔
       (ds.map (·.name)).Nodup ∧
-        (∀ d ∈ ds, d.name ∉ seen) ∧ s' = (ds.map (·.name)).reverse ++ seen := by
+        (∀ d ∈ ds, seen.contains d.name = false) ∧
+        s' = (ds.map (·.name)).foldl (fun s n => s.insert n) seen := by
   induction ds generalizing seen with
-  | nil => simp [addNames, eq_comm]
+  | nil =>
+    simp only [addNames, Except.ok.injEq, List.map_nil, List.nodup_nil, List.not_mem_nil,
+      false_implies, implies_true, List.foldl_nil, true_and]
+    exact eq_comm
   | cons d ds ih =>
     unfold addNames
-    by_cases h : d.name ∈ seen
-    · simp [h, bad]
-    · simp only [h, ite_false, ih, List.map_cons, List.nodup_cons, List.mem_cons, List.reverse_cons,
-        List.append_assoc, List.singleton_append]
+    by_cases h : seen.contains d.name = true
+    · simp only [h, ↓reduceIte, bad, reduceCtorEq, false_iff, not_and]
+      intro _ hs
+      exact absurd (hs d List.mem_cons_self) (by simp [h])
+    · simp only [h, Bool.false_eq_true, ite_false, ih, Std.HashSet.contains_insert,
+        Bool.or_eq_false_iff, beq_eq_false_iff_ne, List.map_cons, List.nodup_cons, List.mem_map,
+        List.forall_mem_cons, List.foldl_cons, not_exists, not_and, true_and]
       constructor
       · rintro ⟨hn, hs, rfl⟩
-        refine ⟨⟨fun hm => ?_, hn⟩, ?_, rfl⟩
-        · obtain ⟨e, he, hne⟩ := List.mem_map.1 hm
-          exact hs e he (by simp [hne])
-        · intro e he
-          rcases he with rfl | he
-          · exact h
-          · exact fun hm => hs e he (by simp [hm])
-      · rintro ⟨⟨hn, hd⟩, hs, rfl⟩
-        refine ⟨hd, fun e he hm => ?_, rfl⟩
-        rcases hm with heq | hm
-        · exact hn (List.mem_map.2 ⟨e, he, heq⟩)
-        · exact hs e (Or.inr he) hm
+        exact ⟨⟨fun e he hne => (hs e he).1 hne.symm, hn⟩, fun e he => (hs e he).2, rfl⟩
+      · rintro ⟨⟨hd, hn⟩, hs, rfl⟩
+        exact ⟨hn, fun e he => ⟨fun hne => hd e he hne.symm, hs e he⟩, rfl⟩
 
 theorem mapM_denoteItem_ok (t : Tables) (ds : List Item) (os : List Decl) :
     ds.mapM (denoteItem t) = .ok os ↔
@@ -232,7 +251,8 @@ theorem mapM_denoteItem_ok (t : Tables) (ds : List Item) (os : List Decl) :
 /-- The shipped record split = the spec's. -/
 theorem items_eq (d : DeclF) : items d = itemsOf d := by cases d <;> rfl
 
-theorem apply_ok (t : Tables) (r : Raw) (t' : Tables) : apply t r = .ok t' ↔ ApplySpec t r t' := by
+theorem apply_ok (t : Tables) (hi : DeclaredIndex t) (r : Raw) (t' : Tables) :
+    apply t r = .ok t' ↔ ApplySpec t r t' := by
   cases r with
   | name i
     f =>
@@ -263,13 +283,38 @@ theorem apply_ok (t : Tables) (r : Raw) (t' : Tables) : apply t r = .ok t' ↔ A
       exact ⟨(), (fresh_ok _ _ _).2 hu, n, hn, rfl⟩
   | decl
     d =>
-    simp only [apply, ApplySpec, bind_ok, items_eq, mapM_denoteItem_ok, addNames_ok, pure,
+    have hc : ∀ n, t.declared.contains n = false ↔ n ∉ t.decls.toList.map (·.name) := fun n => by
+      rw [← hi n]
+      simp
+    simp only [apply, ApplySpec, bind_ok, items_eq, mapM_denoteItem_ok, addNames_ok, hc, pure,
       Except.pure, Except.ok.injEq]
     constructor
     · rintro ⟨os, ⟨hl, hp⟩, s, ⟨hn, hs, rfl⟩, rfl⟩
       exact ⟨os, hl, hp, hn, hs, rfl⟩
     · rintro ⟨os, hl, hp, hn, hs, rfl⟩
       exact ⟨os, ⟨hl, hp⟩, _, ⟨hn, hs, rfl⟩, rfl⟩
+
+theorem declaredIndex_initial : DeclaredIndex initial := by
+  intro n
+  simp [initial]
+
+/-- `ApplySpec` keeps the index exact. -/
+theorem declaredIndex_apply {t : Tables} {r : Raw} {t' : Tables} (hi : DeclaredIndex t)
+    (h : ApplySpec t r t') : DeclaredIndex t' := by
+  cases r with
+  | name i f =>
+    obtain ⟨_, _, _, rfl⟩ := h
+    exact hi
+  | level i f =>
+    obtain ⟨_, _, _, rfl⟩ := h
+    exact hi
+  | expr i f =>
+    obtain ⟨_, _, _, rfl⟩ := h
+    exact hi
+  | decl d =>
+    obtain ⟨os, _, _, _, _, rfl⟩ := h
+    intro n
+    simp only [contains_foldl_insert, hi n, Array.toList_append, List.map_append, List.mem_append]
 
 /-! ## Failure classes: density alone is outside the profile -/
 
@@ -377,7 +422,8 @@ theorem onlyBad_denoteItem (t : Tables) (d : Item) : OnlyBad (denoteItem t d) :=
           onlyBad_bind (onlyBad_exprAt t d.type) fun _ =>
             onlyBad_bind (onlyBad_optExpr t d.value) fun _ => onlyBad_pure _
 
-theorem onlyBad_addNames : ∀ (seen : List Lean.Name) (ds : List Decl), OnlyBad (addNames seen ds)
+theorem onlyBad_addNames :
+    ∀ (seen : Std.HashSet Lean.Name) (ds : List Decl), OnlyBad (addNames seen ds)
   | _, [] => by
     intro c w h
     simp [addNames] at h

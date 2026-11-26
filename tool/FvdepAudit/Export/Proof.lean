@@ -125,17 +125,23 @@ theorem jsonStep_eq (x : ByteArray) :
 theorem applySpec_dense {t : Tables} {r : Raw} {t' : Tables} (h : ApplySpec t r t') :
     Dense t r := by cases r <;> simp_all [ApplySpec, Dense]
 
-theorem recordStep_ok (t : Tables) (v : Value) (t' : Tables) :
+theorem recordStep_ok (t : Tables) (hi : DeclaredIndex t) (v : Value) (t' : Tables) :
     (parseLine v >>= apply t) = .ok t' ↔ RecordStep t v (.ok t') := by
   rw [bind_ok]
   constructor
   · rintro ⟨r, hr, ha⟩
-    exact .ok r t' ((parseLine_ok v r).1 hr) ((apply_ok t r t').1 ha)
+    exact .ok r t' ((parseLine_ok v r).1 hr) ((apply_ok t hi r t').1 ha)
   · intro h
     cases h with
-    | ok r _ hv ha => exact ⟨r, (parseLine_ok v r).2 hv, (apply_ok t r t').2 ha⟩
+    | ok r _ hv ha => exact ⟨r, (parseLine_ok v r).2 hv, (apply_ok t hi r t').2 ha⟩
 
-theorem recordStep_error (t : Tables) (v : Value) (c : Class) :
+/-- A record line the run accepts keeps the declared-name index exact. -/
+theorem declaredIndex_record {t : Tables} {v : Value} {t' : Tables} (hi : DeclaredIndex t)
+    (h : RecordStep t v (.ok t')) : DeclaredIndex t' := by
+  cases h with
+  | ok r _ _ ha => exact declaredIndex_apply hi ha
+
+theorem recordStep_error (t : Tables) (hi : DeclaredIndex t) (v : Value) (c : Class) :
     (∃ w, (parseLine v >>= apply t) = .error (c, w)) ↔ RecordStep t v (.error c) := by
   constructor
   · rintro ⟨w, h⟩
@@ -150,7 +156,7 @@ theorem recordStep_error (t : Tables) (v : Value) (c : Class) :
     · have hv := (parseLine_ok v r).1 hr
       have hcls := apply_class t r c w h
       have hno : ∀ t', ¬ApplySpec t r t' := fun t' ha => by
-        rw [(apply_ok t r t').2 ha] at h
+        rw [(apply_ok t hi r t').2 ha] at h
         cases h
       cases c with
       | profile => exact .sparse r hv (hcls.1 rfl)
@@ -183,7 +189,7 @@ theorem recordStep_error (t : Tables) (v : Value) (c : Class) :
     | sparse r hv hd =>
       have hp := (parseLine_ok v r).2 hv
       cases ha : apply t r with
-      | ok t' => exact absurd (applySpec_dense ((apply_ok t r t').1 ha)) hd
+      | ok t' => exact absurd (applySpec_dense ((apply_ok t hi r t').1 ha)) hd
       | error e =>
         obtain ⟨c', w⟩ := e
         have := (apply_class t r c' w ha).2 hd
@@ -194,7 +200,7 @@ theorem recordStep_error (t : Tables) (v : Value) (c : Class) :
     | unbound r hv hd hno =>
       have hp := (parseLine_ok v r).2 hv
       cases ha : apply t r with
-      | ok t' => exact absurd ((apply_ok t r t').1 ha) (hno t')
+      | ok t' => exact absurd ((apply_ok t hi r t').1 ha) (hno t')
       | error e =>
         obtain ⟨c', w⟩ := e
         have hcls := apply_class t r c' w ha
@@ -283,15 +289,15 @@ theorem headerStep_iff (githash version : String) (v : Value) (o : Except Class 
       simp only [Except.error.injEq, Prod.mk.injEq]
       exact ⟨fun ⟨_, h, _⟩ => h.symm, fun h => ⟨w, h.symm, rfl⟩⟩
 
-theorem recordStep_iff (t : Tables) (v : Value) (o : Except Class Tables) :
+theorem recordStep_iff (t : Tables) (hi : DeclaredIndex t) (v : Value) (o : Except Class Tables) :
     RecordStep t v o ↔ o = recordOut t v := by
   unfold recordOut
   cases o with
   | ok t' =>
-    rw [← recordStep_ok]
+    rw [← recordStep_ok t hi]
     cases parseLine v >>= apply t <;> simp [eq_comm]
   | error c =>
-    rw [← recordStep_error]
+    rw [← recordStep_error t hi]
     cases parseLine v >>= apply t with
     | ok u => simp
     | error e =>
@@ -325,8 +331,8 @@ def runOut (githash version : String) :
 
 theorem run_iff (githash version : String) :
     ∀ (ls : List (List UInt8)) (k : Nat) (t : Tables) (o : Except (Nat × Class) Tables),
-      1 ≤ k → (Run githash version k t ls o ↔ o = runOut githash version k t ls)
-  | [], k, t, o, hk => by
+      1 ≤ k → DeclaredIndex t → (Run githash version k t ls o ↔ o = runOut githash version k t ls)
+  | [], k, t, o, hk, _ => by
     constructor
     · intro h
       cases h with
@@ -342,7 +348,7 @@ theorem run_iff (githash version : String) :
         exact .noHeader t
       · simp only [runOut, h1, ↓reduceIte]
         exact .done k t (by omega)
-  | l :: ls, k, t, o, hk => by
+  | l :: ls, k, t, o, hk, hi => by
     constructor
     · intro h
       cases h with
@@ -350,15 +356,16 @@ theorem run_iff (githash version : String) :
       | headerBad _ _ _ v c hj hh => simp [runOut, stepOut, hj, ← (headerStep_iff _ _ _ _).1 hh]
       | header _ _ _ v o hj hh
         hr =>
-        rw [(run_iff githash version ls 2 t o (by omega)).1 hr]
+        rw [(run_iff githash version ls 2 t o (by omega) hi).1 hr]
         simp [runOut, stepOut, hj, ← (headerStep_iff _ _ _ _).1 hh]
       | recordBad _ _ _ _ v c h2 hj hr =>
         have : k ≠ 1 := by omega
-        simp [runOut, stepOut, hj, this, ← (recordStep_iff _ _ _).1 hr]
+        simp [runOut, stepOut, hj, this, ← (recordStep_iff _ hi _ _).1 hr]
       | record _ _ t' _ _ v o h2 hj hr hrun =>
         have : k ≠ 1 := by omega
-        rw [(run_iff githash version ls (k + 1) t' o (by omega)).1 hrun]
-        simp [runOut, stepOut, hj, this, ← (recordStep_iff _ _ _).1 hr]
+        rw [(run_iff githash version ls (k + 1) t' o (by omega) (declaredIndex_record hi hr)).1
+            hrun]
+        simp [runOut, stepOut, hj, this, ← (recordStep_iff _ hi _ _).1 hr]
     · intro h
       subst h
       cases hj : jsonStep l with
@@ -377,16 +384,18 @@ theorem run_iff (githash version : String) :
             simp only [runOut, stepOut, hj, hh, ↓reduceIte]
             exact
               .header t l ls v _ hj ((headerStep_iff _ _ _ _).2 hh.symm)
-                ((run_iff githash version ls 2 t _ (by omega)).2 rfl)
+                ((run_iff githash version ls 2 t _ (by omega) hi).2 rfl)
         · cases hr : recordOut t v with
           | error c =>
             simp only [runOut, stepOut, hj, hr, h1, ↓reduceIte]
-            exact .recordBad k t l ls v c (by omega) hj ((recordStep_iff _ _ _).2 hr.symm)
+            exact .recordBad k t l ls v c (by omega) hj ((recordStep_iff _ hi _ _).2 hr.symm)
           | ok t' =>
             simp only [runOut, stepOut, hj, hr, h1, ↓reduceIte]
+            have hs := (recordStep_iff _ hi _ _).2 hr.symm
             exact
-              .record k t t' l ls v _ (by omega) hj ((recordStep_iff _ _ _).2 hr.symm)
-                ((run_iff githash version ls (k + 1) t' _ (by omega)).2 rfl)
+              .record k t t' l ls v _ (by omega) hj hs
+                ((run_iff githash version ls (k + 1) t' _ (by omega) (declaredIndex_record hi hs)).2
+                  rfl)
 
 /-! ## `readFrom` = the run -/
 
@@ -447,21 +456,21 @@ theorem read_accepts (g v : String) (b : ByteArray) (ds : List Decl) :
       ∃ t, Run g v 1 initial (linesSpec b.data.toList) (.ok t) ∧ ds = t.decls.toList := by
   have h := readFrom_strip g v b 0 1 {} (Nat.le_refl 1)
   rw [List.drop_zero, initial_eq] at h
-  unfold FvdepCore.Export.read
+  unfold FvdepCore.Export.read FvdepCore.Export.readTables
   constructor
   · intro hr
     cases hrf : readFrom g v b 1 initial 0 with
     | ok t =>
       rw [initial_eq, hrf] at hr
       simp only [Except.map, Except.ok.injEq] at hr
-      refine ⟨t, (run_iff _ _ _ _ _ _ (Nat.le_refl 1)).2 ?_, hr.symm⟩
+      refine ⟨t, (run_iff _ _ _ _ _ _ (Nat.le_refl 1) declaredIndex_initial).2 ?_, hr.symm⟩
       rw [← h, hrf]
       rfl
     | error r =>
       rw [initial_eq, hrf] at hr
       cases hr
   · rintro ⟨t, hrun, rfl⟩
-    have ho := (run_iff _ _ _ _ _ _ (Nat.le_refl 1)).1 hrun
+    have ho := (run_iff _ _ _ _ _ _ (Nat.le_refl 1) declaredIndex_initial).1 hrun
     rw [← h] at ho
     rw [initial_eq]
     cases hrf : readFrom g v b 1 initial 0 with
@@ -474,6 +483,21 @@ theorem read_accepts (g v : String) (b : ByteArray) (ds : List Decl) :
       rw [hrf] at ho
       cases ho
 
+/-- U7 X6 `readTablesAccepts`: `readTables` returns exactly the final tables of a run that stays in
+the profile (the judge reads their `rawExprs` + `rawDecls`). -/
+theorem read_tables (g v : String) (b : ByteArray) (t : Tables) :
+    readTables g v b = .ok t ↔ Run g v 1 initial (linesSpec b.data.toList) (.ok t) := by
+  have h := readFrom_strip g v b 0 1 {} (Nat.le_refl 1)
+  rw [List.drop_zero, initial_eq] at h
+  rw [run_iff _ _ _ _ _ _ (Nat.le_refl 1) declaredIndex_initial, ← h]
+  unfold FvdepCore.Export.readTables
+  rw [initial_eq]
+  cases readFrom g v b 1 initial 0 with
+  | ok t' =>
+    simp only [strip, Except.ok.injEq]
+    exact ⟨fun e => e ▸ rfl, fun e => e ▸ rfl⟩
+  | error r => simp [strip]
+
 /-- X6 `readFirst`: `read` refuses at line `k` with class `c` exactly when the run's first
 violation is line `k`, of class `c`. -/
 theorem read_first (g v : String) (b : ByteArray) (k : Nat) (c : Class) :
@@ -481,8 +505,8 @@ theorem read_first (g v : String) (b : ByteArray) (k : Nat) (c : Class) :
       Run g v 1 initial (linesSpec b.data.toList) (.error (k, c)) := by
   have h := readFrom_strip g v b 0 1 {} (Nat.le_refl 1)
   rw [List.drop_zero, initial_eq] at h
-  rw [run_iff _ _ _ _ _ _ (Nat.le_refl 1), ← h]
-  unfold FvdepCore.Export.read
+  rw [run_iff _ _ _ _ _ _ (Nat.le_refl 1) declaredIndex_initial, ← h]
+  unfold FvdepCore.Export.read FvdepCore.Export.readTables
   rw [initial_eq]
   cases readFrom g v b 1 initial 0 with
   | ok t => simp [Except.map, strip]

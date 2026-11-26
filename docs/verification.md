@@ -2713,6 +2713,79 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Export`
+
+- Contract: U7 X6, X8
+- Claim: `readTables`: one `leanexport` output → the final tables of the run (U5b's projection + the expression + declaration records as read, in line order: `rawExprs`, `rawDecls`), every record validated in full, or the first violating line (`readTablesAccepts`; the refusal side = `readFirst` through `read`).
+- Subject: `FvdepCore.Export.readTables`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.ExportClaims.readTablesAccepts` (hash 0x43ac2e38), proved by `FvdepAudit.Export.Proof.read_tables`:
+
+  ```lean
+  ∀ (githash version : String) (b : ByteArray) (t : FvdepCore.Export.Tables),
+    FvdepCore.Export.readTables githash version b = Except.ok t ↔
+      FvdepAudit.Export.Spec.Run githash version 1 FvdepAudit.Export.Spec.initial
+        (FvdepAudit.Protocol.Spec.linesSpec b.data.toList) (Except.ok t)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Compare`
+
+- Contract: U7 X7
+- Claim: `eqExpr`: two exports' expressions compared by index pairs over their raw records (names, levels + expressions; binder names, binder info + `nondep` never compared), each pair once per judge run (a memo the run's comparisons share), one unit of the work budget per pair taken: within the budget `.equal` ⇒ U4's alpha-equivalence of the denoted expressions, `.differ` ⇒ not, the memo stays sound (`eqExprExact`); `.exhausted` = no verdict (S + G count it a failure).
+- Subject: `FvdepCore.Judge.eqExpr`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.JudgeClaims.eqExprExact` (hash 0x5b11611d), proved by `FvdepAudit.Judge.Proof.eqExpr_exact`:
+
+  ```lean
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables) (i j fuel : Nat)
+    (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (r : FvdepCore.Judge.Cmp × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        (∀ (p : FvdepCore.Judge.Pair),
+            seen.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) →
+          FvdepCore.Judge.eqExpr t1 i t2 j fuel seen = r →
+            (r.fst = FvdepCore.Judge.Cmp.equal →
+                FvdepAudit.Judge.Spec.PairEq t1 t2 (FvdepCore.Judge.Pair.expr i j) ∧
+                  ∀ (p : FvdepCore.Judge.Pair),
+                    r.snd.snd.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) ∧
+              (r.fst = FvdepCore.Judge.Cmp.differ →
+                ¬FvdepAudit.Judge.Spec.PairEq t1 t2 (FvdepCore.Judge.Pair.expr i j))
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Compare`
+
+- Contract: U7 X6, X7
+- Claim: `declEq`: two constants (X6's per-constant records, every field) compared — the kind, flags, numbers, hints, safety, quotient kind, list lengths + rule `nfields` exactly, names + expressions through `eqExpr`'s walk: within the budget `.equal` ⇒ `EntryEq` (field by field), `.differ` ⇒ not, the memo stays sound (`declEqExact`).
+- Subject: `FvdepCore.Judge.declEq`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.JudgeClaims.declEqExact` (hash 0x2640a68b), proved by `FvdepAudit.Judge.Proof.declEq_exact`:
+
+  ```lean
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
+    (e e' : FvdepCore.Judge.Entry) (fuel : Nat) (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (r : FvdepCore.Judge.Cmp × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        (∀ (p : FvdepCore.Judge.Pair),
+            seen.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) →
+          FvdepCore.Judge.declEq t1 e t2 e' fuel seen = r →
+            (r.fst = FvdepCore.Judge.Cmp.equal →
+                FvdepAudit.Judge.Spec.EntryEq t1 t2 e e' ∧
+                  ∀ (p : FvdepCore.Judge.Pair),
+                    r.snd.snd.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) ∧
+              (r.fst = FvdepCore.Judge.Cmp.differ → ¬FvdepAudit.Judge.Spec.EntryEq t1 t2 e e')
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Project`
 
 - Contract: U5b P1–P3

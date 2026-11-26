@@ -164,7 +164,11 @@ def initial : Tables :=
     levels := #[.zero]
     exprs := #[]
     decls := #[]
-    declared := [] }
+    declared := {}
+    rawNames := #[none]
+    rawLevels := #[none]
+    rawExprs := #[]
+    rawDecls := #[] }
 
 /-- X2: a record's index = its table's next one. -/
 def Dense (t : Tables) : Raw → Prop
@@ -236,26 +240,44 @@ def DeclDenotes (t : Tables) (d : Item) (o : Decl) : Prop :=
     | some v => ∃ y, t.exprs[v]? = some y ∧ o.value = some y)
 
 /-- X2 + X3 stage 2: a raw record applied to the tables — dense (its index = the table's size),
-every reference bound, declared names new (to the tables + to each other). -/
+every reference bound, declared names new (to the earlier declarations + to each other); the
+record itself kept beside its denotation (U7 X6), the declared names indexed (U7 X8). -/
 def ApplySpec (t : Tables) : Raw → Tables → Prop
   | .name i f, t' =>
-    i = t.names.size ∧ ∃ n, NameDenotes t.names f n ∧ t' = { t with names := t.names.push n }
+    i = t.names.size ∧
+      ∃ n,
+        NameDenotes t.names f n ∧
+          t' =
+            { t with
+              names := t.names.push n
+              rawNames := t.rawNames.push (some f) }
   | .level i f, t' =>
     i = t.levels.size ∧
-      ∃ v, LevelDenotes t.names t.levels f v ∧ t' = { t with levels := t.levels.push v }
+      ∃ v,
+        LevelDenotes t.names t.levels f v ∧
+          t' =
+            { t with
+              levels := t.levels.push v
+              rawLevels := t.rawLevels.push (some f) }
   | .expr i f, t' =>
     i = t.exprs.size ∧
-      ∃ e, ExprDenotes t.names t.levels t.exprs f e ∧ t' = { t with exprs := t.exprs.push e }
+      ∃ e,
+        ExprDenotes t.names t.levels t.exprs f e ∧
+          t' =
+            { t with
+              exprs := t.exprs.push e
+              rawExprs := t.rawExprs.push f }
   | .decl d, t' =>
     ∃ os : List Decl,
       (itemsOf d).length = os.length ∧
         (∀ p ∈ (itemsOf d).zip os, DeclDenotes t p.1 p.2) ∧
         (os.map (·.name)).Nodup ∧
-        (∀ o ∈ os, o.name ∉ t.declared) ∧
+        (∀ o ∈ os, o.name ∉ t.decls.toList.map (·.name)) ∧
         t' =
           { t with
             decls := t.decls ++ os.toArray
-            declared := (os.map (·.name)).reverse ++ t.declared }
+            declared := (os.map (·.name)).foldl (fun s n => s.insert n) t.declared
+            rawDecls := t.rawDecls.push d }
 
 /-! ## Classes + the run (X1 + X5) -/
 

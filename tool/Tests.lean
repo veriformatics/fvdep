@@ -2322,6 +2322,16 @@ def cases : List (String × (Unit → Bool)) :=
       refusal (rd ["{\"const\":{\"name\":5,\"us\":[]},\"ie\":0}"]) == some (2, .malformed)),
     ("export: a declaration declared twice refuses (malformed)", fun _ =>
       refusal (rd (tables ++ [axiomA, axiomA])) == some (8, .malformed)),
+    ("export: one name declared through two name records refuses (malformed; U7 X8 by name)",
+      fun _ =>
+      refusal
+          (rd
+            ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"a\"}}",
+              "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"a\"}}", "{\"il\":1,\"succ\":0}",
+              "{\"ie\":0,\"sort\":1}",
+              "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[],\"name\":1,\"type\":0}}",
+              "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[],\"name\":2,\"type\":0}}"]) ==
+        some (7, .malformed)),
     ("export: mdata is outside the profile", fun _ =>
       refusal (rd (tables ++ ["{\"ie\":2,\"mdata\":{\"data\":{},\"expr\":0}}"])) ==
         some (7, .profile)),
@@ -2356,6 +2366,155 @@ def cases : List (String × (Unit → Bool)) :=
         refusal (rd ["{\"ie\":0,\"zzz\":1}"]) == some (2, .malformed))]
 
 end ExportR
+
+namespace JudgeX
+
+open FvdepCore.Export FvdepCore.Judge ExportR
+
+/-- The final tables of a hand-made export (`hdr` + `ls`), `none` when refused. -/
+def tbl (ls : List String) : Option Tables :=
+  match
+    readTables Lean.githash Lean.versionString ("\n".intercalate (hdr :: ls) ++ "\n").toUTF8 with
+  | .ok t => some t
+  | .error _ => none
+
+/-- `every` with line `i` edited (`none` when the edit changes nothing: no vacuous variant). -/
+def vary (i : Nat) (old new : String) : Option (List String) :=
+  let l := every[i]!
+  if l.replace old new == l then none else some (every.set i (l.replace old new))
+
+/-- `eqExpr` on expression `i` of `a` vs expression `j` of `b`, a fresh memo. -/
+def cmp (a b : Option (List String)) (i j : Nat) (fuel : Nat := 1000) : Option Cmp := do
+  let t1 ← tbl (← a)
+  let t2 ← tbl (← b)
+  return (eqExpr t1 i t2 j fuel {}).1
+
+/-- `declEq` on constant `k` of `a` vs constant `k'` of `b` (record order), a fresh memo. -/
+def cmpDecl (a b : Option (List String)) (k : Nat) (k' : Nat := k) (fuel : Nat := 1000) :
+    Option Cmp := do
+  let t1 ← tbl (← a)
+  let t2 ← tbl (← b)
+  let e1 ← (t1.rawDecls.toList.flatMap entries)[k]?
+  let e2 ← (t2.rawDecls.toList.flatMap entries)[k']?
+  return (declEq t1 e1 t2 e2 fuel {}).1
+
+/-- Name `a` + the chain `e₀ = leaf`, `eₖ₊₁ = eₖ eₖ`: a tree of `2 ^ depth` leaves over
+`depth + 1` records. -/
+def chain (depth : Nat) (leaf : String := "{\"ie\":0,\"sort\":1}") : List String :=
+  ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"a\"}}", "{\"il\":1,\"succ\":0}", leaf] ++
+    (List.range depth).map fun k =>
+      "{\"app\":{\"arg\":" ++ toString k ++ ",\"fn\":" ++ toString k ++ "},\"ie\":" ++
+        toString (k + 1) ++
+        "}"
+
+def cases : List (String × (Unit → Bool)) :=
+  [("judge: readTables keeps every record beside its denotation (U7 X6)", fun _ =>
+      match tbl every with
+      | some t =>
+        t.rawNames.size == t.names.size && t.rawLevels.size == t.levels.size &&
+          t.rawExprs.size == t.exprs.size &&
+          t.rawNames[0]? == some none &&
+          t.rawLevels[0]? == some none &&
+          t.rawDecls.size == 6 &&
+          (t.rawDecls.toList.flatMap entries).length == t.decls.size
+      | none => false),
+    ("judge: every expression of an export equals itself; a memo hit costs one unit", fun _ =>
+      match tbl every with
+      | some t =>
+        (List.range t.exprs.size).all (fun i => (eqExpr t i t i 1000 {}).1 == .equal) &&
+          (eqExpr t 2 t 2 10 {}).2.1 == 9 &&
+          let r := eqExpr t 6 t 6 1000 {}
+          (eqExpr t 6 t 6 1000 r.2.2).2.1 == 999
+      | none => false),
+    ("judge: binder names, binder info + nondep are not compared (U4's alpha-equivalence)", fun _ =>
+      cmp (some every) (vary 18 "\"binderInfo\":\"implicit\"" "\"binderInfo\":\"default\"") 4 4 ==
+          some .equal &&
+        cmp (some every) (vary 18 "\"name\":2" "\"name\":1") 4 4 == some .equal &&
+        cmp (some every) (vary 20 "\"nondep\":true" "\"nondep\":false") 6 6 == some .equal),
+    ("judge: a different constant, level, literal, bound variable, head, level-argument count " ++
+        "or projection index differs",
+      fun _ =>
+      cmp (some every) (vary 15 "\"name\":1" "\"name\":2") 1 1 == some .differ &&
+        cmp (some every) (vary 14 "\"sort\":1" "\"sort\":2") 0 0 == some .differ &&
+        cmp (some every) (vary 22 "\"42\"" "\"43\"") 8 8 == some .differ &&
+        cmp (some every) (vary 23 "\"s\"" "\"t\"") 9 9 == some .differ &&
+        cmp (some every) (vary 16 "\"bvar\":0" "\"bvar\":1") 2 2 == some .differ &&
+        cmp (some every) (some every) 4 5 == some .differ &&
+        cmp (some every) (vary 15 "[2,3]" "[2]") 1 1 == some .differ &&
+        cmp (some every) (vary 21 "\"idx\":0" "\"idx\":1") 7 7 == some .differ &&
+        cmp (some every) (vary 11 "\"param\":4" "\"param\":1") 10 10 == some .differ &&
+        cmp (some every) (vary 11 "\"param\":4" "\"param\":1") 1 1 == some .differ),
+    ("judge: each child of an application, binder, let + projection is compared", fun _ =>
+      cmp (some every) (vary 16 "\"bvar\":0" "\"bvar\":1") 5 5 == some .differ &&
+        cmp (some every) (vary 19 "\"arg\":2" "\"arg\":0") 5 5 == some .differ &&
+        cmp (some every) (vary 18 "\"body\":2" "\"body\":0") 5 5 == some .differ &&
+        cmp (some every) (vary 18 "\"body\":2" "\"body\":0") 4 4 == some .differ &&
+        cmp (some every) (vary 17 "\"type\":0" "\"type\":2") 3 3 == some .differ &&
+        cmp (some every) (vary 20 "\"value\":0" "\"value\":2") 6 6 == some .differ &&
+        cmp (some every) (vary 21 "\"typeName\":5" "\"typeName\":1") 7 7 == some .differ),
+    ("judge: names compare by what they denote, not by index", fun _ =>
+      let a :=
+        ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"a\"}}",
+          "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"b\"}}",
+          "{\"const\":{\"name\":1,\"us\":[]},\"ie\":0}"]
+      let b :=
+        ["{\"in\":1,\"str\":{\"pre\":0,\"str\":\"b\"}}",
+          "{\"in\":2,\"str\":{\"pre\":0,\"str\":\"a\"}}",
+          "{\"const\":{\"name\":2,\"us\":[]},\"ie\":0}",
+          "{\"const\":{\"name\":1,\"us\":[]},\"ie\":1}"]
+      cmp (some a) (some b) 0 0 == some .equal && cmp (some a) (some b) 0 1 == some .differ),
+    ("judge: the budget — a 64-deep shared DAG (2^64 tree leaves) compares within 2 × depth + 4 " ++
+        "units, fewer = exhausted, a differing leaf found",
+      fun _ =>
+      cmp (some (chain 64)) (some (chain 64)) 64 64 (2 * 64 + 4) == some .equal &&
+        cmp (some (chain 64)) (some (chain 64)) 64 64 64 == some .exhausted &&
+        cmp (some (chain 64)) (some (chain 64 "{\"ie\":0,\"sort\":0}")) 64 64 200 == some .differ),
+    ("judge: an unbound index differs, never a pass", fun _ =>
+      cmp (some every) (some every) 999 999 == some .differ &&
+        cmp (some every) (some every) 0 999 == some .differ),
+    ("judge: declEq — every constant equals itself; binder info in a value is not compared",
+      fun _ =>
+      (List.range 8).all (fun k => cmpDecl (some every) (some every) k == some .equal) &&
+        cmpDecl (some every) (vary 18 "\"binderInfo\":\"implicit\"" "\"binderInfo\":\"default\"")
+            1 ==
+          some .equal),
+    ("judge: declEq — a flag, hint, safety, quotient kind, number, list length, " ++
+        "level parameter, type or recursor rule differing → differ",
+      fun _ =>
+      cmpDecl (some every) (vary 25 "\"isUnsafe\":false" "\"isUnsafe\":true") 0 == some .differ &&
+        cmpDecl (some every) (vary 25 "\"levelParams\":[4]" "\"levelParams\":[1]") 0 ==
+          some .differ &&
+        cmpDecl (some every) (vary 26 "{\"regular\":3}" "\"abbrev\"") 1 == some .differ &&
+        cmpDecl (some every) (vary 26 "\"partial\"" "\"safe\"") 1 == some .differ &&
+        cmpDecl (some every) (vary 27 "\"all\":[10]" "\"all\":[10,1]") 2 == some .differ &&
+        cmpDecl (some every) (vary 28 "\"type\":1" "\"type\":0") 3 == some .differ &&
+        cmpDecl (some every) (vary 29 "\"lift\"" "\"ind\"") 4 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"isRec\":false" "\"isRec\":true") 5 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"numFields\":0" "\"numFields\":1") 6 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"k\":true" "\"k\":false") 7 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"nfields\":0" "\"nfields\":1") 7 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"rhs\":2" "\"rhs\":0") 7 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"cidx\":0" "\"cidx\":1") 6 == some .differ &&
+        cmpDecl (some every) (some every) 0 1 == some .differ &&
+        cmpDecl (some every) (vary 25 "\"type\":8" "\"type\":9") 0 == some .differ &&
+        cmpDecl (some every) (vary 2 "\"i\":7" "\"i\":8") 2 == some .differ &&
+        cmpDecl (some every) (vary 30 "\"levelParams\":[4]" "\"levelParams\":[1]") 7 ==
+          some .differ &&
+        cmpDecl (some every) (vary 28 "\"value\":7" "\"value\":2") 3 == some .differ)]
+
+def ioCases : List (String × IO Bool) :=
+  [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
+        "export-decode corpus input, every field (U7 X9)",
+      do
+      let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+      let dir : System.FilePath := ".." / "tests" / "fuzz" / "export-decode"
+      let paths := ((← dir.readDir).map (·.path.toString)).qsort (· < ·)
+      let o ← IO.Process.output { cmd := dev.toString, args := #["export", "compare"] ++ paths }
+      let lines := o.stdout.splitOn "\n"
+      return o.exitCode == 0 && (lines.filter (·.startsWith "same ")).length ≥ 10 &&
+          (lines.filter (·.startsWith "differ ")).isEmpty)]
+
+end JudgeX
 
 namespace LibraryT
 
@@ -4317,6 +4476,7 @@ def main : IO UInt32 := do
                   Snapshot.cases ++
                   PhaseD.cases ++
                   ExportR.cases ++
+                  JudgeX.cases ++
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
                   WireT.cases seed ++
@@ -4331,6 +4491,7 @@ def main : IO UInt32 := do
             LibraryT.ioCases ++
             LibraryR.ioCases ++
             OracleT.ioCases ++
+            JudgeX.ioCases ++
             ProfileC.ioCases).mapM
         fun c => checkIO c.1 c.2
   let results := results ++ ioResults

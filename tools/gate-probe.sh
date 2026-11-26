@@ -585,8 +585,9 @@ probe coverage-extra-reach plant_extra_reach 'uncovered: probePlan: reachable' \
 # module checks unrun: `call` stays in the first group).
 # shellcheck disable=SC2016  # Lean's double-backtick names are literal on purpose
 plant_step_instance() {
-    sed -i 's/^        wireNativeIntRow, wireNativeOrderingRow,/        wireNativeOrderingRow,/' \
-        tool/FvdepLedger/Rows.lean
+    # The row's name wherever the formatter breaks the list's lines (a line-start anchor moves
+    # with every row added before it).
+    perl -0pi -e 's/\bwireNativeIntRow,\s+//' tool/FvdepLedger/Rows.lean
 }
 # shellcheck disable=SC2016
 plant_step_driver() {

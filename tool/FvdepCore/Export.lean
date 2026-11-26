@@ -1,12 +1,14 @@
 import FvdepCore.Ids
 import FvdepCore.Json.Decode
 import Lean.Expr
+import Std.Data.HashSet
 
 /-! The export reader (contract `docs/contracts/U5b-oracle.md` X1–X5): one `leanexport` run's bytes
 (lean4export format 3.1.0 as Lean 4.35.0's bundled writer emits it) → the projection the oracle
-reads (each declaration's name, kind, level params, type + value), every record validated in full.
-Pure. The profile = the pinned writer's output: dense indices per table (names + levels from 1
-after the predefined 0, exprs from 0), no `mdata`, J's bounds. Two stages per line: `parseLine`
+reads (each declaration's name, kind, level params, type + value), every record validated in full,
++ the records themselves beside it for the judge (U7 X6). Pure. The profile = the pinned writer's
+output: dense indices per table (names + levels from 1 after the predefined 0, exprs from 0), no
+`mdata`, J's bounds. Two stages per line: `parseLine`
 (the record's exact layout over J's sorted members: keys, JSON types, spellings — no table read)
 + `apply` (density, references, declared names). Lines by offsets (`lineEnd`): an export may
 reach T's `exportBytes` (default 128 MiB), so the reader never builds a byte list. -/
@@ -407,7 +409,16 @@ structure Tables where
   levels : Array Lean.Level := #[.zero]
   exprs : Array Lean.Expr := #[]
   decls : Array Decl := #[]
-  declared : List Lean.Name := []
+  /-- U7 X8: the names declared so far, indexed (a list scan is quadratic in declarations). -/
+  declared : Std.HashSet Lean.Name := {}
+  /-- U7 X6: the name records as read (index 0 = the predefined anonymous name: `none`). -/
+  rawNames : Array (Option NameF) := #[none]
+  /-- U7 X6: the level records as read (index 0 = the predefined zero: `none`). -/
+  rawLevels : Array (Option LevelF) := #[none]
+  /-- U7 X6: the expression records as read (children = earlier indices). -/
+  rawExprs : Array ExprF := #[]
+  /-- U7 X6: the declaration records as read (every field), in line order. -/
+  rawDecls : Array DeclF := #[]
 
 def nameAt (t : Tables) (i : Nat) : R Lean.Name := need s!"name {i} (unbound)" t.names[i]?
 
@@ -457,28 +468,36 @@ def denoteItem (t : Tables) (d : Item) : R Decl := do
       type := ← exprAt t d.type
       value := ← optExpr t d.value }
 
-/-- X3: each declaration's name new (newest first in `seen`). -/
-def addNames (seen : List Lean.Name) : List Decl → R (List Lean.Name)
+/-- X3 + U7 X8: each declaration's name new (`seen` = the names declared before). -/
+def addNames (seen : Std.HashSet Lean.Name) : List Decl → R (Std.HashSet Lean.Name)
   | [] => .ok seen
   | d :: ds =>
-    if d.name ∈ seen then bad s!"declaration {d.name} is declared twice"
-    else addNames (d.name :: seen) ds
+    if seen.contains d.name then bad s!"declaration {d.name} is declared twice"
+    else addNames (seen.insert d.name) ds
 
 /-- X2 + X3 stage 2: one raw record applied to the tables. -/
 def apply (t : Tables) : Raw → R Tables
   | .name i f => do
     fresh "name" t.names.size i
-    return { t with names := t.names.push (← denoteName t f) }
+    return { t with
+        names := t.names.push (← denoteName t f)
+        rawNames := t.rawNames.push (some f) }
   | .level i f => do
     fresh "level" t.levels.size i
-    return { t with levels := t.levels.push (← denoteLevel t f) }
+    return { t with
+        levels := t.levels.push (← denoteLevel t f)
+        rawLevels := t.rawLevels.push (some f) }
   | .expr i f => do
     fresh "expression" t.exprs.size i
-    return { t with exprs := t.exprs.push (← denoteExpr t f) }
+    return { t with
+        exprs := t.exprs.push (← denoteExpr t f)
+        rawExprs := t.rawExprs.push f }
   | .decl d => do
     let ds ← (items d).mapM (denoteItem t)
     return { t with
-        decls := t.decls ++ ds.toArray, declared := ← addNames t.declared ds }
+        decls := t.decls ++ ds.toArray
+        declared := ← addNames t.declared ds
+        rawDecls := t.rawDecls.push d }
 
 /-! ## Lines -/
 
@@ -532,8 +551,13 @@ def readFrom (githash version : String) (b : ByteArray) (k : Nat) (t : Tables) (
 termination_by b.size - i
 decreasing_by omega
 
+/-- X1–X5 + U7 X6: an export's final tables (the judge reads the raw records), or its first
+violation. -/
+def readTables (githash version : String) (b : ByteArray) : Except Refusal Tables :=
+  readFrom githash version b 1 {} 0
+
 /-- X1–X5: the projection of an export, or its first violation. -/
 def read (githash version : String) (b : ByteArray) : Except Refusal (List Decl) :=
-  (readFrom githash version b 1 {} 0).map (·.decls.toList)
+  (readTables githash version b).map (·.decls.toList)
 
 end FvdepCore.Export
