@@ -2673,6 +2673,277 @@ def sCases : List (String × (Unit → Bool)) :=
         FvdepCore.Judge.templateBytes x !=
           FvdepCore.Judge.templateBytes { x with impl := "impl2" })]
 
+/-! ## G (graph) fixtures: names = the mandatory inventory + `gExtra` (prefixes first, from 1);
+level 1 = succ 0; exprs 0 = Sort 1, 1 = T, 2 = aux, 3 = op, 4 = ax, 5–10 = `@Eq.{1} T impl spec`,
+11 = shape, 12–71 = per k < 20 two `const d_k` records + their application, 72 = `d_20`, 73–112 =
+`T T` doubled 39 times (2^40 leaves), 113–116 = `Box`, `aux2`, `Box.rec`, `Box.mk`, 117–125 =
+`∀ _ : C5, fun _ : C1 => let _ : C2 := C3; (C4).S.0`; every name `axiom _ : Sort 1` unless a case
+says otherwise. -/
+
+def gDepth : Nat := 20
+
+/-- `d_k` (`d_0` = `T`). -/
+def dName (k : Nat) : Lean.Name := if k == 0 then `T else .str .anonymous ("d" ++ toString k)
+
+def gExtra : List Lean.Name :=
+  [`Eq, `T, `spec, `impl, `proof, `aux, `op, `ax, `shape, `Box, `Box.mk, `Box.rec, `aux2, `C1, `C2,
+      `C3, `C4, `C5, `S] ++
+    (List.range gDepth).map fun k => dName (k + 1)
+
+/-- Name records for `ns` + their prefixes (parents first, from index 1), each name's index. -/
+def nameRecs (ns : List Lean.Name) : List String × List (Lean.Name × Nat) :=
+  ns.foldl (fun acc n => go n acc) ([], [])
+where go : Lean.Name → List String × List (Lean.Name × Nat) → List String × List (Lean.Name × Nat)
+    | .str p s, acc =>
+      if acc.2.any (·.1 == .str p s) then acc
+      else
+        let acc := go p acc
+        let pre := ((acc.2.find? (·.1 == p)).map (·.2)).getD 0
+        let k := acc.2.length + 1
+        (acc.1 ++
+            ["{\"in\":" ++ toString k ++ ",\"str\":{\"pre\":" ++ toString pre ++ ",\"str\":\"" ++
+                s ++
+                "\"}}"],
+          acc.2 ++ [(.str p s, k)])
+    | _, acc => acc
+
+def gIdx (n : Lean.Name) : String :=
+  toString
+    ((((nameRecs (FvdepCore.Judge.mandatory ++ gExtra)).2.find? (·.1 == n)).map (·.2)).getD 0)
+
+def gConst (k : Nat) (n : Lean.Name) (us : String := "[]") : String :=
+  "{\"const\":{\"name\":" ++ gIdx n ++ ",\"us\":" ++ us ++ "},\"ie\":" ++ toString k ++ "}"
+
+def gApp (k f a : Nat) : String :=
+  "{\"app\":{\"arg\":" ++ toString a ++ ",\"fn\":" ++ toString f ++ "},\"ie\":" ++ toString k ++ "}"
+
+def gAxiom (n : Lean.Name) (ty : Nat := 0) : String :=
+  "{\"axiom\":{\"isUnsafe\":false,\"levelParams\":[],\"name\":" ++ gIdx n ++ ",\"type\":" ++
+    toString ty ++
+    "}}"
+
+def gDef (n : Lean.Name) (ty v : Nat) : String :=
+  "{\"def\":{\"all\":[" ++ gIdx n ++ "],\"hints\":\"abbrev\",\"levelParams\":[],\"name\":" ++
+    gIdx n ++
+    ",\"safety\":\"safe\",\"type\":" ++
+    toString ty ++
+    ",\"value\":" ++
+    toString v ++
+    "}}"
+
+def gOpaque (n : Lean.Name) (ty v : Nat) : String :=
+  "{\"opaque\":{\"all\":[" ++ gIdx n ++ "],\"isUnsafe\":false,\"levelParams\":[],\"name\":" ++
+    gIdx n ++
+    ",\"type\":" ++
+    toString ty ++
+    ",\"value\":" ++
+    toString v ++
+    "}}"
+
+def gThm (n : Lean.Name) (ty v : Nat) : String :=
+  "{\"thm\":{\"all\":[" ++ gIdx n ++ "],\"levelParams\":[],\"name\":" ++ gIdx n ++ ",\"type\":" ++
+    toString ty ++
+    ",\"value\":" ++
+    toString v ++
+    "}}"
+
+/-- e1: the mandatory inventory, `Eq` + `T` as axioms, `spec := aux`, `aux` (`:= T` unless given),
+`impl := T`, `shape := T`. -/
+def gBase (aux : List String := [gDef `aux 1 1]) : List String :=
+  (nameRecs (FvdepCore.Judge.mandatory ++ gExtra)).1 ++
+    ["{\"il\":1,\"succ\":0}", "{\"ie\":0,\"sort\":1}", gConst 1 `T, gConst 2 `aux, gConst 3 `op,
+      gConst 4 `ax, gConst 5 `Eq "[1]", gApp 6 5 1, gConst 7 `impl, gApp 8 6 7, gConst 9 `spec,
+      gApp 10 8 9, gConst 11 `shape] ++
+    ((List.range gDepth).flatMap fun k =>
+      [gConst (12 + 3 * k) (dName k), gConst (13 + 3 * k) (dName k),
+        gApp (14 + 3 * k) (12 + 3 * k) (13 + 3 * k)]) ++
+    [gConst 72 (dName gDepth), gApp 73 1 1] ++
+    ((List.range 39).map fun k => gApp (74 + k) (73 + k) (73 + k)) ++
+    [gConst 113 `Box, gConst 114 `aux2, gConst 115 `Box.rec, gConst 116 `Box.mk, gConst 117 `C4,
+      "{\"ie\":118,\"proj\":{\"idx\":0,\"struct\":117,\"typeName\":" ++ gIdx `S ++ "}}",
+      gConst 119 `C2, gConst 120 `C3,
+      "{\"ie\":121,\"letE\":{\"body\":118,\"name\":" ++ gIdx `T ++
+        ",\"nondep\":false,\"type\":119,\"value\":120}}",
+      gConst 122 `C1,
+      "{\"ie\":123,\"lam\":{\"binderInfo\":\"default\",\"body\":121,\"name\":" ++ gIdx `T ++
+        ",\"type\":122}}",
+      gConst 124 `C5,
+      "{\"forallE\":{\"binderInfo\":\"default\",\"body\":123,\"name\":" ++ gIdx `T ++
+        ",\"type\":124},\"ie\":125}"] ++
+    (FvdepCore.Judge.mandatory ++ [`Eq, `T]).map (gAxiom ·) ++
+    [gDef `spec 1 2] ++
+    aux ++
+    [gDef `impl 1 1, gDef `shape 1 1]
+
+/-- e2 = `base` + the proof `proof : @Eq.{1} T impl spec := v`. -/
+def gProof (base : List String := gBase) (v : Nat := 1) : List String := base ++ [gThm `proof 10 v]
+
+def gSwap (ls : List String) (old new : String) : List String :=
+  ls.map fun l => if l == old then new else l
+
+/-- `d_(k+1) := d_k d_k` over two records of `d_k`. -/
+def gChain : List String := (List.range gDepth).map fun k => gDef (dName (k + 1)) 1 (14 + 3 * k)
+
+/-- The block `Box : Sort 1`, `Box.mk : e_ctorTy` (`fields` fields), `Box.rec : Box` with one rule
+(`Box.mk`, right side `aux2`); `Box` listing itself in `all`. -/
+def gBlock (ctorTy : Nat := 113) (fields : Nat := 0) (isRec : Bool := false) : String :=
+  "{\"inductive\":{\"ctors\":[{\"cidx\":0,\"induct\":" ++ gIdx `Box ++
+    ",\"isUnsafe\":false,\"levelParams\":[],\"name\":" ++
+    gIdx `Box.mk ++
+    ",\"numFields\":" ++
+    toString fields ++
+    ",\"numParams\":0,\"type\":" ++
+    toString ctorTy ++
+    "}],\"recs\":[{\"all\":[" ++
+    gIdx `Box ++
+    "],\"isUnsafe\":false,\"k\":true,\"levelParams\":[],\"name\":" ++
+    gIdx `Box.rec ++
+    ",\"numIndices\":0,\"numMinors\":1,\"numMotives\":1,\"numParams\":0,\"rules\":[{\"ctor\":" ++
+    gIdx `Box.mk ++
+    ",\"nfields\":0,\"rhs\":114}],\"type\":113}],\"types\":[{\"all\":[" ++
+    gIdx `Box ++
+    "],\"ctors\":[" ++
+    gIdx `Box.mk ++
+    "],\"isRec\":" ++
+    toString isRec ++
+    ",\"isReflexive\":false,\"isUnsafe\":false,\"levelParams\":[],\"name\":" ++
+    gIdx `Box ++
+    ",\"numIndices\":0,\"numNested\":0,\"numParams\":0,\"type\":0}]}}"
+
+/-- `gBase` with `spec := e_v`, the block + `aux2 := T` declared. -/
+def gInd (v : Nat) (block : String := gBlock) (aux2 : String := gDef `aux2 1 1) : List String :=
+  gSwap gBase (gDef `spec 1 2) (gDef `spec 1 v) ++ [block, aux2]
+
+/-- `gBase` with `spec := e_125` (every expression form) + `C1`…`C5`, `S` declared. -/
+def gForms : List String :=
+  gSwap gBase (gDef `spec 1 2) (gDef `spec 1 125) ++ [`C1, `C2, `C3, `C4, `C5, `S].map (gAxiom ·)
+
+/-- G over two hand-made exports (`none` = one refused by the reader): the outcome + the axioms. -/
+def gRun (a b : List String) (r : FvdepCore.Judge.Request := reqFn) (opaques : List Lean.Name := [])
+    (fuel : Nat := 100000) : Option (FvdepCore.Judge.Outcome × List Lean.Name) := do
+  let t1 ← tbl a
+  let t2 ← tbl b
+  let o :=
+    FvdepCore.Judge.graph (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2) r opaques fuel {}
+  return (o.1, o.2.1)
+
+def gIs (o : FvdepCore.Judge.Outcome) : Option (FvdepCore.Judge.Outcome × List Lean.Name) → Bool
+  | some (x, _) => x == o
+  | none => false
+
+def gOpaqueCause : String :=
+  "the implementation reaches aux, an opaque or partial definition: its compiled code is not " ++
+    "the checked term"
+
+def gCases : List (String × (Unit → Bool)) :=
+  [("judge G: e1's closure declared alike in e2 → matched; the axioms = the proof's, in the " ++
+        "walk's first-reach order",
+      fun _ =>
+      gRun gBase gProof == some (.matched, [`T, `Eq]) &&
+        gRun gBase (gProof (gBase ++ [gAxiom `ax]) 4) == some (.matched, [`ax, `T, `Eq]) &&
+        gRun gBase gProof reqAbi == some (.matched, [`T, `Eq])),
+    ("judge G3: a name e1's closure reaches that e1 lacks → infrastructure naming it", fun _ =>
+      gIs (.infra "the trusted export lacks aux") (gRun (gBase []) (gProof (gBase [])))),
+    ("judge G3: a reached name e2 lacks or redefines (another value, another kind) → mismatch " ++
+        "naming it",
+      fun _ =>
+      gIs (.mismatch "the solution lacks aux") (gRun gBase (gProof (gBase []))) &&
+        gIs (.mismatch "the solution redefines aux")
+          (gRun gBase (gProof (gBase [gDef `aux 1 2]))) &&
+        gIs (.mismatch "the solution redefines aux")
+          (gRun gBase (gProof (gBase [gOpaque `aux 1 1])))),
+    ("judge G1: every root compared whatever the proof uses — Eq, impl, spec, the ABI shape " ++
+        "(abi alone) + each mandatory name, declared with another type in e2 → mismatch naming it",
+      fun _ =>
+      gIs (.mismatch "the solution redefines Eq")
+          (gRun gBase (gSwap gProof (gAxiom `Eq) (gAxiom `Eq 1))) &&
+        gIs (.mismatch "the solution redefines impl")
+          (gRun gBase (gSwap gProof (gDef `impl 1 1) (gDef `impl 1 2))) &&
+        gIs (.mismatch "the solution redefines spec")
+          (gRun gBase (gSwap gProof (gDef `spec 1 2) (gDef `spec 1 1))) &&
+        gIs (.mismatch "the solution redefines shape")
+          (gRun gBase (gSwap gProof (gDef `shape 1 1) (gDef `shape 1 2)) reqAbi) &&
+        gIs .matched (gRun gBase (gSwap gProof (gDef `shape 1 1) (gDef `shape 1 2))) &&
+        FvdepCore.Judge.mandatory.length == 33 &&
+        FvdepCore.Judge.mandatory.all fun n =>
+          gIs (.mismatch ("the solution redefines " ++ toString n))
+            (gRun gBase (gSwap gProof (gAxiom n) (gAxiom n 1)))),
+    ("judge G5: an opaque the implementation reaches → mismatch naming it, unless the reviewed " ++
+        "list holds it",
+      fun _ =>
+      let a := gBase [gOpaque `aux 1 1]
+      gIs (.mismatch gOpaqueCause) (gRun a (gProof a)) &&
+        gRun a (gProof a) reqFn [`aux] == some (.matched, [`T, `Eq]) &&
+        gIs (.mismatch gOpaqueCause) (gRun a (gProof a) reqFn [`op])),
+    ("judge G6: a name the proof reaches that e2 lacks → mismatch naming it", fun _ =>
+      gIs (.mismatch "the solution lacks op") (gRun gBase (gProof gBase 3))),
+    ("judge G: G3's failure is named before G5's, G5's before G6's", fun _ =>
+      let a := gBase [gOpaque `aux 1 1]
+      gIs (.mismatch "the solution redefines impl")
+          (gRun a (gSwap (gProof a) (gDef `impl 1 1) (gDef `impl 1 2))) &&
+        gIs (.mismatch gOpaqueCause) (gRun a (gProof a 3))),
+    ("judge G2: a shared expression is scanned once per export (2^40 leaves within a " ++
+        "100,000-unit budget)",
+      fun _ =>
+      let a := gBase [gDef `aux 1 112]
+      gIs .matched (gRun a (gProof a))),
+    ("judge G3 + G6: a name reached twice is checked once (2^20 paths within the budget)", fun _ =>
+      let a := gSwap gBase (gDef `spec 1 2) (gDef `spec 1 72) ++ gChain
+      gIs .matched (gRun a (gProof a))),
+    ("judge G2: an inductive's constructors + `all`, a constructor's inductive, a recursor's " ++
+        "rules are uses — each name checked once (a self-listing block within the budget); a " ++
+        "redefinition reached only through each → mismatch naming it",
+      fun _ =>
+      gIs .matched (gRun (gInd 115) (gProof (gInd 115))) &&
+        gIs (.mismatch "the solution redefines Box.mk")
+          (gRun (gInd 113) (gProof (gInd 113 (gBlock 113 1)))) &&
+        gIs (.mismatch "the solution redefines aux2")
+          (gRun (gInd 115) (gProof (gInd 115 gBlock (gDef `aux2 1 2)))) &&
+        gIs (.mismatch "the solution redefines Box")
+          (gRun (gInd 116 (gBlock 0)) (gProof (gInd 116 (gBlock 0 0 true))))),
+    ("judge G2: an expression's constants = each `const` + each `proj`'s structure name, " ++
+        "through binder types, `let` types, values + bodies (a redefinition reached only " ++
+        "through each → mismatch naming it)",
+      fun _ =>
+      gIs .matched (gRun gForms (gProof gForms)) &&
+        [`C1, `C2, `C3, `C4, `C5, `S].all fun n =>
+          gIs (.mismatch ("the solution redefines " ++ toString n))
+            (gRun gForms (gProof (gSwap gForms (gAxiom n) (gAxiom n 1))))),
+    ("judge G2: an opaque's value is scanned (the reviewed list admits the opaque, not its uses)",
+      fun _ =>
+      gIs (.mismatch "the solution redefines aux2")
+        (gRun (gBase [gOpaque `aux 1 114, gDef `aux2 1 1])
+          (gProof (gBase [gOpaque `aux 1 114, gDef `aux2 1 2])) reqFn [`aux])),
+    ("judge G3: a name e1's closure reaches but the proof never does, missing in e2 → mismatch " ++
+        "(G3, not G6, names it)",
+      fun _ =>
+      gIs (.mismatch "the solution lacks Nat.gcd")
+        (gRun gBase (gProof (gBase.filter (· != gAxiom `Nat.gcd))))),
+    ("judge G3: the walk out of budget = mismatch, never a pass", fun _ =>
+      match tbl gBase with
+      | some t =>
+        let v := FvdepCore.Judge.viewOf t
+        (FvdepCore.Judge.graphWalk v v 1 (FvdepCore.Judge.walkStart reqFn 0 {})).1 ==
+            .mismatch FvdepCore.Judge.budget &&
+          (FvdepCore.Judge.graphWalk v v 0 (FvdepCore.Judge.walkStart reqFn 5 {})).1 ==
+            .mismatch FvdepCore.Judge.budget
+      | none => false),
+    ("judge G: a budget too small = mismatch, never a pass", fun _ =>
+      gIs (.mismatch "the comparison passes its work budget") (gRun gBase gProof reqFn [] 0) &&
+        gIs (.mismatch "the comparison passes its work budget") (gRun gBase gProof reqFn [] 40) &&
+        gIs .matched (gRun gBase gProof reqFn [] 100000)),
+    ("judge A2: an allowlisted axiom → its plain name; any other → `«…»` over its escaped " ++
+        "components, at most 255 characters inside",
+      fun _ =>
+      FvdepCore.Index.Statuses.std.map FvdepCore.Judge.axiomText ==
+          ["propext", "Classical.choice", "Quot.sound"] &&
+        FvdepCore.Judge.axiomText `sorryAx == "«sorryAx»" &&
+        FvdepCore.Judge.axiomText (.str .anonymous "Classical.choice") == "«Classical\\.choice»" &&
+        FvdepCore.Judge.axiomText (.str (.str .anonymous "a«") "\\»") == "«a\\«.\\\\\\»»" &&
+        FvdepCore.Judge.axiomText (.num `x 3) == "«x.3»" &&
+        FvdepCore.Judge.axiomText (.str .anonymous (String.ofList (List.replicate 300 'z'))) ==
+          "«" ++ String.ofList (List.replicate 255 'z') ++ "»")]
+
 def ioCases : List (String × IO Bool) :=
   [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
         "export-decode corpus input, every field (U7 X9)",
@@ -4649,6 +4920,7 @@ def main : IO UInt32 := do
                   ExportR.cases ++
                   JudgeX.cases ++
                   JudgeX.sCases ++
+                  JudgeX.gCases ++
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
                   WireT.cases seed ++

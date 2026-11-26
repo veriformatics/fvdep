@@ -11,6 +11,7 @@ import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
+import FvdepAudit.Judge.Graph.Proof
 import FvdepAudit.Judge.Proof
 import FvdepAudit.Judge.Statement.Proof
 import FvdepAudit.Judge.Template.Proof
@@ -1767,6 +1768,44 @@ def templateInjective : Prop :=
       templateBytes x = templateBytes y → x = y
 
 end FvdepLedger.Rows.StatementClaims
+
+namespace FvdepLedger.Rows.GraphClaims
+
+open FvdepCore.Export FvdepCore.Judge FvdepAudit.Judge.Spec FvdepAudit.Judge.Statement.Spec
+  FvdepAudit.Judge.Graph.Spec
+
+/-- U7 G1–G6: on two exports the reader accepts, a sound memo in: `graph` matches ⇒ e1's closure
+of G1's roots is declared in e2 field for field, reaches no opaque outside the reviewed list, the
+proof's closure in e2 is declared + the axioms returned = exactly the reached ones, once each (the
+memo out sound); infrastructure ⇒ e1 lacks a reached name; when all three hold, the step fails only
+by exhausting its budget. -/
+def graphExact : Prop :=
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tables) (r : Request)
+    (opaques : List Lean.Name) (fuel : Nat) (seen : Std.HashSet Pair)
+    (o : Outcome × List Lean.Name × Nat × Std.HashSet Pair),
+    readTables githash version b1 = .ok t1 →
+      readTables githash version b2 = .ok t2 →
+      (∀ p, seen.contains p = true → PairEq t1 t2 p) →
+      graph (viewOf t1) (viewOf t2) r opaques fuel seen = o →
+      (o.1 = .matched →
+          GraphHolds t1 t2 r ∧
+            OpaqueHolds t1 r opaques ∧
+            ProofHolds t2 r ∧
+            (∀ c, c ∈ o.2.1 ↔ ReachedAxiom t2 r c) ∧
+            o.2.1.Nodup ∧ ∀ p, o.2.2.2.contains p = true → PairEq t1 t2 p) ∧
+        (∀ d, o.1 = .infra d → ∃ c, Reach t1 (graphRoots r) c ∧ ∀ e, ¬Named t1 c e) ∧
+        (GraphHolds t1 t2 r →
+          OpaqueHolds t1 r opaques →
+          ProofHolds t2 r →
+          o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget")
+
+/-- U7 A2: an axiom's text is an allowlisted string exactly when its structured name is one of the
+standard three (no other name renders as one: NanoDa #37 flattens names). -/
+def axiomTextExact : Prop :=
+  ∀ (n : Lean.Name),
+    axiomText n ∈ ["propext", "Classical.choice", "Quot.sound"] ↔ n ∈ FvdepCore.Index.Statuses.std
+
+end FvdepLedger.Rows.GraphClaims
 
 namespace FvdepLedger.Rows.LibraryClaims
 
@@ -3847,6 +3886,43 @@ def judgeTemplateRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 G: the constant graph. -/
+def judgeGraphRow : Row :=
+  { component := `FvdepCore.Judge.Graph
+    contract := "U7 G1–G6"
+    claim :=
+      "`graph`: G3 walks e1 from G1's roots (the template's constants + the mandatory " ++
+        "inventory) through each constant's uses (G2: Lean's `runForUsedConsts` over the raw " ++
+        "records, each expression scanned once per export), every reached name declared in e2 " ++
+        "field for field (`declEq`, S's memo + budget); then G5 (no reached `opaque` outside " ++
+        "the reviewed list); then G6 (the proof's closure in e2 declared, its axioms recorded): " ++
+        "`.matched` ⇒ `GraphHolds` ∧ `OpaqueHolds` ∧ `ProofHolds` + the axioms returned = " ++
+        "exactly the reached ones, once each; infrastructure ⇒ e1 lacks a reached name; all " ++
+        "three ⇒ matched or the budget's mismatch (`graphExact`); the walk order + the causes' " ++
+        "texts = J4's tested detail lines."
+    claims := [(``GraphClaims.graphExact, ``FvdepAudit.Judge.Proof.graph_exact)]
+    subject := ``FvdepCore.Judge.graph
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
+/-- U7 A2: the axioms' texts. -/
+def judgeAxiomsRow : Row :=
+  { component := `FvdepCore.Judge.Axioms
+    contract := "U7 A1–A2"
+    claim :=
+      "`axiomText`: an allowlisted axiom (U4's `std`) → its plain name, any other → `«…»` " ++
+        "over its components, `\\`, `«`, `»` + `.` escaped (at most 255 characters inside): " ++
+        "an axiom's text is an allowlisted string exactly when its structured name is " ++
+        "allowlisted (`axiomTextExact`); the quoted form = tested presentation."
+    claims := [(``GraphClaims.axiomTextExact, ``FvdepAudit.Judge.Proof.axiomText_exact)]
+    subject := ``FvdepCore.Judge.axiomText
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U5b P3: project selection (U8 reuses it). -/
 def projectSelectRow : Row :=
   { component := `FvdepCore.Project
@@ -4941,12 +5017,12 @@ def ledger : Ledger :=
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
-        judgeTemplateRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
-        libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
-        libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
-        wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow,
-        wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow,
-        wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
+        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, projectSelectRow, librarySourceRow,
+        libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow,
+        libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow,
+        wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
+        wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow,
+        wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
         oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
         stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
         snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,

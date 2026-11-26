@@ -26,6 +26,9 @@ inductive Outcome where
   | infra (cause : String)
   deriving DecidableEq, Repr
 
+/-- S + G's cause once the work budget runs out (J4's detail line). -/
+def budget : String := "the comparison passes its work budget"
+
 /-- A safe definition without level parameters: its type's index. -/
 def safeType? : Option Entry → Option Nat
   | some (.defn _ _ [] _ .safe ty _) => some ty
@@ -144,7 +147,6 @@ def statement (v1 v2 : View) (r : Request) (fuel : Nat) (seen : Std.HashSet Pair
                     | (.equal, f, s) => (.matched, f, s)
                     | (.differ, f, s) =>
                       (.mismatch "the proof does not prove the required statement", f, s)
-                    | (.exhausted, f, s) =>
-                      (.mismatch "the comparison passes its work budget", f, s)
+                    | (.exhausted, f, s) => (.mismatch budget, f, s)
 
 end FvdepCore.Judge

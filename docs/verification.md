@@ -2861,6 +2861,69 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Judge.Graph`
+
+- Contract: U7 G1–G6
+- Claim: `graph`: G3 walks e1 from G1's roots (the template's constants + the mandatory inventory) through each constant's uses (G2: Lean's `runForUsedConsts` over the raw records, each expression scanned once per export), every reached name declared in e2 field for field (`declEq`, S's memo + budget); then G5 (no reached `opaque` outside the reviewed list); then G6 (the proof's closure in e2 declared, its axioms recorded): `.matched` ⇒ `GraphHolds` ∧ `OpaqueHolds` ∧ `ProofHolds` + the axioms returned = exactly the reached ones, once each; infrastructure ⇒ e1 lacks a reached name; all three ⇒ matched or the budget's mismatch (`graphExact`); the walk order + the causes' texts = J4's tested detail lines.
+- Subject: `FvdepCore.Judge.graph`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.GraphClaims.graphExact` (hash 0x74d3862d), proved by `FvdepAudit.Judge.Proof.graph_exact`:
+
+  ```lean
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
+    (r : FvdepCore.Judge.Request) (opaques : List Lean.Name) (fuel : Nat)
+    (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (o : FvdepCore.Judge.Outcome × List Lean.Name × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        (∀ (p : FvdepCore.Judge.Pair),
+            seen.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) →
+          FvdepCore.Judge.graph (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2) r opaques fuel
+                seen =
+              o →
+            (o.fst = FvdepCore.Judge.Outcome.matched →
+                FvdepAudit.Judge.Graph.Spec.GraphHolds t1 t2 r ∧
+                  FvdepAudit.Judge.Graph.Spec.OpaqueHolds t1 r opaques ∧
+                    FvdepAudit.Judge.Graph.Spec.ProofHolds t2 r ∧
+                      (∀ (c : Lean.Name),
+                          c ∈ o.snd.fst ↔ FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c) ∧
+                        o.snd.fst.Nodup ∧
+                          ∀ (p : FvdepCore.Judge.Pair),
+                            o.snd.snd.snd.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) ∧
+              (∀ (d : String),
+                  o.fst = FvdepCore.Judge.Outcome.infra d →
+                    ∃ c,
+                      FvdepAudit.Judge.Graph.Spec.Reach t1 (FvdepCore.Judge.graphRoots r) c ∧
+                        ∀ (e : FvdepCore.Judge.Entry),
+                          ¬FvdepAudit.Judge.Statement.Spec.Named t1 c e) ∧
+                (FvdepAudit.Judge.Graph.Spec.GraphHolds t1 t2 r →
+                  FvdepAudit.Judge.Graph.Spec.OpaqueHolds t1 r opaques →
+                    FvdepAudit.Judge.Graph.Spec.ProofHolds t2 r →
+                      o.fst = FvdepCore.Judge.Outcome.matched ∨
+                        o.fst =
+                          FvdepCore.Judge.Outcome.mismatch "the comparison passes its work budget")
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Axioms`
+
+- Contract: U7 A1–A2
+- Claim: `axiomText`: an allowlisted axiom (U4's `std`) → its plain name, any other → `«…»` over its components, `\`, `«`, `»` + `.` escaped (at most 255 characters inside): an axiom's text is an allowlisted string exactly when its structured name is allowlisted (`axiomTextExact`); the quoted form = tested presentation.
+- Subject: `FvdepCore.Judge.axiomText`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.GraphClaims.axiomTextExact` (hash 0x568cb915), proved by `FvdepAudit.Judge.Proof.axiomText_exact`:
+
+  ```lean
+  ∀ (n : Lean.Name),
+    FvdepCore.Judge.axiomText n ∈ ["propext", "Classical.choice", "Quot.sound"] ↔
+      n ∈ FvdepCore.Index.Statuses.std
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Project`
 
 - Contract: U5b P1–P3
