@@ -3018,10 +3018,10 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Judge.Plan`
 
 - Contract: U7 J1–J3, X8
-- Claim: `stages`: e1 + e2 read once each (a trusted-side read or parse fault = infrastructure, the solution's unreadable export = a statement mismatch), then S → G → A, the first failure or infrastructure stopping every later stage: the kernel phase is reached only on two parsed exports whose statement, graph + proof closure hold, every reached axiom allowlisted, the stages then observing exactly statement + graph + axioms (`stagesSound`); on such exports it is reached unless a stage ran out of W (`stagesComplete`); J3's export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) + `judgeObs`'s kernel observations = tested data (`tests/judge`: the launch cases).
+- Claim: `stages`: e1 + e2 read once each (a trusted-side read or parse fault = infrastructure, the solution's unreadable export = a statement mismatch), then S → G → A, the first failure or infrastructure stopping every later stage: the kernel phase is reached only on two parsed exports whose statement, graph + proof closure hold, every reached axiom allowlisted, the stages then observing exactly statement + graph + axioms, the axiom names = the reached axioms' texts (`stagesSound`); on such exports it is reached unless S ran out of W or S matched + G ran out (`stagesComplete`); J3's export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) + `judgeObs`'s kernel observations = tested data (`tests/judge`: the launch cases).
 - Subject: `FvdepCore.Judge.stages`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesSound` (hash 0x8e2615ec), proved by `FvdepAudit.Judge.Proof.stages_sound`:
+- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesSound` (hash 0x3238d217), proved by `FvdepAudit.Judge.Proof.stages_sound`:
 
   ```lean
   ∀ (p : FvdepCore.Judge.VProfile) (githash version : String) (r : FvdepCore.Judge.Request)
@@ -3040,12 +3040,17 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                             [FvdepCore.Evidence.Obs.statement d1 d2 true,
                               FvdepCore.Evidence.Obs.graph d1 d2 true,
                               FvdepCore.Evidence.Obs.axioms d2 names] ∧
-                          (∀ (a : String), a ∈ names → a ∈ p.allowlist) ∧
-                            ∀ (c : Lean.Name),
-                              FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c →
-                                FvdepCore.Judge.axiomText c ∈ p.allowlist
+                          (∀ (a : String),
+                              a ∈ names ↔
+                                ∃ c,
+                                  FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c ∧
+                                    FvdepCore.Judge.axiomText c = a) ∧
+                            (∀ (a : String), a ∈ names → a ∈ p.allowlist) ∧
+                              ∀ (c : Lean.Name),
+                                FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c →
+                                  FvdepCore.Judge.axiomText c ∈ p.allowlist
   ```
-- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesComplete` (hash 0x64183e63), proved by `FvdepAudit.Judge.Proof.stages_complete`:
+- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesComplete` (hash 0xa913a33f), proved by `FvdepAudit.Judge.Proof.stages_complete`:
 
   ```lean
   ∀ (p : FvdepCore.Judge.VProfile) (githash version : String) (r : FvdepCore.Judge.Request)
@@ -3062,9 +3067,16 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                   (FvdepCore.Judge.stages p githash version r d1 d2 (Except.ok b1)
                           (Except.ok b2)).kernels =
                       true ∨
-                    FvdepCore.Judge.budgetCause ∈
-                      (FvdepCore.Judge.stages p githash version r d1 d2 (Except.ok b1)
-                          (Except.ok b2)).details
+                    (FvdepCore.Judge.statement (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2)
+                            r p.work ∅).fst =
+                        FvdepCore.Judge.Outcome.exhausted ∨
+                      ∃ fuel memo,
+                        FvdepCore.Judge.statement (FvdepCore.Judge.viewOf t1)
+                              (FvdepCore.Judge.viewOf t2) r p.work ∅ =
+                            (FvdepCore.Judge.Outcome.matched, fuel, memo) ∧
+                          (FvdepCore.Judge.graph (FvdepCore.Judge.viewOf t1)
+                                (FvdepCore.Judge.viewOf t2) r p.opaques fuel memo).fst =
+                            FvdepCore.Judge.Outcome.exhausted
   ```
 - Uninterpreted: none
 - Residue: none
@@ -3073,7 +3085,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepIO.Judge`
 
 - Contract: U7 J1, K1, K4
-- Claim: `judge`: each frozen export read once + checked against its phase's digest, J's `stages`, then — reached — `run`: K4's pins before any step, in K4's order while acquired (T1's fingerprint, then each kernel binary hashed + compared in turn: `pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a fresh source directory (the copy's SHA-256 = the frozen export's); each kernel alone through U5's runner in U2's order, every one run whatever another reported (an exception = that kernel's infrastructure), each observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested) + its own line kept for J4.
+- Claim: `judge`: each frozen export read once for S, G + A + checked against its phase's digest, J's `stages` (each cause cut to J4's 1,024 bytes), then — reached — `run`: K4's pins before any step, in K4's order while acquired (T1's fingerprint, then each kernel binary hashed + compared in turn: `pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a fresh source directory (a second read of e2: the copy's SHA-256 = the frozen export's, X8); each kernel alone through U5's runner in U2's order, every one run whatever another reported (an exception = that kernel's infrastructure), each observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested) + its own line kept for J4.
 - Subject: `FvdepIO.Judge.judge`
 - Path: none yet (wired by U7)
 - Uninterpreted: `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Hash.sha256`, `FvdepIO.Hash.Sha256.initState`

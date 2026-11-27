@@ -268,9 +268,9 @@ partial def parseRun (o : RunOptions) : List String → Except String RunOptions
     if x.startsWith "--" then .error s!"unexpected argument {x}"
     else parseRun { o with files := o.files ++ [x] } rest
 
-/-- D2: J on two given exports (their digests = their own bytes'): the stages, then K, then U2's
-verdict over the phases' observations as if both built — always SIMULATION (a given e1 is no phase
-1's). -/
+/-- D2: J on two given exports (their digests = their own bytes'; each at most T's export cap,
+checked before any read): the stages, then K, then U2's verdict over the phases' observations as
+if both built — always SIMULATION (a given e1 is no phase 1's), the request named `judge`. -/
 def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
   withTools fun bwrap sys run fp => do
     let some decl :=
@@ -281,16 +281,12 @@ def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
       do
         say ["infra io: internal: no request key"]
         return 2
-    let d1 := FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File e1)
-    let d2 := FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File e2)
     let r : Request :=
       { impl := impl.toName
         spec := spec.toName
         proof := proof.toName
         abi := o.abi.map String.toName }
     let p := withJudgeLimits (overridden o.k) o.work []
-    let jo ←
-      FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p r e1 e2 d1 d2 o.k.stubs
     let key : ChallengeKey :=
       { request :=
           { decl
@@ -301,10 +297,39 @@ def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
         library := ⟨List.replicate 40 0, List.length_replicate⟩
         profile := p.evidence
         statement := "" }
-    let all := [.implProfile none, .phase1 (.ok d1), .phase2 d1 (.ok d2)] ++ jo.obs
-    let res := result key (all.map fun x => ⟨key, x⟩)
-    let (block, rc) := verdictBlock "judge" impl ("given e1 + e2" :: o.k.overrides) res jo.details
-    say (jo.obs.map judgeLine ++ [s!"judge work {jo.used}"] ++ block)
+    let block (all : List Obs) (details : List String) : List String × UInt32 :=
+      verdictBlock "judge" impl ("given e1 + e2" :: o.k.overrides)
+        (result key (all.map fun x => ⟨key, x⟩)) details
+    let cap := ({} : FvdepCore.Sandbox.Limits).exportCap
+    let intake (f : String) : IO (Except String String) :=
+      tryCatch
+        (do
+          let m ← System.FilePath.metadata f
+          if cap < m.byteSize.toNat then
+            return .error s!"the export {f} passes the export cap of {cap} bytes"
+          return .ok (FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File f)))
+        fun ex => pure (.error s!"the export {f} could not be read: {ex}")
+    let refuse (why : String) : IO UInt32 := do
+      let (ls, rc) := block [.infra .io why] []
+      say ls
+      return rc
+    let d1 ←
+      match ← intake e1 with
+      | .ok d =>
+        pure d
+      | .error why =>
+        return ← refuse why
+    let d2 ←
+      match ← intake e2 with
+      | .ok d =>
+        pure d
+      | .error why =>
+        return ← refuse why
+    let jo ←
+      FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p r e1 e2 d1 d2 o.k.stubs
+    let (ls, rc) :=
+      block ([.implProfile none, .phase1 (.ok d1), .phase2 d1 (.ok d2)] ++ jo.obs) jo.details
+    say (jo.obs.map judgeLine ++ [s!"judge work {jo.used}"] ++ ls)
     return rc
 
 def run : List String → IO UInt32

@@ -50,6 +50,11 @@ structure Options where
 def values (args : List String) : List String × List String :=
   (args.takeWhile fun a => !a.startsWith "--", args.dropWhile fun a => !a.startsWith "--")
 
+/-- `o` with `name` among the overrides its verdict block names (D1: an option changing what is
+judged — a limit, the export roots, a given profile result or child — makes it a simulation). -/
+def Options.override (o : Options) (name : String) : Options :=
+  if o.simulated.contains name then o else { o with simulated := o.simulated ++ [name] }
+
 partial def parse (o : Options) : List String → Except String Options
   | [] => .ok o
   | "--library" :: v :: rest => parse { o with library := v } rest
@@ -92,43 +97,51 @@ partial def parse (o : Options) : List String → Except String Options
       match FvdepDev.ProfileCheck.setLimit o.prof v with
       | .ok p =>
         parse
-          { o with
-            prof := p, profOptions := true }
+          ({ o with
+                prof := p, profOptions := true }.override
+            s!"--limit {(v.splitOn "=").headD v}")
           rest
       | .error e => .error e
   | "--results" :: f :: rest =>
     parse
-      { o with
-        prof := { o.prof with results := some f }, profOptions := true }
+      ({ o with
+            prof := { o.prof with results := some f }, profOptions := true }.override
+        "--results")
       rest
   | "--child" :: f :: rest =>
     parse
-      { o with
-        prof := { o.prof with child := some f }, profOptions := true }
+      ({ o with
+            prof := { o.prof with child := some f }, profOptions := true }.override
+        "--child")
       rest
   | "--roots1" :: rest =>
     match values rest with
     | ([], _) => .error "--roots1 takes at least one constant"
-    | (cs, rest) => parse { o with roots1 := some cs } rest
+    | (cs, rest) => parse ({ o with roots1 := some cs }.override "--roots1") rest
   | "--roots2" :: rest =>
     match values rest with
     | ([], _) => .error "--roots2 takes at least one constant"
-    | (cs, rest) => parse { o with roots2 := some cs } rest
+    | (cs, rest) => parse ({ o with roots2 := some cs }.override "--roots2") rest
   | "--deadline" :: v :: rest =>
     match number "--deadline" v with
-    | .ok n => parse { o with limits := { o.limits with deadline := n } } rest
+    | .ok n =>
+      parse ({ o with limits := { o.limits with deadline := n } }.override "--deadline") rest
     | .error e => .error e
   | "--work-bytes" :: v :: rest =>
     match number "--work-bytes" v with
-    | .ok n => parse { o with limits := { o.limits with workBytes := n } } rest
+    | .ok n =>
+      parse ({ o with limits := { o.limits with workBytes := n } }.override "--work-bytes") rest
     | .error e => .error e
   | "--frame-bytes" :: v :: rest =>
     match number "--frame-bytes" v with
-    | .ok n => parse { o with limits := { o.limits with frameBytes := n } } rest
+    | .ok n =>
+      parse ({ o with limits := { o.limits with frameBytes := n } }.override "--frame-bytes") rest
     | .error e => .error e
   | "--export-bytes" :: v :: rest =>
     match number "--export-bytes" v with
-    | .ok n => parse { o with limits := { o.limits with exportBytes := some n } } rest
+    | .ok n =>
+      parse ({ o with limits := { o.limits with exportBytes := some n } }.override "--export-bytes")
+        rest
     | .error e => .error e
   | _ => .error "missing or unknown arguments"
 
@@ -167,6 +180,17 @@ def retain (dir run : System.FilePath) (files : List (String × FileRec)) : IO U
             ("size", .int f.size)])
   IO.FS.writeBinFile (dir / "manifest.json")
       (FvdepCore.Json.print (.obj [("files", .arr entries.toList), ("schema", .int 1)]))
+
+/-- D1's U2 refusal for U6's (B3; interface §6's codes): I1's import rule = `import_not_allowed`,
+I2's module name = `reserved_module`, every other rule = `profile_construct`; its detail = the
+record's module, location + cause (U8 renders interface §4's reason). -/
+def refusalOf (f : FvdepCore.Profile.Refusal) : FvdepCore.Evidence.Refusal × String :=
+  let code :=
+    match f.rule, f.detail with
+    | "header", "import" :: _ => FvdepCore.Evidence.Refusal.importNotAllowed
+    | "header", "name" :: _ => .reservedModule
+    | _, _ => .profileConstruct
+  (code, s!"{f.module} {f.line}:{f.column} {" ".intercalate (f.rule :: f.detail)}")
 
 def check (o : Options) : IO UInt32 := do
   let usageError (why : String) : IO UInt32 := do
@@ -226,6 +250,17 @@ def check (o : Options) : IO UInt32 := do
     do
       say [s!"infra io: the entry {o.id} names no implementation + proof constant"]
       return 2
+  let jr : FvdepCore.Judge.Request :=
+    { impl := impl.toName
+      spec := o.spec.toName
+      proof := proof.toName
+      abi := o.abi.map String.toName }
+  -- J3: each effective export root list (the default or an override) names each root once.
+  let roots1 := o.roots1.getD ((FvdepCore.Judge.exportRoots1 jr).map toString)
+  let roots2 := o.roots2.getD ((FvdepCore.Judge.exportRoots2 jr).map toString)
+  for (n, rs) in [(1, roots1), (2, roots2)] do
+    if let some d := firstDuplicate rs then
+      return ← usageError s!"phase {n}'s export roots name {d} twice"
   let src ←
     match ← FvdepIO.Snapshot.read proj entry.implModules entry.proofModules with
     | .ok s =>
@@ -233,6 +268,23 @@ def check (o : Options) : IO UInt32 := do
     | .error d =>
       say [s!"infra io: {d}"]
       return 2
+  let implD := FvdepIO.Hash.digest .implSources (FvdepCore.Phase.sourceFiles src.impl)
+  let proofD := FvdepIO.Hash.digest .proofSources (FvdepCore.Phase.sourceFiles src.proof)
+  let jp := FvdepDev.Judge.withJudgeLimits FvdepCore.Judge.v1 o.judgeWork o.kernelDeadlines
+  let key : FvdepCore.Evidence.ChallengeKey :=
+    { request :=
+        { decl := entry.decl
+          specClosure := ""
+          implSources := some implD
+          proofSources := some proofD
+          adapter := none }
+      library := ⟨List.replicate 40 0, List.length_replicate⟩
+      profile := jp.evidence
+      statement := "" }
+  -- U7 D1's verdict block: U2's result over every observation so far (U6's, U5's, J's), one key.
+  let finalize (all : List Obs) (details : List String) : List String × UInt32 :=
+    FvdepDev.Judge.verdictBlock s!"{o.id}@{entry.decl.version}" impl o.simulated
+      (FvdepCore.Evidence.result key (all.map fun x => ⟨key, x⟩)) details
   let bwrap ←
     match ← preflightBwrap with
     | .ok b =>
@@ -255,9 +307,7 @@ def check (o : Options) : IO UInt32 := do
     if o.profile then
       let frozen := src.impl.mergeSort fun a b => Decidable.decide (a.1 ≤ b.1)
       head :=
-        [s!"impl_sources {FvdepIO.Hash.digest .implSources (FvdepCore.Phase.sourceFiles src.impl)}",
-            s!"proof_sources " ++
-              FvdepIO.Hash.digest .proofSources (FvdepCore.Phase.sourceFiles src.proof)] ++
+        [s!"impl_sources {implD}", s!"proof_sources {proofD}"] ++
           FvdepDev.ProfileCheck.moduleLines frozen
       let rows ←
         match ← FvdepIO.Profile.libraryRows lib with
@@ -271,6 +321,15 @@ def check (o : Options) : IO UInt32 := do
       let (ls, rc) := FvdepDev.ProfileCheck.report verdict
       head := head ++ s!"request {digest}" :: ls
       unless verdict matches .accepted _ do
+        if o.judge then
+          let seen : Obs :=
+            match verdict with
+            | .refused _ f => .implProfile (some (refusalOf f))
+            | .infra c d => .infra c d
+            | .accepted _ => .implProfile none
+          let (block, brc) := finalize [seen] []
+          say (head ++ block)
+          return brc
         say head
         return rc
     let abi :=
@@ -282,19 +341,14 @@ def check (o : Options) : IO UInt32 := do
         recipe := consumer FvdepIO.Toolchain.release fp
         limits := o.limits
         library := lib }
-    let jr : FvdepCore.Judge.Request :=
-      { impl := impl.toName
-        spec := o.spec.toName
-        proof := proof.toName
-        abi := o.abi.map String.toName }
     let req : FvdepIO.Phase.Request :=
       { impl := src.impl
         proof := src.proof
         specModule := o.specModule
         spec := o.spec
         abi
-        roots1 := o.roots1.getD ((FvdepCore.Judge.exportRoots1 jr).map toString)
-        roots2 := o.roots2.getD ((FvdepCore.Judge.exportRoots2 jr).map toString)
+        roots1
+        roots2
         trusted :=
           if o.roots1.isSome || o.roots2.isSome then []
           else (FvdepCore.Judge.trustedRoots jr).map toString }
@@ -321,36 +375,24 @@ def check (o : Options) : IO UInt32 := do
           s!"export phase{if f.path == "e1.ndjson" then 1 else 2} exports/{f.path} " ++
             s!"{f.size} {f.sha256}"
         else s!"artifact {phase} {f.path} {f.size} {f.sha256}"
-    -- U7 D1: J on the frozen exports, then U2's verdict over every observation (U6's, U5's, J's).
+    -- U7 D1: J on the frozen exports, then the verdict block; a phase stop's block without J.
     let (judgeLines, judgeRc) ←
       match o.judge, obs with
       | true, [.phase1 (.ok d1), .phase2 _ (.ok d2)] =>
         do
-          let p := FvdepDev.Judge.withJudgeLimits FvdepCore.Judge.v1 o.judgeWork o.kernelDeadlines
           let jo ←
-            FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p jr
+            FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp jp jr
                 (run / "exports" / "e1.ndjson") (run / "exports" / "e2.ndjson") d1 d2
-          let key : FvdepCore.Evidence.ChallengeKey :=
-            { request :=
-                { decl := entry.decl
-                  specClosure := ""
-                  implSources := some rep.implSources
-                  proofSources := some rep.proofSources
-                  adapter := none }
-              library := ⟨List.replicate 40 0, List.length_replicate⟩
-              profile := p.evidence
-              statement := "" }
-          let all := FvdepCore.Evidence.Obs.implProfile none :: obs ++ jo.obs
-          let res := FvdepCore.Evidence.result key (all.map fun x => ⟨key, x⟩)
-          let (block, rc) :=
-            FvdepDev.Judge.verdictBlock s!"{o.id}@{entry.decl.version}" impl o.simulated res
-              jo.details
+          let (block, rc) := finalize (.implProfile none :: obs ++ jo.obs) jo.details
           let times :=
             jo.kernels.map fun x => s!"time kernel {FvdepCore.Evidence.kernelName x.kernel} {x.ms}"
           pure
               (jo.obs.map FvdepDev.Judge.judgeLine ++ [s!"judge work {jo.used}"] ++ times ++ block,
                 some rc)
-      | _, _ =>
+      | true, _ =>
+        let (block, rc) := finalize (.implProfile none :: obs) []
+        pure (block, some rc)
+      | false, _ =>
         pure ([], none)
     say
         ((if o.profile then head

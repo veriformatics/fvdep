@@ -158,25 +158,26 @@ structure JudgeOut where
 
 /-- J: the judge over one request's frozen exports (`e1`, `e2` + the digests their phases
 recorded): the stages, then — reached — the kernel phase on e2; J4's causes = S's or G's cause, A's
-failing names, then each non-accepting kernel's own line. -/
+failing names, then each non-accepting kernel's own line, each cut to 1,024 bytes (T's
+`cutDetail`; the kernel lines are cut in bytes already). -/
 def judge (bwrap : String) (sys step src : System.FilePath) (fingerprint : String) (p : VProfile)
     (r : Request) (e1 e2 : System.FilePath) (d1 d2 : String)
     (stubs : List (Kernel × System.FilePath) := []) : IO JudgeOut := do
   let b1 ← readExport e1 d1
   let b2 ← readExport e2 d2
   let pre := stages p Lean.githash Lean.versionString r d1 d2 b1 b2
+  let causes := pre.details.map FvdepCore.Profile.cutDetail
   if !pre.kernels then
-    return ⟨pre.obs, pre.details, pre.used, []⟩
+    return ⟨pre.obs, causes, pre.used, []⟩
   match ← run bwrap sys step src fingerprint p e2 d2 stubs with
   | .error (c, d) =>
-    return ⟨pre.obs ++ [.infra c d], pre.details, pre.used, []⟩
+    return ⟨pre.obs ++ [.infra c d], causes, pre.used, []⟩
   | .ok ks =>
     let lines :=
       ks.filterMap fun x =>
         match x.result with
         | .status .accept | .infra .. => none
         | _ => some x.line
-    return ⟨judgeObs pre d2 (ks.map fun x => (x.kernel, x.result)), pre.details ++ lines, pre.used,
-        ks⟩
+    return ⟨judgeObs pre d2 (ks.map fun x => (x.kernel, x.result)), causes ++ lines, pre.used, ks⟩
 
 end FvdepIO.Judge

@@ -1888,7 +1888,7 @@ open FvdepCore.Evidence FvdepCore.Export FvdepCore.Judge FvdepAudit.Judge.Spec
 
 /-- U7 J1: the kernel phase is reached only on two read + parsed exports whose statement, graph +
 proof closure hold, every reached axiom allowlisted; the stages then observed exactly the
-statement, the graph + the axioms. -/
+statement, the graph + the axioms, the axiom names being exactly the reached axioms' texts. -/
 def stagesSound : Prop :=
   ∀ (p : VProfile) (githash version : String) (r : Request) (d1 d2 : Digest) (e1 e2 : Read),
     (stages p githash version r d1 d2 e1 e2).kernels = true →
@@ -1903,10 +1903,12 @@ def stagesSound : Prop :=
           ProofHolds t2 r ∧
           (stages p githash version r d1 d2 e1 e2).obs =
             [.statement d1 d2 true, .graph d1 d2 true, .axioms d2 names] ∧
+          (∀ a, a ∈ names ↔ ∃ c, ReachedAxiom t2 r c ∧ axiomText c = a) ∧
           (∀ a ∈ names, a ∈ p.allowlist) ∧ ∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist
 
 /-- U7 J1: on two parsed exports whose statement, graph + proof closure hold with every reached
-axiom allowlisted, the kernel phase is reached unless a stage ran out of W. -/
+axiom allowlisted, the kernel phase is reached unless S ran out of W, or S matched + G ran out of
+the units S left. -/
 def stagesComplete : Prop :=
   ∀ (p : VProfile) (githash version : String) (r : Request) (d1 d2 : Digest) (b1 b2 : ByteArray)
     (t1 t2 : Tables),
@@ -1918,7 +1920,10 @@ def stagesComplete : Prop :=
       ProofHolds t2 r →
       (∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist) →
       (stages p githash version r d1 d2 (.ok b1) (.ok b2)).kernels = true ∨
-        budgetCause ∈ (stages p githash version r d1 d2 (.ok b1) (.ok b2)).details
+        (statement (viewOf t1) (viewOf t2) r p.work {}).1 = .exhausted ∨
+        ∃ fuel memo,
+          statement (viewOf t1) (viewOf t2) r p.work {} = (.matched, fuel, memo) ∧
+            (graph (viewOf t1) (viewOf t2) r p.opaques fuel memo).1 = .exhausted
 
 end FvdepLedger.Rows.JudgePlanClaims
 
@@ -4113,9 +4118,10 @@ def judgePlanRow : Row :=
         "the solution's unreadable export = a statement mismatch), then S → G → A, the first " ++
         "failure or infrastructure stopping every later stage: the kernel phase is reached " ++
         "only on two parsed exports whose statement, graph + proof closure hold, every reached " ++
-        "axiom allowlisted, the stages then observing exactly statement + graph + axioms " ++
-        "(`stagesSound`); on such exports it is reached unless a stage ran out of W " ++
-        "(`stagesComplete`); J3's export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) " ++
+        "axiom allowlisted, the stages then observing exactly statement + graph + axioms, " ++
+        "the axiom names = the reached axioms' texts (`stagesSound`); on such exports it is " ++
+        "reached unless S ran out of W or S matched + G ran out (`stagesComplete`); J3's " ++
+        "export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) " ++
         "+ `judgeObs`'s kernel observations = tested data (`tests/judge`: the launch cases)."
     claims :=
       [(``JudgePlanClaims.stagesSound, ``FvdepAudit.Judge.Proof.stages_sound),
@@ -4131,11 +4137,13 @@ def judgeKernelStepRow : Row :=
   { component := `FvdepIO.Judge
     contract := "U7 J1, K1, K4"
     claim :=
-      "`judge`: each frozen export read once + checked against its phase's digest, J's " ++
-        "`stages`, then — reached — `run`: K4's pins before any step, in K4's order while " ++
+      "`judge`: each frozen export read once for S, G + A + checked against its phase's " ++
+        "digest, J's `stages` (each cause cut to J4's 1,024 bytes), then — reached — `run`: " ++
+        "K4's pins before any step, in K4's order while " ++
         "acquired (T1's fingerprint, then each kernel binary hashed + compared in turn: " ++
         "`pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a " ++
-        "fresh source directory (the copy's SHA-256 = the frozen export's); each kernel alone " ++
+        "fresh source directory (a second read of e2: the copy's SHA-256 = the frozen " ++
+        "export's, X8); each kernel alone " ++
         "through U5's runner in U2's order, every one run whatever another reported (an " ++
         "exception = that kernel's infrastructure), each observation judged by K2's " ++
         "`kernelStatus` (`kframeOf` + `kernelRunOf`: tested) + its own line kept for J4."

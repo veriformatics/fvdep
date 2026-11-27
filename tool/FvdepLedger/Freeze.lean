@@ -107,19 +107,26 @@ def profileSpec : Spec :=
     claims := [claimNamespace] }
 
 /-- U7 V3: the verification profile — the value (pins, deadlines, W, the allowlist, G5's list, the
-canary digest), K's table + texts + step layout + NanoDa's config, J's stages + J3's export roots,
-the reader (X), S/G/A's code + G1's inventory, their claim statements; the IO interpreter (residue)
-outside it. -/
+canary digest), K's table + texts + step layout (+ the per-file cap + the helper's exit rule it
+reads) + NanoDa's config, J's stages + J3's export roots, P4's export request (`stepCommand`'s
+argv, `exportRequestImports`' order, the export cap), the reader (X), S/G/A's code + G1's
+inventory, the claims' spec modules (deep: a spec edit changes what a claim says) + their
+statements; the IO interpreter (residue) outside it. -/
 def verificationSpec : Spec :=
   { idConst := `FvdepCore.Judge.verificationId
     own := fun m =>
-      [`FvdepCore.Judge, `FvdepAudit.Judge, `FvdepCore.Export].any fun p => p.isPrefixOf m
+      [`FvdepCore.Judge, `FvdepAudit.Judge, `FvdepCore.Export, `FvdepAudit.Export].any fun p =>
+        p.isPrefixOf m
     rootMods :=
       [`FvdepCore.Judge.Profile, `FvdepCore.Judge.Kernel, `FvdepCore.Judge.Plan,
         `FvdepCore.Judge.Statement, `FvdepCore.Judge.Graph, `FvdepCore.Judge.Axioms,
         `FvdepCore.Judge.Compare, `FvdepCore.Judge.View, `FvdepCore.Judge.Template,
-        `FvdepCore.Export]
-    roots := [`FvdepCore.Judge.v1, `FvdepCore.Judge.verificationId]
+        `FvdepCore.Export, `FvdepAudit.Judge.Spec, `FvdepAudit.Judge.Statement.Spec,
+        `FvdepAudit.Judge.Graph.Spec, `FvdepAudit.Judge.Kernel.Spec, `FvdepAudit.Export.Spec]
+    roots :=
+      [`FvdepCore.Judge.v1, `FvdepCore.Judge.verificationId, `FvdepCore.Sandbox.Limits.fileCap,
+        `FvdepCore.Sandbox.Limits.exportCap, `FvdepCore.Phase.Child.helperExit,
+        `FvdepIO.Phase.stepCommand, `FvdepIO.Phase.exportRequestImports]
     claims :=
       [`FvdepLedger.Rows.ExportClaims, `FvdepLedger.Rows.JudgeClaims,
         `FvdepLedger.Rows.StatementClaims, `FvdepLedger.Rows.GraphClaims,

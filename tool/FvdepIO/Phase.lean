@@ -148,6 +148,11 @@ def detailOf (n : Nat) (step : Step) (lim : Limits) (exportOver : Bool)
     | _ => if exportOver then s!" (the export passed --export-bytes {lim.exportCap})" else ""
   s!"phase {n}, {stepName step}: {d}{cap}"
 
+/-- P4's export request imports (U7 V3 freezes them with `stepCommand`): the phase's modules in
+build order, then the spec's + the ABI shape's defining modules, each once. -/
+def exportRequestImports (order : List String) (specModule : String) (abiModule : List String) :
+    List String := (order ++ [specModule] ++ abiModule).eraseDups
+
 /-- A step's command (P1, P4; T2's recipe): the helper's options before `--file-bytes`, the argv,
 extra environment, the artifact family its frame must hold, the tool B1 names. `imports` + `roots`
 = the roots check's or the export's request; `isModule` = a compiled module's header flag (P2). -/
@@ -296,7 +301,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
   let view := run / s!"view{n}"
   if let .error f← FvdepIO.Cache.view s.cache view (entries.map fun x => (x.key, x.manifest)) then
     return { obs := .infra f.code s!"phase {n}, the library view: {f.detail}", libRoots }
-  let exportImports := (g.order ++ [r.specModule] ++ abiModule).eraseDups
+  let exportImports := exportRequestImports g.order r.specModule abiModule
   let roots := if n == 1 then r.roots1 else r.roots2
   let libConsts := ([r.spec] ++ (r.abi.map (·.2)).toList ++ r.trusted).eraseDups
   let empty := run / "empty"

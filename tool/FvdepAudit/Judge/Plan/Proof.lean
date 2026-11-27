@@ -25,6 +25,7 @@ theorem stages_sound (p : VProfile) (githash version : String) (r : Request) (d1
           ProofHolds t2 r ∧
           (stages p githash version r d1 d2 e1 e2).obs =
             [.statement d1 d2 true, .graph d1 d2 true, .axioms d2 names] ∧
+          (∀ a, a ∈ names ↔ ∃ c, ReachedAxiom t2 r c ∧ axiomText c = a) ∧
           (∀ a ∈ names, a ∈ p.allowlist) ∧
           ∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist := by
   intro hk
@@ -59,8 +60,11 @@ theorem stages_sound (p : VProfile) (githash version : String) (r : Request) (d1
     simp only [stages, h1, h2, hs, hg, List.all_eq_true] at hk
     intro a ha
     simpa using hk a ha
-  refine ⟨b1, b2, t1, t2, axs.map axiomText, rfl, rfl, h1, h2, hH, gH, oH, pH, ?_, hall, ?_⟩
+  refine ⟨b1, b2, t1, t2, axs.map axiomText, rfl, rfl, h1, h2, hH, gH, oH, pH, ?_, ?_, hall, ?_⟩
   · simp [stages, h1, h2, hs, hg]
+  · intro a
+    simp only [List.mem_map]
+    exact ⟨fun ⟨c, hc, he⟩ => ⟨c, (hax c).1 hc, he⟩, fun ⟨c, hc, he⟩ => ⟨c, (hax c).2 hc, he⟩⟩
   · intro c hc
     exact hall _ (List.mem_map.2 ⟨c, (hax c).2 hc, rfl⟩)
 
@@ -75,7 +79,10 @@ theorem stages_complete (p : VProfile) (githash version : String) (r : Request) 
       ProofHolds t2 r →
       (∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist) →
       (stages p githash version r d1 d2 (.ok b1) (.ok b2)).kernels = true ∨
-        budgetCause ∈ (stages p githash version r d1 d2 (.ok b1) (.ok b2)).details := by
+        (statement (viewOf t1) (viewOf t2) r p.work {}).1 = .exhausted ∨
+        ∃ fuel memo,
+          statement (viewOf t1) (viewOf t2) r p.work {} = (.matched, fuel, memo) ∧
+            (graph (viewOf t1) (viewOf t2) r p.opaques fuel memo).1 = .exhausted := by
   intro h1 h2 hH gH oH pH hA
   rcases hs : statement (viewOf t1) (viewOf t2) r p.work {} with ⟨o, fuel, memo⟩
   have S :=
@@ -99,11 +106,9 @@ theorem stages_complete (p : VProfile) (githash version : String) (r : Request) 
       simpa using hA a ((hax a).1 ha)
     · simp only at he'
       subst he'
-      right
-      simp [stages, h1, h2, hs, hg]
+      exact Or.inr (Or.inr ⟨fuel, memo, rfl, by simp [hg]⟩)
   · simp only at he
     subst he
-    right
-    simp [stages, h1, h2, hs]
+    exact Or.inr (Or.inl rfl)
 
 end FvdepAudit.Judge.Proof
