@@ -107,7 +107,8 @@ def observedRow (F : Facts) (e : Entry) : Row :=
       canonical? e = some (m, v) → e.module = entryModule m v → modulePath e.module ∈ F.entryFiles)
     (subject e.id e.version, .unobserved "entry file")
 
-/-- An entry's rows: V1 → V2 → V3 (reasons, then each flag in order) → V4 → V5 → V6 → V7 → C4. -/
+/-- An entry's rows: V1 → V2 → V3 (reasons, then each flag in order) → V4 → V5 → V5a → V6 → V7 →
+C4. -/
 def entryRows (F : Facts) (l : Lists) (i : Nat) (e : Entry) : List Row :=
   let s := subject e.id e.version
   let S := specModule e
@@ -147,6 +148,12 @@ def entryRows (F : Facts) (l : Lists) (i : Nat) (e : Entry) : List Row :=
           e.abi = some a ∧
             (abiTypeOf? F a e.spec = none ∧ f = (s, .unobserved "ABI application type") ∨
               abiTypeOf? F a e.spec ≠ none ∧ f = (s, .abiNotBytes a))),
+      row (ImportReach F e.module S) (s, .notImported S e.module),
+      (∀ a d, e.abi = some a → libDecl? F a = some d → ImportReach F e.module d.module, fun f =>
+        ∃ a d,
+          e.abi = some a ∧
+            libDecl? F a = some d ∧
+            ¬ImportReach F e.module d.module ∧ f = (s, .notImported d.module e.module)),
       (∀ c, e.compat = some c → CompatEarlier l e c, fun f =>
         ∃ c, e.compat = some c ∧ f = (s, .compatNotEarlier c)),
       (∀ c,

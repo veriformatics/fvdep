@@ -386,6 +386,7 @@ inductive Violation where
   | obligationTwice (o : Name)
   | abiNotDefinition (abi : Name)
   | abiNotBytes (abi : Name)
+  | notImported (m entry : Name)
   | compatNotEarlier (v : String)
   | compatOtherType (v : String)
   | closureHolds (m : Name)
@@ -423,6 +424,7 @@ def Violation.reason : Violation → String
   | .abiNotBytes a =>
     s!"the ABI shape {a} does not take the spec to ByteArray → ByteArray or " ++
       "ByteArray → Option ByteArray"
+  | .notImported m entry => s!"{m} is not imported by the entry module {entry}"
   | .compatNotEarlier v => s!"compat {v} is not an earlier listed version"
   | .compatOtherType v => s!"compat {v} has another spec type"
   | .closureHolds m => s!"its closure holds {m}"
@@ -488,8 +490,17 @@ def compatTypeCheck (F : Facts) (l : Lists) (e : Entry) (c : String) : Option Vi
     | none => some (.unobserved "spec type comparison")
     | some b => fail b (.compatOtherType c)
 
+/-- V5a's second row: the ABI shape's defining module inside the entry's closure `cl`. -/
+def abiImported (F : Facts) (e : Entry) (cl : List Name) : Option Violation :=
+  match e.abi with
+  | some a =>
+    match libDecl? F a with
+    | some d => fail (cl.contains d.module) (.notImported d.module e.module)
+    | none => none
+  | none => none
+
 /-- An entry's rows (index `i` in `modules`): V1 → V2 → V3 (reasons, then the flags in order) →
-V4 → V5 → V6 → V7 → C4. -/
+V4 → V5 → V5a → V6 → V7 → C4. -/
 def entryChecks (F : Facts) (l : Lists) (i : Nat) (e : Entry) : List (Option Violation) :=
   let S := specModule e
   let r := reach F (e.spec :: e.abi.toList)
@@ -512,6 +523,7 @@ def entryChecks (F : Facts) (l : Lists) (i : Nat) (e : Entry) : List (Option Vio
       (match e.abi with
       | some a => abiTypeCheck F a e.spec
       | none => none),
+      fail (cl.contains S) (.notImported S e.module), abiImported F e cl,
       (match e.compat with
       | some c => fail (compatEarlier l e c) (.compatNotEarlier c)
       | none => none),

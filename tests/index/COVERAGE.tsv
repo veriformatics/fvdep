@@ -51,6 +51,10 @@ C1.v5.module	C3 V5; C9	F1	named fixture
 C1.v5.module.unchanged	C1 no write before decision	F1	named fixture
 C1.v5.type	C3 V5; C9	F1	named fixture
 C1.v5.type.unchanged	C1 no write before decision	F1	named fixture
+C1.v5a.spec	C3 V5a; C9	F1	named fixture (MAIN)
+C1.v5a.spec.unchanged	C1 no write before decision	F1	named fixture (MAIN)
+C1.v5a.abi	C3 V5a; C9	F1	named fixture (MAIN)
+C1.v5a.abi.unchanged	C1 no write before decision	F1	named fixture (MAIN)
 C1.v6.unlisted	C3 V6; C9	F1	named fixture
 C1.v6.unlisted.unchanged	C1 no write before decision	F1	named fixture
 C1.v6.same	C3 V6; C9	F1	named fixture

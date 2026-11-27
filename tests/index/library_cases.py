@@ -118,6 +118,47 @@ end Fvdep.Abi.V1_0_0
         lib.entry(abi="Fvdep.Abi.V1_0_0.wrong")
     refusal("v5.type", "V5", "the ABI shape Fvdep.Abi.V1_0_0.wrong does not take the spec to "
             "ByteArray → ByteArray or ByteArray → Option ByteArray", abi_type)
+    # V5a (MAIN, U7 part B): names built as `Name.mkStrN` terms — what a double-backtick literal
+    # elaborates to — reach a module the entry never imports; the umbrella root imports it instead,
+    # so V3 + V5 pass on the global facts while C4's digest would leave the module's bytes out.
+    def unimported(abi: bool) -> Callable[[Any], None]:
+        def name(*parts: str) -> str:
+            return "(Lean.Name.mkStr" + str(len(parts)) + " " + " ".join(
+                fx.quoted(x) for x in parts) + ")"
+        def mutate(lib: Any) -> None:
+            sp = S.split(".")
+            obls = ", ".join(name(*sp, o) for o in ("bits", "length"))
+            shape = "some " + name("Fvdep", "Abi", "V1_0_0", "encoder") if abi else "none"
+            imports = [R, S] if abi else [R]
+            fx.write(lib.root, E, "".join(f"import {m}\n" for m in imports) + f"""namespace {E}
+def entry : {R}.Module := {{
+  id := "base64.encode"
+  version := "1.0.0"
+  spec := {name(*sp, "encode")}
+  obligations := [{obls}]
+  abi := {shape}
+  compat := none
+}}
+end {E}
+""")
+            lib.proofs(source=f"""import {S}
+import {E}
+namespace {P}
+theorem bits : {S}.bits := True.intro
+theorem length : {S}.length := True.intro
+def proofs : {R}.Proofs := {{
+  obligations := [(``{S}.bits, ``{P}.bits), (``{S}.length, ``{P}.length)]
+  compat := none
+}}
+end {P}
+""")
+            root = lib.root / "Fvdep.lean"
+            root.write_text(root.read_text() + f"import {S}\n" +
+                            ("import Fvdep.Abi.V1_0_0\n" if abi else ""))
+        return mutate
+    refusal("v5a.spec", "V5a", f"{S} is not imported by the entry module {E}", unimported(False))
+    refusal("v5a.abi", "V5a", f"Fvdep.Abi.V1_0_0 is not imported by the entry module {E}",
+            unimported(True))
     for label, value in (("unlisted", "0.0.0"), ("same", "1.0.0"), ("bad", "01.0.0")):
         refusal("v6." + label, "V6", f"compat {value} is not an earlier listed version", entry(compat=value))
     def different_type(lib: Any) -> None:

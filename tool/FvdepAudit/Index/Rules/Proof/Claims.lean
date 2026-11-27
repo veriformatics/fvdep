@@ -130,6 +130,60 @@ theorem compatEarlier_iff (l : Lists) (e : Entry) (c : String) :
 theorem not_true_iff {b : Bool} {P : Prop} (h : b = true ↔ P) : (!b) = true ↔ ¬P := by
   cases b <;> simp_all
 
+/-- V5a's ABI row: `abiImported` ↔ its row. -/
+theorem abiImported_row (F : Facts) (e : Entry) :
+    RowOk ((abiImported F e (closure F e.module)).map (subject e.id e.version, ·))
+      (∀ a d, e.abi = some a → libDecl? F a = some d → ImportReach F e.module d.module, fun f =>
+        ∃ a d,
+          e.abi = some a ∧
+            libDecl? F a = some d ∧
+            ¬ImportReach F e.module d.module ∧
+            f = (subject e.id e.version, .notImported d.module e.module)) := by
+  unfold abiImported RowOk
+  cases ha : e.abi with
+  | none =>
+    refine ⟨iff_of_true rfl ?_, ?_⟩
+    · intro _ _ h
+      cases h
+    · intro _ hf
+      cases hf
+  | some a =>
+    dsimp only
+    cases hd : libDecl? F a with
+    | none =>
+      dsimp only
+      refine ⟨iff_of_true rfl ?_, ?_⟩
+      · intro a' d' h1 h2
+        cases h1
+        rw [hd] at h2
+        cases h2
+      · intro _ hf
+        cases hf
+    | some d =>
+      dsimp only
+      have hc := (closure_exact F e.module d.module).1
+      by_cases hr : ImportReach F e.module d.module
+      · rw [show
+            fail ((closure F e.module).contains d.module) (.notImported d.module e.module) = none by
+            simp [fail, hc.2 hr]]
+        refine ⟨iff_of_true rfl ?_, ?_⟩
+        · intro a' d' h1 h2
+          cases h1
+          rw [hd] at h2
+          cases h2
+          exact hr
+        · intro _ hf
+          cases hf
+      · rw [show
+            fail ((closure F e.module).contains d.module) (.notImported d.module e.module) =
+              some (.notImported d.module e.module)
+            by simp [fail, mt hc.1 hr]]
+        refine ⟨⟨fun h => absurd h (by simp), fun h => absurd (h a d rfl hd) hr⟩, ?_⟩
+        intro f hf
+        simp only [Option.map_some, Option.some.injEq] at hf
+        subst hf
+        exact ⟨a, d, rfl, hd, hr, rfl⟩
+
 theorem entry_corr (F : Facts) (l : Lists) (i : Nat) (e : Entry) :
     Corr ((entryChecks F l i e).map (·.map (subject e.id e.version, ·))) (entryRows F l i e) := by
   simp only [entryChecks, entryRows, List.map_append, List.map_cons, List.map_nil, List.map_map]
@@ -153,7 +207,10 @@ theorem entry_corr (F : Facts) (l : Lists) (i : Nat) (e : Entry) :
     exact rowOk_least (fun c => (subject e.id e.version, .flagged c fl)) (mem_carriers F e fl)
   · refine
       .cons ?_
-        (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ .nil))))))))
+        (.cons ?_
+          (.cons ?_
+            (.cons ?_
+              (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ (.cons ?_ .nil))))))))))
     · rw [Option.map_map]
       exact rowOk_find (fun o => not_true_iff (propIn_iff F e o)) _
     · rw [Option.map_map]
@@ -186,6 +243,11 @@ theorem entry_corr (F : Facts) (l : Lists) (i : Nat) (e : Entry) :
                 exact hb (by simpa [alphaEq_iff] using h)
               simp only [not_or] at hb
               simp [fail, hb', hb.1, hb.2]
+    · exact
+        rowOk_fail _ _
+          (by
+            simp only [List.contains_iff_mem]; exact (closure_exact F e.module _).1)
+    · exact abiImported_row F e
     · cases hc : e.compat with
       | none => simp [RowOk]
       | some

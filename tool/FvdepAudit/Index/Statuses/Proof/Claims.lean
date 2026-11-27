@@ -368,7 +368,9 @@ theorem compatResolved_of_valid {F : Facts} {l : Lists} (hv : RegistryValid F l)
       (List.mem_append_right _
         (List.mem_cons_of_mem _
           (List.mem_cons_of_mem _
-            (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_self ..))))))
+            (List.mem_cons_of_mem _
+              (List.mem_cons_of_mem _
+                (List.mem_cons_of_mem _ (List.mem_cons_of_mem _ (List.mem_cons_self ..))))))))
   obtain ⟨_, _, d, hd, _⟩ := hspec
   intro c hce
   obtain ⟨_, _, _, _, _, _, hl⟩ := hearlier c hce
