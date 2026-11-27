@@ -1,4 +1,4 @@
-import FvdepCore.Judge.Profile
+import FvdepCore.Judge.Plan
 import FvdepIO.Sandbox
 import FvdepIO.Sha256
 
@@ -27,19 +27,32 @@ def kernelRunOf (deadline : Nat) (o : FvdepIO.Sandbox.Observation) : KernelRun :
     whole := o.stdout.dropped == 0 && o.stderr.dropped == 0
     deadline }
 
-/-- K4: each kernel binary's SHA-256 hex under the toolchain at `sys` (`none` = D3's stub). -/
-def digests (sys : System.FilePath) (stubs : List Kernel) :
-    IO (Except String (List (Kernel × Option String))) := do
-  let mut out := []
+/-- K4: kernel `k`'s binary under the toolchain at `sys` — its SHA-256 hex, or why it is missing;
+`none` = D3's stub (its own pin skipped). -/
+def digest1 (sys : System.FilePath) (stubs : List Kernel) (k : Kernel) :
+    IO (Option (Except String String)) := do
+  if stubs.contains k then
+    return none
+  let path := sys / "bin" / kernelBin k
+  unless ← path.pathExists do
+    return some (.error s!"the kernel binary {path} is missing")
+  return some (.ok (FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File path)))
+
+/-- K4 in its order while acquired: T1's fingerprint, then each kernel binary hashed + compared in
+turn (`pinCheck`'s texts); `none` = the pins hold. -/
+def pins (sys : System.FilePath) (fingerprint : String) (p : VProfile) (stubs : List Kernel) :
+    IO (Option String) := do
+  if let some why := pinCheck p fingerprint fun _ => none then
+    return some why
   for k in kernels do
-    if stubs.contains k then
-      out := out ++ [(k, none)]
-    else
-      let path := sys / "bin" / kernelBin k
-      unless ← path.pathExists do
-        return .error s!"the kernel binary {path} is missing"
-      out := out ++ [(k, some (FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File path)))]
-  return .ok out
+    if let some h← digest1 sys stubs k then
+      match h with
+      | .error e =>
+        return some e
+      | .ok d =>
+        if let some why := pinCheck p fingerprint fun j => if j == k then some d else none then
+          return some why
+  return none
 
 /-- K1: a fresh source directory `dir` = e2's bytes (the copy re-read + hashed = `digest`, the
 frozen export's), NanoDa's config (both 0644) + D3's stubs (0755). -/
@@ -68,39 +81,86 @@ def stage (dir e2 : System.FilePath) (digest : String) (p : VProfile)
           other := { read := true, execution := true } }
   return .ok ()
 
+/-- U5's runner as K1 calls it: a step's spec + limits → its observation (a test injects
+another). -/
+abbrev StepRunner :=
+  FvdepCore.Sandbox.Spec → FvdepCore.Sandbox.Limits → IO (Except String FvdepIO.Sandbox.Observation)
+
 /-- K1: each kernel alone in U2's order — every one run whatever another reported — its binary the
-toolchain's, or D3's stub staged in `src`. -/
-def kernelPhase (bwrap : String) (sys step src : System.FilePath) (p : VProfile)
-    (stubs : List Kernel) : IO (List (Kernel × KResult)) := do
+toolchain's, or D3's stub staged in `src`; each with J4's line (the kernel's own message). -/
+def kernelPhaseWith (step : StepRunner) (sys stepDir src : System.FilePath) (p : VProfile)
+    (stubs : List Kernel) : IO (List (Kernel × KResult × String)) := do
   let mut out := []
   for k in kernels do
     let bin := if stubs.contains k then stubPath k else kernelPath k
-    let spec := kernelSpec sys.toString step.toString src.toString p.step (p.kernel k).threads k bin
+    let spec :=
+      kernelSpec sys.toString stepDir.toString src.toString p.step (p.kernel k).threads k bin
     let r ←
-      match ← FvdepIO.Sandbox.run bwrap spec (p.limits k) with
-      | .ok o =>
-        pure (kernelStatus k (kernelRunOf (p.kernel k).deadline o))
-      | .error e =>
-        pure (.infra .sandboxSetup e)
+      tryCatch
+          (do
+            match ← step spec (p.limits k) with
+            | .ok o =>
+              let kr := kernelRunOf (p.kernel k).deadline o
+              pure (kernelStatus k kr, kernelLine kr)
+            | .error e =>
+              pure (.infra .sandboxSetup e, e))
+          fun ex => pure (.infra .io s!"the kernel step failed: {ex}", s!"{ex}")
     out := out ++ [(k, r)]
   return out
 
 /-- The kernel phase: K4's pins, the staged source directory `src`, then the three steps;
 infrastructure before any step = `.error (code, detail)`. -/
-def run (bwrap : String) (sys step src : System.FilePath) (fingerprint : String) (p : VProfile)
-    (e2 : System.FilePath) (digest : String) (stubs : List (Kernel × System.FilePath)) :
-    IO (Except (Infra × String) (List (Kernel × KResult))) := do
+def runWith (step : StepRunner) (sys stepDir src : System.FilePath) (fingerprint : String)
+    (p : VProfile) (e2 : System.FilePath) (digest : String)
+    (stubs : List (Kernel × System.FilePath)) :
+    IO (Except (Infra × String) (List (Kernel × KResult × String))) := do
   let stubKs := stubs.map (·.1)
-  match ← digests sys stubKs with
+  if let some why← pins sys fingerprint p stubKs then
+    return .error (.toolMissing, why)
+  match ← stage src e2 digest p stubs with
   | .error e =>
-    return .error (.toolMissing, e)
-  | .ok ds =>
-    if let some why := pinCheck p fingerprint fun k => (ds.lookup k).join then
-      return .error (.toolMissing, why)
-    match ← stage src e2 digest p stubs with
-    | .error e =>
-      return .error (.io, e)
-    | .ok () =>
-      return .ok (← kernelPhase bwrap sys step src p stubKs)
+    return .error (.io, e)
+  | .ok () =>
+    return .ok (← kernelPhaseWith step sys stepDir src p stubKs)
+
+/-- The kernel phase through U5's runner. -/
+def run (bwrap : String) (sys stepDir src : System.FilePath) (fingerprint : String) (p : VProfile)
+    (e2 : System.FilePath) (digest : String) (stubs : List (Kernel × System.FilePath)) :
+    IO (Except (Infra × String) (List (Kernel × KResult × String))) :=
+  runWith (fun spec lim => FvdepIO.Sandbox.run bwrap spec lim) sys stepDir src fingerprint p e2
+    digest stubs
+
+/-- J1 + X8: an export's bytes, read once + checked against the digest its phase recorded. -/
+def readExport (path : System.FilePath) (digest : String) : IO Read := do
+  try
+    let b ← IO.FS.readBinFile path
+    let h := FvdepIO.Hash.sha256Hex b
+    if h != digest then
+      return .error s!"{path.fileName.getD ""} has SHA-256 {h}; its phase recorded {digest}"
+    return .ok b
+  catch e =>
+    return .error s!"{e}"
+
+/-- J: the judge over one request's frozen exports (`e1`, `e2` + the digests their phases
+recorded): the stages, then — reached — the kernel phase on e2; the observations (U2 E2) + J4's
+causes in U2's reason order (S's or G's cause, A's failing names, each non-accepting kernel's own
+line). -/
+def judge (bwrap : String) (sys step src : System.FilePath) (fingerprint : String) (p : VProfile)
+    (r : Request) (e1 e2 : System.FilePath) (d1 d2 : String) : IO (List Obs × List String) := do
+  let b1 ← readExport e1 d1
+  let b2 ← readExport e2 d2
+  let pre := stages p Lean.githash Lean.versionString r d1 d2 b1 b2
+  if !pre.kernels then
+    return (pre.obs, pre.details)
+  match ← run bwrap sys step src fingerprint p e2 d2 [] with
+  | .error (c, d) =>
+    return (pre.obs ++ [.infra c d], pre.details)
+  | .ok ks =>
+    let lines :=
+      ks.filterMap fun x =>
+        match x.2.1 with
+        | .status .accept | .infra .. => none
+        | _ => some x.2.2
+    return (judgeObs pre d2 (ks.map fun x => (x.1, x.2.1)), pre.details ++ lines)
 
 end FvdepIO.Judge

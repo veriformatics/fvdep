@@ -23,6 +23,9 @@ structure Request where
   abi : Option (String × String)
   roots1 : List String
   roots2 : List String
+  /-- U7 J3: export roots the library roots check owns (absent → infrastructure, never the phase's
+  `failed`); the consumer roots check skips them. -/
+  trusted : List String := []
 
 /-- A check's setting: the cache (library fills + views; its `run` = the command's supervisor-only
 run directory), the consumer recipe (T2), the step limits (`deadline` = each phase's window, P1),
@@ -295,7 +298,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
     return { obs := .infra f.code s!"phase {n}, the library view: {f.detail}", libRoots }
   let exportImports := (g.order ++ [r.specModule] ++ abiModule).eraseDups
   let roots := if n == 1 then r.roots1 else r.roots2
-  let libConsts := [r.spec] ++ (r.abi.map (·.2)).toList
+  let libConsts := ([r.spec] ++ (r.abi.map (·.2)).toList ++ r.trusted).eraseDups
   let empty := run / "empty"
   IO.FS.createDirAll empty
   let st ← IO.mkRef ({} : Shared)
@@ -330,7 +333,7 @@ def phaseBody (s : Setup) (r : Request) (n : Nat) (mods : List (String × ByteAr
       | .libraryRoots | .consumerRoots =>
         let (imports, rs) :=
           if step == .libraryRoots then ([r.specModule] ++ abiModule, libConsts)
-          else (exportImports, roots)
+          else (exportImports, roots.filter fun x => !r.trusted.contains x)
         let src := run / s!"roots{n}-{if step == .libraryRoots then "library" else "consumer"}"
         IO.FS.createDirAll src
         IO.FS.writeFile (src / "FvdepRoots.lean") (rootsSource imports rs)

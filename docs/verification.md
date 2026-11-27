@@ -2988,7 +2988,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Claim: `kernelStatus`: U5's step observation first (setup + protocol failures, an unreadable or over-cap frame, a status the helper contradicts, a data file, a full tmpfs, a child that never started → infrastructure; the deadline → `timeout`), then each kernel's table over the child's exit code + the bytes it printed: accept exactly on the kernel's accept line(s) with both streams whole + stderr empty, reject + decline on their prefixes, every other outcome a crash (`kernelStatusExact`); the kernels' texts = the named constants (reviewed against K2's measurements); K1's step layout + argv + K3's config bytes = tested data; each kernel's own verdict = residue `kernels` (U7-D2).
 - Subject: `FvdepCore.Judge.kernelStatus`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.KernelClaims.kernelStatusExact` (hash 0xdbc49105), proved by `FvdepAudit.Judge.Proof.kernelStatus_exact`:
+- Statement `FvdepLedger.Rows.KernelClaims.kernelStatusExact` (hash 0x6a42168a), proved by `FvdepAudit.Judge.Proof.kernelStatus_exact`:
 
   ```lean
   ∀ (k : FvdepCore.Evidence.Kernel) (r : FvdepCore.Judge.KernelRun),
@@ -3004,8 +3004,9 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
             ∃ c,
               FvdepAudit.Judge.Kernel.Spec.Exited r c ∧
                 FvdepAudit.Judge.Kernel.Spec.Declines k c r.stderr) ∧
-          ((∃ code, (FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.infra code) ↔
-              FvdepAudit.Judge.Kernel.Spec.IsInfra r) ∧
+          (∀ (code : FvdepCore.Evidence.Infra),
+              (FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.infra code ↔
+                FvdepAudit.Judge.Kernel.Spec.IsInfra r code) ∧
             ∀ (s : Nat),
               (FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.timeout s ↔
                 r.outcome = FvdepCore.Sandbox.Outcome.timedOut ∧ s = r.deadline
@@ -3014,20 +3015,75 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Judge.Plan`
+
+- Contract: U7 J1–J3, X8
+- Claim: `stages`: e1 + e2 read once each (a trusted-side read or parse fault = infrastructure, the solution's unreadable export = a statement mismatch), then S → G → A, the first failure or infrastructure stopping every later stage: the kernel phase is reached only on two parsed exports whose statement, graph + proof closure hold, every reached axiom allowlisted, the stages then observing exactly statement + graph + axioms (`stagesSound`); on such exports it is reached unless a stage ran out of W (`stagesComplete`); J3's export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) + `judgeObs`'s kernel observations = tested data (`tests/judge`: the launch cases).
+- Subject: `FvdepCore.Judge.stages`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesSound` (hash 0x8e2615ec), proved by `FvdepAudit.Judge.Proof.stages_sound`:
+
+  ```lean
+  ∀ (p : FvdepCore.Judge.VProfile) (githash version : String) (r : FvdepCore.Judge.Request)
+    (d1 d2 : FvdepCore.Evidence.Digest) (e1 e2 : FvdepCore.Judge.Read),
+    (FvdepCore.Judge.stages p githash version r d1 d2 e1 e2).kernels = true →
+      ∃ b1 b2 t1 t2 names,
+        e1 = Except.ok b1 ∧
+          e2 = Except.ok b2 ∧
+            FvdepCore.Export.readTables githash version b1 = Except.ok t1 ∧
+              FvdepCore.Export.readTables githash version b2 = Except.ok t2 ∧
+                FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r ∧
+                  FvdepAudit.Judge.Graph.Spec.GraphHolds t1 t2 r ∧
+                    FvdepAudit.Judge.Graph.Spec.OpaqueHolds t1 r p.opaques ∧
+                      FvdepAudit.Judge.Graph.Spec.ProofHolds t2 r ∧
+                        (FvdepCore.Judge.stages p githash version r d1 d2 e1 e2).obs =
+                            [FvdepCore.Evidence.Obs.statement d1 d2 true,
+                              FvdepCore.Evidence.Obs.graph d1 d2 true,
+                              FvdepCore.Evidence.Obs.axioms d2 names] ∧
+                          (∀ (a : String), a ∈ names → a ∈ p.allowlist) ∧
+                            ∀ (c : Lean.Name),
+                              FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c →
+                                FvdepCore.Judge.axiomText c ∈ p.allowlist
+  ```
+- Statement `FvdepLedger.Rows.JudgePlanClaims.stagesComplete` (hash 0x64183e63), proved by `FvdepAudit.Judge.Proof.stages_complete`:
+
+  ```lean
+  ∀ (p : FvdepCore.Judge.VProfile) (githash version : String) (r : FvdepCore.Judge.Request)
+    (d1 d2 : FvdepCore.Evidence.Digest) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r →
+          FvdepAudit.Judge.Graph.Spec.GraphHolds t1 t2 r →
+            FvdepAudit.Judge.Graph.Spec.OpaqueHolds t1 r p.opaques →
+              FvdepAudit.Judge.Graph.Spec.ProofHolds t2 r →
+                (∀ (c : Lean.Name),
+                    FvdepAudit.Judge.Graph.Spec.ReachedAxiom t2 r c →
+                      FvdepCore.Judge.axiomText c ∈ p.allowlist) →
+                  (FvdepCore.Judge.stages p githash version r d1 d2 (Except.ok b1)
+                          (Except.ok b2)).kernels =
+                      true ∨
+                    FvdepCore.Judge.budgetCause ∈
+                      (FvdepCore.Judge.stages p githash version r d1 d2 (Except.ok b1)
+                          (Except.ok b2)).details
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepIO.Judge`
 
-- Contract: U7 K1, K4
-- Claim: `run`: K4's pins before any step — T1's fingerprint, then the three kernel binaries' SHA-256 against `v1` (`pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a fresh source directory (the copy's SHA-256 = the frozen export's); then each kernel alone through U5's runner in U2's order, every one run whatever another reported, each observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested).
-- Subject: `FvdepIO.Judge.run`
+- Contract: U7 J1, K1, K4
+- Claim: `judge`: each frozen export read once + checked against its phase's digest, J's `stages`, then — reached — `run`: K4's pins before any step, in K4's order while acquired (T1's fingerprint, then each kernel binary hashed + compared in turn: `pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a fresh source directory (the copy's SHA-256 = the frozen export's); each kernel alone through U5's runner in U2's order, every one run whatever another reported (an exception = that kernel's infrastructure), each observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested) + its own line kept for J4.
+- Subject: `FvdepIO.Judge.judge`
 - Path: none yet (wired by U7)
-- Uninterpreted: `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Hash.Sha256.initState`
-- Residue: `kernels` (the three kernels as processes — leanchecker, con-leche `--verified`, NanoDa in strict axiom mode: each one's verdict on e2 + the bytes it prints), `toolchain-install` (the toolchain install the kernel steps bind read-only: the files T1 fingerprinted + K4 hashed stay those bytes from the check through each step's bind within one command), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
+- Uninterpreted: `FvdepIO.Hash.Sha256.absorb`, `FvdepIO.Spawn.bwrap`, `FvdepIO.Hash.Sha256.squeeze`, `FvdepIO.Hash.sha256`, `FvdepIO.Hash.Sha256.initState`
+- Residue: `kernels` (the three kernels as processes — leanchecker, con-leche `--verified`, NanoDa in strict axiom mode: each one's verdict on e2 + the bytes it prints), `toolchain-install` (the toolchain install the kernel steps bind read-only: the files T1 fingerprinted stay the bytes of its last full hash (T1 reuses its cache record while the tree's stat stamp holds: the stamp detects a change, it is no content identity) + the three binaries K4 hashes in this command stay those bytes through each step's bind), `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`)), `step-helper` (`fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), the `statvfs` samples, the regular files under `/fvdep/work/out` read without following a link, the frame written on descriptor 4), `hacl-sha256` (SHA-256: HACL*'s C (verified upstream in F*/Low*: memory safety + functional correctness vs FIPS 180-4) + fvdep's FFI shim, chunk + streaming orchestration (`c/fvdep_sha256*.c`, `FvdepIO.Hash`)), `bwrap` (bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3)), `os` (OS, filesystem + process semantics), `runtime` (Lean compiler + runtime (compiled code = the kernel definition; string + IO primitives))
 - Unproven: `kernel-steps` (`FvdepIO.Judge`'s IO: the three kernel binaries hashed, e2 + NanoDa's config + D3's stubs staged into a fresh directory (the copy re-hashed), each kernel step through `FvdepIO.Sandbox.run`)
 
 ## `FvdepCore.Judge.Profile`
 
 - Contract: U7 V1–V2, K4
-- Claim: `v1`: the compiled-in profile (pins, deadlines, threads, the step limits, the allowlist, G5's opaque names, W, the implementation profile's freeze) — U2's challenge profile from it = its id + exactly the standard three axioms (`profileBridge`); its kernels = U2's `kernels`, one entry each by construction; the persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested data: `lake test` compares the bytes + the freeze record's digest); K4's `pinCheck`: the pins hold exactly when T1's fingerprint + every hashed kernel binary equal their pins, a stub's own skipped (`pinCheckExact`).
+- Claim: `v1`: the compiled-in profile (pins, deadlines, threads, the step limits, the allowlist, G5's opaque names, W, the implementation profile's freeze) — U2's challenge profile from it = its id + exactly the standard three axioms (`profileBridge`); its kernels = U2's `kernels`, one entry each by construction; the persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested data: `lake test` compares the bytes + the freeze record's digest); K4's `pinCheck`: the pins hold exactly when T1's fingerprint + every hashed kernel binary equal their pins, a stub's own skipped (`pinCheckExact`: the pass iff; the first mismatch named + `none` supplied for D3's stubs alone = tested, `judge K4` + `judge D3`).
 - Subject: `FvdepCore.Judge.v1`
 - Path: none yet (wired by U7)
 - Statement `FvdepLedger.Rows.KernelClaims.profileBridge` (hash 0x937b604c), proved by `FvdepAudit.Judge.Proof.profile_bridge`:
@@ -4334,8 +4390,8 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - `bwrap` — bubblewrap (≥ 0.8.0): how it reads the arguments fvdep emits (`bwrapRead`: each option by its name + arity, `--` ends the options) + what each operation does (namespaces, read-only binds, sized tmpfs, read-only remounts, the status lines on descriptor 3): an OS tool with no Lean semantics; the claims hold the arguments fvdep builds against a model of bwrap's reading, written from its manual (bubblewrap 0.11.1); the CI smoke + U5-B's isolation tests (G1) check the real tool on vflab + the CI runner (ruling: "bwrap")
 - `lean-toolchain` — `lean` + `leanexport` as processes: a compile's exit code (Lean refusing its input exits 1), its outputs + diagnostics, the export's bytes: the toolchain is trusted (Decisions `Self-verification scope`: Lean parser, elaborator + exporter); P5's verdicts map its exit codes, tested by tester-6's blind suite through `fvdep-dev` (U5-D) (ruling: "Lean parser, elaborator + exporter")
 - `cache-fs` — the build cache's filesystem effects: publication (temp, fsync, rename, directory fsync), per-key locks + pins, the observed entry listings + use stamps eviction + validation decide over: filesystem semantics have no Lean model here; the pure policies decide over observed state (K5, K6), the effects are tested by K7's work counts + tester-6's cache cases (U5-C) (ruling: "the build cache's filesystem effects")
-- `kernels` — the three kernels as processes — leanchecker, con-leche `--verified`, NanoDa in strict axiom mode: each one's verdict on e2 + the bytes it prints: external checkers fvdep runs, trusted by diversity (Decisions `Verification profile`: Lean's default kernel, con-leche's machine-checked consistency theorem for `--verified`, NanoDa an independent implementation); K2's table maps each exit code + output (texts measured on the pinned binaries, `lake test`); C's canaries run each against known-good + known-false inputs (ruling: "kernels (diversity above)")
-- `toolchain-install` — the toolchain install the kernel steps bind read-only: the files T1 fingerprinted + K4 hashed stay those bytes from the check through each step's bind within one command: the user's own files (contract U7 K4: a concurrent modification of one's own toolchain is outside the threat model); T1's stat stamp + K4's per-command rehash of the three binaries (ruling: "premise `toolchain-install`")
+- `kernels` — the three kernels as processes — leanchecker, con-leche `--verified`, NanoDa in strict axiom mode: each one's verdict on e2 + the bytes it prints: external checkers fvdep runs, trusted by diversity (Decisions `Verification profile`: Lean's default kernel, con-leche's machine-checked consistency theorem for `--verified`, NanoDa an independent implementation); K2's table maps each exit code + output (texts from the 4.35 sources + measured outputs: accepts on the pinned binaries, rejects + declines on another packaging of the same release until C's raw controls run the pinned ones, U7-F); C's canaries run each against known-good + known-false inputs (ruling: "kernels (diversity above)")
+- `toolchain-install` — the toolchain install the kernel steps bind read-only: the files T1 fingerprinted stay the bytes of its last full hash (T1 reuses its cache record while the tree's stat stamp holds: the stamp detects a change, it is no content identity) + the three binaries K4 hashes in this command stay those bytes through each step's bind: the user's own files + fvdep's own cache record (contract U7 K4: a modification of one's own toolchain or cache that keeps T1's stat stamp is outside the threat model); T1's stamp + K4's per-command rehash of the three binaries (ruling: "premise `toolchain-install`")
 - `kernel-steps` — `FvdepIO.Judge`'s IO: the three kernel binaries hashed, e2 + NanoDa's config + D3's stubs staged into a fresh directory (the copy re-hashed), each kernel step through `FvdepIO.Sandbox.run`: filesystem + process effects without a Lean model; the pin decision (`pinCheck`) + the status table (`kernelStatus`) are pure + claimed; the IO is tested by `lake test`'s `judge D3` stub kernels through the real runner + `judge K4` on the installed toolchain (vflab + CI) (ruling: "the IO interpreter's effect → primitive mapping (tested)")
 - `sandbox-spawn` — the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`): C + the OS have no Lean semantics: each export is one reviewed call; the outcome + frame reading over the runner's observations are proven (rows `FvdepCore.Sandbox`, `FvdepCore.Step`); the IO is tested by tester-6's blind D2 cases (stage `sandbox-suite`) + the isolation cases (stage `isolation`, each killed by a mutant of `tests/isolation/mutants.py`) (ruling: "the sandbox spawn shim")
 - `step-helper` — `fvdep-step`, PID 2 of every step: its arguments, non-dumpable, descriptor 4 taken only as an inherited pipe, `RLIMIT_CORE` = 1 + `RLIMIT_FSIZE`, the output directories, its child (`posix_spawnp`), the kill-all (refused in C unless PID 2), the `statvfs` samples, the regular files under `/fvdep/work/out` read without following a link, the frame written on descriptor 4: C + the OS have no Lean semantics: the frame it writes reads back exactly (row `FvdepCore.Step`, `frameRead`); its IO is tested by the isolation cases (stage `isolation`: G1.helper, G1.grandchild, G1.core, G4.file-cap, R8.channel, G1.killall-guard, each killed by a mutant) + tester-6's D2 frame cases (ruling: "the step helper's IO")

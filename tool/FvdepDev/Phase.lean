@@ -1,4 +1,5 @@
 import FvdepDev.Cache
+import FvdepDev.Judge
 import FvdepDev.ProfileCheck
 import FvdepIO.Bundle
 import FvdepIO.Snapshot
@@ -20,6 +21,8 @@ def usage : String :=
     "--spec <constant> [--abi-module <M> --abi <constant>] [--roots1 <c>…] [--roots2 <c>…] " ++
     "[--deadline <s>] [--work-bytes <n>] [--frame-bytes <n>] [--export-bytes <n>] " ++
     "[--artifacts <dir>] [--profile [--limit <name>=<n>]... [--results <file> | --child <file>]]" ++
+    " [--judge [--limit judge.work=<n>] [--limit kernel.<k>.deadline=<s>]...]" ++
+    " [--manifest <file>]" ++
     "\n       fvdep-dev phase rerun <bundle dir>\n"
 
 structure Options where
@@ -37,6 +40,11 @@ structure Options where
   profile : Bool := false
   prof : FvdepDev.ProfileCheck.Options := {}
   profOptions : Bool := false
+  judge : Bool := false
+  manifest : Option String := none
+  judgeWork : Option Nat := none
+  kernelDeadlines : List (FvdepCore.Evidence.Kernel × Nat) := []
+  simulated : List String := []
 
 /-- The values after a list option, up to the next option. -/
 def values (args : List String) : List String × List String :=
@@ -51,14 +59,43 @@ partial def parse (o : Options) : List String → Except String Options
   | "--abi" :: v :: rest => parse { o with abi := some v } rest
   | "--artifacts" :: v :: rest => parse { o with artifacts := some v } rest
   | "--profile" :: rest => parse { o with profile := true } rest
+  | "--judge" :: rest => parse { o with judge := true } rest
+  | "--manifest" :: v :: rest => parse { o with manifest := some v } rest
   | "--limit" :: v :: rest =>
-    match FvdepDev.ProfileCheck.setLimit o.prof v with
-    | .ok p =>
-      parse
-        { o with
-          prof := p, profOptions := true }
-        rest
-    | .error e => .error e
+    match v.splitOn "=", v.splitOn "." with
+    | ["judge.work", n], _ =>
+      match n.toNat? with
+      | some w =>
+        if o.judgeWork.isSome then .error "--limit judge.work given twice"
+        else
+          parse
+            { o with
+              judgeWork := some w
+              simulated := o.simulated ++ ["--limit judge.work"] }
+            rest
+      | none => .error s!"--limit judge.work takes a number: {v}"
+    | [key, n], "kernel" :: _ =>
+      match key.splitOn ".", n.toNat? with
+      | ["kernel", k, "deadline"], some sec =>
+        match FvdepDev.Judge.kernelOf k with
+        | some kk =>
+          if sec == 0 || o.kernelDeadlines.any (·.1 == kk) then .error s!"--limit {key}: once, ≥ 1"
+          else
+            parse
+              { o with
+                kernelDeadlines := o.kernelDeadlines ++ [(kk, sec)]
+                simulated := o.simulated ++ [s!"--limit {key}"] }
+              rest
+        | none => .error s!"unknown kernel {k}"
+      | _, _ => .error s!"unknown limit {v}"
+    | _, _ =>
+      match FvdepDev.ProfileCheck.setLimit o.prof v with
+      | .ok p =>
+        parse
+          { o with
+            prof := p, profOptions := true }
+          rest
+      | .error e => .error e
   | "--results" :: f :: rest =>
     parse
       { o with
@@ -143,6 +180,10 @@ def check (o : Options) : IO UInt32 := do
     return ← usageError "--abi-module and --abi go together"
   if o.profOptions && !o.profile then
     return ← usageError "--limit, --results and --child go with --profile"
+  if o.judge && !o.profile then
+    return ← usageError "--judge goes with --profile"
+  if (o.judgeWork.isSome || !o.kernelDeadlines.isEmpty) && !o.judge then
+    return ← usageError "--limit judge.work and kernel.<k>.deadline go with --judge"
   if o.prof.results.isSome && o.prof.child.isSome then
     return ← usageError "--results and --child exclude each other"
   if let some why := ({ fileBytes := o.prof.fileBytes } : Limits).check then
@@ -166,7 +207,7 @@ def check (o : Options) : IO UInt32 := do
   let proj : System.FilePath := o.project
   let text ←
     try
-      IO.FS.readBinFile (proj / "fvdep.toml")
+      IO.FS.readBinFile ((o.manifest.map System.FilePath.mk).getD (proj / "fvdep.toml"))
     catch ex =>
       say [s!"infra io: fvdep.toml could not be read: {ex}"]
       return 2
@@ -241,14 +282,22 @@ def check (o : Options) : IO UInt32 := do
         recipe := consumer FvdepIO.Toolchain.release fp
         limits := o.limits
         library := lib }
+    let jr : FvdepCore.Judge.Request :=
+      { impl := impl.toName
+        spec := o.spec.toName
+        proof := proof.toName
+        abi := o.abi.map String.toName }
     let req : FvdepIO.Phase.Request :=
       { impl := src.impl
         proof := src.proof
         specModule := o.specModule
         spec := o.spec
         abi
-        roots1 := o.roots1.getD ([impl, o.spec] ++ (o.abi.map ([·])).getD [])
-        roots2 := o.roots2.getD [proof] }
+        roots1 := o.roots1.getD ((FvdepCore.Judge.exportRoots1 jr).map toString)
+        roots2 := o.roots2.getD ((FvdepCore.Judge.exportRoots2 jr).map toString)
+        trusted :=
+          if o.roots1.isSome || o.roots2.isSome then []
+          else (FvdepCore.Judge.trustedRoots jr).map toString }
     let rep ← tryFinally (FvdepIO.Phase.check setup req) (FvdepIO.Cache.unpinAll e)
     let obs := rep.runs.map (·.obs)
     let mut bundleLines := #[]
@@ -272,19 +321,46 @@ def check (o : Options) : IO UInt32 := do
           s!"export phase{if f.path == "e1.ndjson" then 1 else 2} exports/{f.path} " ++
             s!"{f.size} {f.sha256}"
         else s!"artifact {phase} {f.path} {f.size} {f.sha256}"
+    -- U7 D1: J on the frozen exports, then U2's verdict over every observation (U6's, U5's, J's).
+    let (judgeLines, judgeRc) ←
+      match o.judge, obs with
+      | true, [.phase1 (.ok d1), .phase2 _ (.ok d2)] =>
+        do
+          let p := FvdepDev.Judge.withJudgeLimits FvdepCore.Judge.v1 o.judgeWork o.kernelDeadlines
+          let (jobs, details) ←
+            FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p jr
+                (run / "exports" / "e1.ndjson") (run / "exports" / "e2.ndjson") d1 d2
+          let key : FvdepCore.Evidence.ChallengeKey :=
+            { request :=
+                { decl := entry.decl
+                  specClosure := ""
+                  implSources := some rep.implSources
+                  proofSources := some rep.proofSources
+                  adapter := none }
+              library := ⟨List.replicate 40 0, List.length_replicate⟩
+              profile := p.evidence
+              statement := "" }
+          let all := FvdepCore.Evidence.Obs.implProfile none :: obs ++ jobs
+          let res := FvdepCore.Evidence.result key (all.map fun x => ⟨key, x⟩)
+          let (block, rc) :=
+            FvdepDev.Judge.verdictBlock s!"{o.id}@{entry.decl.version}" impl o.simulated res details
+          pure (jobs.map FvdepDev.Judge.judgeLine ++ block, some rc)
+      | _, _ =>
+        pure ([], none)
     say
         ((if o.profile then head
           else [s!"impl_sources {rep.implSources}", s!"proof_sources {rep.proofSources}"]) ++
           obs.map obsLine ++
           fileLines ++
-          bundleLines.toList)
+          bundleLines.toList ++
+          judgeLines)
     if let some dir := o.artifacts then
       try
         retain dir run files
       catch ex =>
         say [s!"infra io: the artifacts could not be kept in {dir}: {ex}"]
         return 2
-    return exitOf obs
+    return judgeRc.getD (exitOf obs)
   finally
     try
       IO.FS.removeDirAll run

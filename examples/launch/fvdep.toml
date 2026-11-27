@@ -1,0 +1,52 @@
+schema = 1
+
+[library]
+commit = "0000000000000000000000000000000000000000"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64"]
+impl = "Launch.Base64.encode"
+proof = "Launch.Proof.Base64.encode_eq"
+
+[modules."base64.decode"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64"]
+impl = "Launch.Base64.decode"
+proof = "Launch.Proof.Base64.decode_eq"
+
+[modules."base64.encode_url"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64"]
+impl = "Launch.Base64.encodeUrl"
+proof = "Launch.Proof.Base64.encodeUrl_eq"
+
+[modules."base64.decode_url"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64"]
+impl = "Launch.Base64.decodeUrl"
+proof = "Launch.Proof.Base64.decodeUrl_eq"
+
+[modules."semver.parse"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Semver"]
+proof_modules = ["Launch.Proof.Semver"]
+impl = "Launch.Semver.parse"
+proof = "Launch.Proof.Semver.parse_eq"
+
+[modules."semver.compare"]
+version = "1.0.0"
+shape = "fn"
+impl_modules = ["Launch.Semver"]
+proof_modules = ["Launch.Proof.Semver"]
+impl = "Launch.Semver.compare"
+proof = "Launch.Proof.Semver.compare_eq"

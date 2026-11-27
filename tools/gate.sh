@@ -109,6 +109,7 @@ oracle-suite lean
 profile-suite lean
 profile-witness lean
 acceptance  suites
+judge-suite suites
 index       lean
 index-history lean
 imports     checks
@@ -132,12 +133,12 @@ tree-clean  lean suites probes checks
 # Run phase (`run_stages`): the stages over 90 s alone start first (longest first), then the rest in
 # registry order; a stage's weight = its peak memory alone (GiB, anon + tmpfs, rounded up; unlisted
 # = 1). Both from `tools/vflab-run bash tools/gate-measure.sh [STAGE…]` (vflab, no other fvdep job).
-GATE_FIRST='index-suite acceptance sandbox-suite oracle-suite sys-suite profile-suite coverage'
-GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle-suite=4 ledger-suite=3 sys-suite=3'
+GATE_FIRST='index-suite acceptance sandbox-suite oracle-suite judge-suite sys-suite profile-suite coverage'
+GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle-suite=4 judge-suite=3 ledger-suite=3 sys-suite=3'
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -345,6 +346,15 @@ oracle_suite() {
         bash tests/oracle/run.sh ${FVDEP_ORACLE_CASE:+--case "$FVDEP_ORACLE_CASE"}
 }
 
+# The judge suite (MAIN's; U7 E + D1): the launch examples PROVEN end to end — U6's profile, U5's
+# phases + J (S, G, A, the three kernels) on each of the 10 cases, no override
+# (`fvdep-dev phase check … --profile --judge`). Its steps run fvdep-step ⇒ tests/judge/run.sh
+# refuses outside a PID namespace of the job's own.
+judge_suite() {
+    suite judge-suite "$(stage_key judge-suite)" "${FVDEP_JUDGE_CASE:-}" \
+        bash tests/judge/run.sh ${FVDEP_JUDGE_CASE:+--case "$FVDEP_JUDGE_CASE"}
+}
+
 # The blind profile suite (tester-8; U6 P, C, I, K, R, B, D1–D3): `fvdep-dev profile check` +
 # `fvdep-dev phase check … --profile` over planted modules, records + child faults, each case on its
 # own FVDEP_CACHE (a toolchain record seeded once per run). Its steps run fvdep-step + fvdep-parse ⇒
@@ -381,7 +391,7 @@ index_key() { shipped_closure index.json tool/Main.lean; }
 
 # Each keyed stage's input-closure key (its `suite` mark holds it): one place, read by the stage +
 # by `marks`.
-KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance index'
+KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite index'
 stage_key() { # NAME
     case "$1" in
     lean-style) closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt ;;
@@ -403,6 +413,7 @@ stage_key() { # NAME
     oracle-suite) sandbox_closure tests/oracle tool/Main.lean ;;
     profile-suite | profile-witness) sandbox_closure tests/profile tool/Main.lean tool/ParseMain.lean ;;
     acceptance) shipped_closure tests/acceptance tool/Main.lean ;;
+    judge-suite) sandbox_closure tests/judge examples/launch tool/Main.lean tool/ParseMain.lean ;;
     index) index_key ;;
     *)
         printf 'stage_key: %s is no keyed stage\n' "$1" >&2

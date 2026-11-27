@@ -14,6 +14,7 @@ import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Judge.Graph.Proof
 import FvdepAudit.Judge.Graph.Proof.Stop
 import FvdepAudit.Judge.Kernel.Proof
+import FvdepAudit.Judge.Plan.Proof
 import FvdepAudit.Judge.Proof
 import FvdepAudit.Judge.Statement.Proof
 import FvdepAudit.Judge.Template.Proof
@@ -1863,7 +1864,7 @@ def kernelStatusExact : Prop :=
         ∃ c, Exited r c ∧ r.whole = true ∧ Accepts k c r.stdout r.stderr) ∧
       ((kernelStatus k r).shape = .reject ↔ ∃ c, Exited r c ∧ Rejects k c r.stdout r.stderr) ∧
       ((kernelStatus k r).shape = .decline ↔ ∃ c, Exited r c ∧ Declines k c r.stderr) ∧
-      ((∃ code, (kernelStatus k r).shape = .infra code) ↔ IsInfra r) ∧
+      (∀ code, (kernelStatus k r).shape = .infra code ↔ IsInfra r code) ∧
       ∀ s, (kernelStatus k r).shape = .timeout s ↔ r.outcome = .timedOut ∧ s = r.deadline
 
 /-- U7 K4: the pins hold exactly when T1's fingerprint is the profile's + every kernel binary hashed
@@ -1879,6 +1880,47 @@ def profileBridge : Prop :=
   v1.evidence = ⟨"fvdep/verification/1", ["propext", "Classical.choice", "Quot.sound"]⟩
 
 end FvdepLedger.Rows.KernelClaims
+
+namespace FvdepLedger.Rows.JudgePlanClaims
+
+open FvdepCore.Evidence FvdepCore.Export FvdepCore.Judge FvdepAudit.Judge.Spec
+  FvdepAudit.Judge.Statement.Spec FvdepAudit.Judge.Graph.Spec
+
+/-- U7 J1: the kernel phase is reached only on two read + parsed exports whose statement, graph +
+proof closure hold, every reached axiom allowlisted; the stages then observed exactly the
+statement, the graph + the axioms. -/
+def stagesSound : Prop :=
+  ∀ (p : VProfile) (githash version : String) (r : Request) (d1 d2 : Digest) (e1 e2 : Read),
+    (stages p githash version r d1 d2 e1 e2).kernels = true →
+      ∃ b1 b2 t1 t2 names,
+        e1 = .ok b1 ∧
+          e2 = .ok b2 ∧
+          readTables githash version b1 = .ok t1 ∧
+          readTables githash version b2 = .ok t2 ∧
+          Holds t1 t2 r ∧
+          GraphHolds t1 t2 r ∧
+          OpaqueHolds t1 r p.opaques ∧
+          ProofHolds t2 r ∧
+          (stages p githash version r d1 d2 e1 e2).obs =
+            [.statement d1 d2 true, .graph d1 d2 true, .axioms d2 names] ∧
+          (∀ a ∈ names, a ∈ p.allowlist) ∧ ∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist
+
+/-- U7 J1: on two parsed exports whose statement, graph + proof closure hold with every reached
+axiom allowlisted, the kernel phase is reached unless a stage ran out of W. -/
+def stagesComplete : Prop :=
+  ∀ (p : VProfile) (githash version : String) (r : Request) (d1 d2 : Digest) (b1 b2 : ByteArray)
+    (t1 t2 : Tables),
+    readTables githash version b1 = .ok t1 →
+      readTables githash version b2 = .ok t2 →
+      Holds t1 t2 r →
+      GraphHolds t1 t2 r →
+      OpaqueHolds t1 r p.opaques →
+      ProofHolds t2 r →
+      (∀ c, ReachedAxiom t2 r c → axiomText c ∈ p.allowlist) →
+      (stages p githash version r d1 d2 (.ok b1) (.ok b2)).kernels = true ∨
+        budgetCause ∈ (stages p githash version r d1 d2 (.ok b1) (.ok b2)).details
+
+end FvdepLedger.Rows.JudgePlanClaims
 
 namespace FvdepLedger.Rows.LibraryClaims
 
@@ -2576,18 +2618,22 @@ def residue : List Residue :=
         "external checkers fvdep runs, trusted by diversity (Decisions `Verification profile`: " ++
           "Lean's default kernel, con-leche's machine-checked consistency theorem for " ++
           "`--verified`, NanoDa an independent implementation); K2's table maps each exit code " ++
-          "+ output (texts measured on the pinned binaries, `lake test`); C's canaries run each " ++
-          "against known-good + known-false inputs"
+          "+ output (texts from the 4.35 sources + measured outputs: accepts on the pinned " ++
+          "binaries, rejects + declines on another packaging of the same release until C's raw " ++
+          "controls run the pinned ones, U7-F); C's canaries run each against known-good + " ++
+          "known-false inputs"
       ruling := "kernels (diversity above)"
       boundary := [] },
     { id := "toolchain-install"
       what :=
-        "the toolchain install the kernel steps bind read-only: the files T1 fingerprinted + K4 " ++
-          "hashed stay those bytes from the check through each step's bind within one command"
+        "the toolchain install the kernel steps bind read-only: the files T1 fingerprinted stay " ++
+          "the bytes of its last full hash (T1 reuses its cache record while the tree's stat " ++
+          "stamp holds: the stamp detects a change, it is no content identity) + the three " ++
+          "binaries K4 hashes in this command stay those bytes through each step's bind"
       reason :=
-        "the user's own files (contract U7 K4: a concurrent modification of one's own " ++
-          "toolchain is outside the threat model); T1's stat stamp + K4's per-command rehash of " ++
-          "the three binaries"
+        "the user's own files + fvdep's own cache record (contract U7 K4: a modification of " ++
+          "one's own toolchain or cache that keeps T1's stat stamp is outside the threat " ++
+          "model); T1's stamp + K4's per-command rehash of the three binaries"
       ruling := "premise `toolchain-install`"
       boundary := [] },
     { id := "kernel-steps"
@@ -4059,23 +4105,48 @@ def judgeKernelRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 J1 + J3: the judge's stages over one request. -/
+def judgePlanRow : Row :=
+  { component := `FvdepCore.Judge.Plan
+    contract := "U7 J1–J3, X8"
+    claim :=
+      "`stages`: e1 + e2 read once each (a trusted-side read or parse fault = infrastructure, " ++
+        "the solution's unreadable export = a statement mismatch), then S → G → A, the first " ++
+        "failure or infrastructure stopping every later stage: the kernel phase is reached " ++
+        "only on two parsed exports whose statement, graph + proof closure hold, every reached " ++
+        "axiom allowlisted, the stages then observing exactly statement + graph + axioms " ++
+        "(`stagesSound`); on such exports it is reached unless a stage ran out of W " ++
+        "(`stagesComplete`); J3's export roots (`exportRoots1`, `exportRoots2`, `trustedRoots`) " ++
+        "+ `judgeObs`'s kernel observations = tested data (`tests/judge`: the launch cases)."
+    claims :=
+      [(``JudgePlanClaims.stagesSound, ``FvdepAudit.Judge.Proof.stages_sound),
+        (``JudgePlanClaims.stagesComplete, ``FvdepAudit.Judge.Proof.stages_complete)]
+    subject := ``FvdepCore.Judge.stages
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U7 K1 + K4: the kernel phase's IO. -/
 def judgeKernelStepRow : Row :=
   { component := `FvdepIO.Judge
-    contract := "U7 K1, K4"
+    contract := "U7 J1, K1, K4"
     claim :=
-      "`run`: K4's pins before any step — T1's fingerprint, then the three kernel binaries' " ++
-        "SHA-256 against `v1` (`pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's " ++
-        "config staged into a fresh " ++
-        "source directory (the copy's SHA-256 = the frozen export's); then each kernel alone " ++
-        "through U5's runner in U2's order, every one run whatever another reported, each " ++
-        "observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested)."
+      "`judge`: each frozen export read once + checked against its phase's digest, J's " ++
+        "`stages`, then — reached — `run`: K4's pins before any step, in K4's order while " ++
+        "acquired (T1's fingerprint, then each kernel binary hashed + compared in turn: " ++
+        "`pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's config staged into a " ++
+        "fresh source directory (the copy's SHA-256 = the frozen export's); each kernel alone " ++
+        "through U5's runner in U2's order, every one run whatever another reported (an " ++
+        "exception = that kernel's infrastructure), each observation judged by K2's " ++
+        "`kernelStatus` (`kframeOf` + `kernelRunOf`: tested) + its own line kept for J4."
     claims := []
-    subject := ``FvdepIO.Judge.run
+    subject := ``FvdepIO.Judge.judge
     path := []
     noCaller := "U7"
     residue :=
-      ["kernels", "toolchain-install", "sandbox-spawn", "hacl-sha256", "bwrap", "os", "runtime"]
+      ["kernels", "toolchain-install", "sandbox-spawn", "step-helper", "hacl-sha256", "bwrap", "os",
+        "runtime"]
     unproven := ["kernel-steps"] }
 
 /-- U7 V1–V2: the verification profile v1. -/
@@ -4090,7 +4161,8 @@ def judgeProfileRow : Row :=
         "persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested " ++
         "data: `lake test` compares the bytes + the freeze record's digest); K4's `pinCheck`: " ++
         "the pins hold exactly when T1's fingerprint + every hashed kernel binary equal their " ++
-        "pins, a stub's own skipped (`pinCheckExact`)."
+        "pins, a stub's own skipped (`pinCheckExact`: the pass iff; the first mismatch named + " ++
+        "`none` supplied for D3's stubs alone = tested, `judge K4` + `judge D3`)."
     claims :=
       [(``KernelClaims.profileBridge, ``FvdepAudit.Judge.Proof.profile_bridge),
         (``KernelClaims.pinCheckExact, ``FvdepAudit.Judge.Proof.pinCheck_exact)]
@@ -5194,13 +5266,13 @@ def ledger : Ledger :=
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
-        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgeKernelStepRow,
-        judgeProfileRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
-        libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
-        libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
-        wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow,
-        wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow,
-        wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
+        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgePlanRow,
+        judgeKernelStepRow, judgeProfileRow, projectSelectRow, librarySourceRow, libraryTreeRow,
+        libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow,
+        libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow,
+        wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
+        wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow,
+        wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
         oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
         stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
         snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,

@@ -17,19 +17,26 @@ full tmpfs. -/
 def Exited (r : KernelRun) (c : Nat) : Prop :=
   r.outcome = .exited c ∧ r.frame = .ok (.exited c) 0 false
 
-/-- K2's infrastructure: a setup or protocol failure, or an exit whose frame is unreadable, over its
-cap, or reports a status the helper's exit contradicts, a data file, a full tmpfs or a child that
-never started. -/
-def IsInfra (r : KernelRun) : Prop :=
-  (∃ d, r.outcome = .setupFailed d) ∨
-    r.outcome = .protocol ∨
-    ∃ n,
-      r.outcome = .exited n ∧
-        (r.frame = .invalid ∨
-          r.frame = .overflow ∨
-          ∃ ch f full,
-            r.frame = .ok ch f full ∧
-              (ch.helperExit ≠ n ∨ f ≠ 0 ∨ full = true ∨ ∃ w, ch = .notStarted w))
+/-- U5 R8: the helper's exit code for its child's status — the child's own code, 128 + its signal,
+127 for a child that never started (written from R8, apart from `Child.helperExit`). -/
+def helperCode : Child → Nat
+  | .exited c => c
+  | .signaled s => 128 + s
+  | .notStarted _ => 127
+
+/-- K2's infrastructure + its code: a setup or protocol failure (`sandboxSetup`), or an exit whose
+frame is unreadable, over its cap, or reports a status the helper's exit contradicts, a data file, a
+full tmpfs or a child that never started (`io`). -/
+def IsInfra (r : KernelRun) (code : Infra) : Prop :=
+  ((∃ d, r.outcome = .setupFailed d) ∨ r.outcome = .protocol) ∧ code = .sandboxSetup ∨
+    (∃ n,
+        r.outcome = .exited n ∧
+          (r.frame = .invalid ∨
+            r.frame = .overflow ∨
+            ∃ ch f full,
+              r.frame = .ok ch f full ∧
+                (helperCode ch ≠ n ∨ f ≠ 0 ∨ full = true ∨ ∃ w, ch = .notStarted w))) ∧
+      code = .io
 
 /-- K2's accept per kernel + exit code: leanchecker 0 + exactly its accept line, con-leche 0 +
 exactly `con-leche: accepted <digits> declarations (--verified)` + LF, NanoDa 0 + nothing; stderr

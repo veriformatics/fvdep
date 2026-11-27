@@ -3,9 +3,9 @@ import FvdepCore.Judge.Kernel
 
 /-! U7 V (contract `docs/contracts/U7-judge.md` V1–V3): the verification profile v1 — compiled-in
 data the judge runs under (kernels + their pins, the allowlist, the step limits, W, G5's reviewed
-opaque names) + its persisted form (V2). Pure. v1's deadlines, W, opaque list + canary digest stay
-provisional until Q qualifies them (V3: the freeze records then); the pins = vflab's elan v4.35.0
-install until U7-D2 checks them against the release's own bytes. -/
+opaque names) + its persisted form (V2) + K4's pin check. Pure. v1's deadlines, W, opaque list +
+canary digest stay provisional until Q qualifies them (V3: the freeze records then); the pins + the
+fingerprint = the release's own bytes (contract K4). -/
 
 namespace FvdepCore.Judge
 

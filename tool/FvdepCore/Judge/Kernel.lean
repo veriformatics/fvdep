@@ -132,10 +132,24 @@ def isConAccept (b : ByteArray) : Bool :=
   p.isPrefixOf xs && q.isSuffixOf xs && p.length + q.length < xs.length &&
     ((xs.drop p.length).take (xs.length - p.length - q.length)).all isDigitByte
 
+/-- A stream's lines, split at LF in bytes (each line decoded alone: a later invalid byte never
+re-decodes an earlier line). -/
+def splitLf : List UInt8 → List (List UInt8)
+  | [] => [[]]
+  | b :: rest =>
+    if b == 10 then [] :: splitLf rest
+    else
+      match splitLf rest with
+      | l :: ls => (b :: l) :: ls
+      | [] => [[b]]
+
+def lineText (l : List UInt8) : String :=
+  FvdepCore.Index.Command.textOfBytes (ByteArray.mk l.toArray)
+
 /-- A decline's detail: the kernel's first stderr line, its run time (` t=…`) cut — two equal
 declines must compare equal (U2's conflict check, K5's reuse) —, at most 1,024 bytes. -/
 def declineDetail (err : ByteArray) : String :=
-  let l := (((FvdepCore.Index.Command.textOfBytes err).splitOn "\n").headD "")
+  let l := lineText ((splitLf err.data.toList).headD [])
   let core :=
     match l.splitOn " t=" with
     | [] => l
@@ -196,6 +210,16 @@ def kernelStatus (k : Kernel) (r : KernelRun) : KResult :=
             | .notStarted why => .infra .io s!"the step did not start: {why}"
             | .signaled _ => .status .crash
             | .exited c => .status (kernelTable k c r.stdout r.stderr r.whole)
+
+/-- J4: a kernel's own message — the first nonblank line of its stderr, else of its stdout, at most
+1,024 bytes (`(no output)` when both are blank). -/
+def kernelLine (r : KernelRun) : String :=
+  let firstOf (b : ByteArray) : Option String :=
+    (splitLf b.data.toList).findSome? fun l =>
+      let t := lineText l
+      if FvdepCore.Index.Assemble.trimText t != "" then some t else none
+  FvdepCore.Profile.cutDetail
+    (((firstOf r.stderr).orElse fun _ => firstOf r.stdout).getD "(no output)")
 
 /-! ## K3 -/
 

@@ -696,6 +696,14 @@ plant_oracle_case() {
 probe oracle-suite plant_oracle_case "FAIL O.help" \
     env FVDEP_ORACLE_CASE=O.help bash -c 'source tools/gate.sh; oracle_suite'
 
+# judge-suite: a case expecting another verdict line fails, named (one case: semver.parse, the
+# fastest).
+plant_judge_case() {
+    sed -i "s/PROVEN \$id@1.0.0 \$impl/PROVEN \$id@9.9.9 \$impl/" tests/judge/run.sh
+}
+probe judge-suite plant_judge_case "FAIL E.fn.parse" \
+    env FVDEP_JUDGE_CASE=E.fn.parse bash -c 'source tools/gate.sh; judge_suite'
+
 # profile-suite: a usage case expecting the outcome of a run fails, named (one case, no launch).
 plant_profile_case() {
     sed -i 's/        r.usage("profile check", "--role")/        r.code(0)/' tests/profile/boundary_cases.py

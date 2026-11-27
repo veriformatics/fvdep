@@ -140,18 +140,13 @@ def withTools (act : String → System.FilePath → System.FilePath → String �
 
 def pins : IO UInt32 :=
   withTools fun _ sys _ fp => do
-    match ← FvdepIO.Judge.digests sys [] with
-    | .error e =>
-      say [s!"infra tool_missing: {e}"]
+    match ← FvdepIO.Judge.pins sys fp v1 [] with
+    | some why =>
+      say [s!"infra tool_missing: {why}"]
       return 2
-    | .ok ds =>
-      match pinCheck v1 fp fun k => (ds.lookup k).join with
-      | some why =>
-        say [s!"infra tool_missing: {why}"]
-        return 2
-      | none =>
-        say ["pins hold"]
-        return 0
+    | none =>
+      say ["pins hold"]
+      return 0
 
 def kernelsCmd (o : Options) (e2 : String) : IO UInt32 :=
   withTools fun bwrap sys run fp => do
@@ -171,14 +166,64 @@ def kernelsCmd (o : Options) (e2 : String) : IO UInt32 :=
       say (head ++ [s!"infra {FvdepCore.Oracle.Command.infraWord c}: {d}"])
       return 2
     | .ok rs =>
-      say (head ++ rs.map fun r => s!"kernel {kernelName r.1} {statusText r.2}")
-      if rs.any fun r => r.2 matches .infra .. then
+      say (head ++ rs.map fun r => s!"kernel {kernelName r.1} {statusText r.2.1}")
+      if rs.any fun r => r.2.1 matches .infra .. then
         return 2
       else
-        if rs.all fun r => r.2 == .status .accept then
+        if rs.all fun r => r.2.1 == .status .accept then
           return 0
         else
           return 1
+
+/-- D1: v1 under `--limit judge.work` + `kernel.<k>.deadline` (each an override: SIMULATION). -/
+def withJudgeLimits (p : VProfile) (work : Option Nat) (ds : List (Kernel × Nat)) : VProfile :=
+  let p := ds.foldl (fun p d => setKernel p d.1 fun x => { x with deadline := d.2 }) p
+  match work with
+  | some w => { p with work := w }
+  | none => p
+
+/-- D1: a reason code's interface §6 spelling. -/
+def codeWord : Code → String
+  | .profileConstruct => "profile_construct"
+  | .importNotAllowed => "import_not_allowed"
+  | .reservedModule => "reserved_module"
+  | .buildFailed => "build_failed"
+  | .statementMismatch => "statement_mismatch"
+  | .graphMismatch => "graph_mismatch"
+  | .axiom => "axiom"
+  | .kernelReject => "kernel_reject"
+  | .kernelCrash => "kernel_crash"
+  | .kernelTimeout => "kernel_timeout"
+  | .kernelDecline => "kernel_decline"
+  | .sandboxSetup => "sandbox_setup"
+  | .toolMissing => "tool_missing"
+  | .adapter => "adapter"
+  | .fetchFailed => "fetch_failed"
+  | .io => "io"
+  | _ => "internal"
+
+/-- D1: J's observation lines. -/
+def judgeLine : Obs → String
+  | .statement _ _ b => s!"statement {if b then "matched" else "mismatch"}"
+  | .graph _ _ b => s!"graph {if b then "matched" else "mismatch"}"
+  | .axioms _ ns => "axioms" ++ String.join (ns.map (" " ++ ·))
+  | .kernel _ k s => s!"kernel {kernelName k} {statusText (.status s)}"
+  | .infra c d => s!"infra {FvdepCore.Oracle.Command.infraWord c}: {d}"
+  | _ => "infra io: internal: an observation the judge never makes"
+
+/-- D1 + interface §4: the verdict block — line 1 + one `  detail:` line per listed reason (J4's
+causes, in U2's order); under an override line 1 reads `SIMULATION …` (D3). Exit 0 PROVEN, 1 NOT
+PROVEN, 2 infrastructure. -/
+def verdictBlock (id impl : String) (sim : List String) (r : Result) (details : List String) :
+    List String × UInt32 :=
+  let tail := if sim.isEmpty then "" else s!" (overrides: {", ".intercalate sim})"
+  let head := if sim.isEmpty then "" else "SIMULATION "
+  let dl (n : Nat) := (details.take n).map ("  detail: " ++ ·)
+  match r with
+  | .verdict .proven _ => ([s!"{head}PROVEN {id} {impl}{tail}"], 0)
+  | .verdict _ rs =>
+    ([s!"{head}NOT PROVEN {id}: {(rs.head?.map (·.detail)).getD ""}{tail}"] ++ dl rs.length, 1)
+  | .infra c ns => ([s!"{head}infra {codeWord c.code}: {c.detail}{tail}"] ++ dl ns.length, 2)
 
 def run : List String → IO UInt32
   | ["profile"] => do

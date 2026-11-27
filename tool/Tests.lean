@@ -3038,6 +3038,10 @@ def kCases : List (String × (Unit → Bool)) :=
         kernelStatus .conLeche (kExit 2 "" "con-leche: not implemented yet: a t=1 b t=2\n") ==
           .status (.decline "con-leche: not implemented yet: a t=1 b") &&
         kernelStatus .conLeche (decl "x\nmore\n") == says "x" &&
+        kernelStatus .conLeche
+            ⟨.exited 2, .ok (.exited 2) 0 false, .empty,
+              ((kText (head ++ "π t=0.1s\n")).push 0xff).push 0x0a, true, 600⟩ ==
+          says "π" &&
         kernelStatus .conLeche (decl "x t=1s\nsecond t=2s\n") == says "x" &&
         kernelStatus .conLeche (decl (String.ofList (List.replicate 2000 'y'))) ==
           says (String.ofList (List.replicate 989 'y') ++ "...") &&
@@ -3068,6 +3072,47 @@ def kCases : List (String × (Unit → Bool)) :=
         kShape .lean (run (.exited 137) (ok (.signaled 9) 0 false)) == .crash &&
         kShape .lean (run (.exited 0) (ok (.signaled 9) 0 false)) == .infra .io &&
         kShape .lean (run (.exited 0) (ok (.exited 0) 0 false)) == .accept),
+    ("judge J1: the stages' stops — a trusted export unread or unreadable = infrastructure, the " ++
+        "solution's unreadable export = a statement mismatch with its line; past A the kernel " ++
+        "observations in K's order, none when a stage stopped",
+      fun _ =>
+      let r : Request := ⟨`I.impl, `S.spec, `P.proof, none⟩
+      let go (e1 e2 : Read) : Pre := stages v1 "g" "v" r "d1" "d2" e1 e2
+      let junk : Read := .ok (kText "x")
+      (match (go (.error "gone") junk).obs with
+        | [.infra .io d] => d == "the trusted export could not be read: gone"
+        | _ => false) &&
+        (match (go junk junk).obs with
+          | [.infra .io d] => d.startsWith "the trusted export is unreadable: line 1: "
+          | _ => false) &&
+        !(go junk junk).kernels &&
+        (let hdr : Read :=
+          .ok
+            (kText
+              ("{\"meta\":{\"exporter\":{\"name\":\"lean4export\",\"version\":\"3.1.0\"}," ++
+                "\"format\":{\"version\":\"3.1.0\"},\"lean\":{\"githash\":\"g\"," ++
+                "\"version\":\"v\"}}}\n"))
+        let pre := go hdr junk
+        pre.obs == [.statement "d1" "d2" false] &&
+          (pre.details.head?.getD "").startsWith "the solution export is unreadable: line 1: ") &&
+        (go (.error "gone") junk).details.isEmpty &&
+        judgeObs ⟨[.statement "a" "b" false], ["c"], false⟩ "b" [(.lean, .status .accept)] ==
+          [.statement "a" "b" false] &&
+        judgeObs ⟨[.axioms "b" []], [], true⟩ "b"
+            [(.lean, .status .accept), (.conLeche, .infra .io "x"), (.nanoda, .status .reject)] ==
+          [.axioms "b" [], .kernel "b" .lean .accept, .infra .io "x", .kernel "b" .nanoda .reject]),
+    ("judge J4: a kernel's own line = the first nonblank line of stderr, else of stdout, cut in " ++
+        "bytes before decoding (a later invalid byte never re-decodes it), capped",
+      fun _ =>
+      let run (out err : ByteArray) : KernelRun :=
+        ⟨.exited 1, .ok (.exited 1) 0 false, out, err, true, 9⟩
+      kernelLine (kExit 1 "out line\n" "") == "out line" &&
+        kernelLine (kExit 1 "o\n" "\n  \nerr line\nmore") == "err line" &&
+        kernelLine (kExit 1 "" "") == "(no output)" &&
+        kernelLine (run .empty ((kText "e π\n").push 0xff)) == "e π" &&
+        kernelLine (run ((kText "o π\n").push 0xff) .empty) == "o π" &&
+        kernelLine (kExit 1 "" (String.ofList (List.replicate 2000 'z'))) ==
+          String.ofList (List.replicate 1021 'z') ++ "..."),
     ("judge K1: each kernel's argv + the step's layout (toolchain, helper, staged e2 + config; " ++
         "`LEAN_ABORT_ON_PANIC=1` alone; the helper's per-file cap)",
       fun _ =>
@@ -3165,6 +3210,59 @@ def ioCases : List (String × IO Bool) :=
       let freeze ← IO.FS.readFile (".." / "docs" / "profile-freeze.txt")
       return file.data == v1.text.data &&
           freeze == FvdepCore.Profile.profileId ++ " " ++ v1.implementationFreeze ++ "\n"),
+    ("judge K1: a kernel step's exception = that kernel's infrastructure; the next kernels " ++
+        "still run (an injected runner: the first step throws, the others accept)",
+      do
+      let calls ← IO.mkRef 0
+      let ok (out : String) : FvdepIO.Sandbox.Observation :=
+        { outcome := .exited 0
+          stdout := { head := kText out, total := (kText out).size }
+          stderr := {}
+          frame := .ok ⟨⟨.exited 0, false, false⟩, []⟩ }
+      let step : FvdepIO.Judge.StepRunner := fun spec _ => do
+        calls.modify (· + 1)
+        if (← calls.get) == 1 then
+          throw (IO.userError "poll: injected")
+        if spec.argv.any (·.endsWith "con-leche") then
+          return .ok (ok "con-leche: accepted 1 declarations (--verified)\n")
+        return .ok (ok "")
+      let rs ←
+        tryCatch (some <$> FvdepIO.Judge.kernelPhaseWith step "/s" "/h" "/x" v1 []) fun _ =>
+            pure none
+      return (← calls.get) == 3 &&
+          match rs with
+          |
+          some
+              [(.lean, .infra .io _, _), (.conLeche, .status .accept, _),
+                (.nanoda, .status .accept, _)] =>
+            true
+          | _ => false),
+    ("judge K4: the pins in K4's order while acquired — T1's fingerprint first, then each " ++
+        "kernel binary hashed + compared in turn (a mismatch named before a later missing binary)",
+      do
+      let dir ← IO.FS.createTempDir
+      IO.FS.createDirAll (dir / "bin")
+      IO.FS.writeFile (dir / "bin" / "leanchecker") "a"
+      IO.FS.writeFile (dir / "bin" / "nanoda_bin") "c"
+      let ha := FvdepCore.Hash.hex (FvdepIO.Hash.sha256 "a".toUTF8)
+      let p :=
+        { v1 with
+          fingerprint := "fp", lean := { v1.lean with sha256 := "00" } }
+      let never : FvdepIO.Judge.StepRunner := fun _ _ => throw (IO.userError "no step")
+      let e2 := dir / "e2"
+      IO.FS.writeFile e2 "{}"
+      let r1 ← FvdepIO.Judge.runWith never dir (dir / "h") (dir / "src") "fp" p e2 "" []
+      let r2 ← FvdepIO.Judge.runWith never dir (dir / "h") (dir / "src") "other" p e2 "" []
+      IO.FS.removeDirAll dir
+      let want1 :=
+        "the kernel binary bin/leanchecker has SHA-256 " ++ ha ++
+          "; the verification profile pins 00"
+      return (match r1 with
+          | .error (.toolMissing, d) => d == want1
+          | _ => false) &&
+          match r2 with
+          | .error (.toolMissing, d) => d.startsWith "the toolchain fingerprint is other"
+          | _ => false),
     ("judge K4: fvdep's toolchain = v1's pins (the three kernel binaries + T1's fingerprint; on " ++
         "every host the gate runs: vflab + CI)",
       do

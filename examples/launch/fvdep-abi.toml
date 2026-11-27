@@ -1,0 +1,36 @@
+schema = 1
+
+[library]
+commit = "0000000000000000000000000000000000000000"
+
+[modules."base64.encode"]
+version = "1.0.0"
+shape = "abi"
+impl_modules = ["Launch.Base64Abi", "Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64Abi", "Launch.Proof.Base64"]
+impl = "Launch.Base64Abi.encode"
+proof = "Launch.Proof.Base64Abi.encode_eq"
+
+[modules."base64.decode"]
+version = "1.0.0"
+shape = "abi"
+impl_modules = ["Launch.Base64Abi", "Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64Abi", "Launch.Proof.Base64"]
+impl = "Launch.Base64Abi.decode"
+proof = "Launch.Proof.Base64Abi.decode_eq"
+
+[modules."base64.encode_url"]
+version = "1.0.0"
+shape = "abi"
+impl_modules = ["Launch.Base64Abi", "Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64Abi", "Launch.Proof.Base64"]
+impl = "Launch.Base64Abi.encodeUrl"
+proof = "Launch.Proof.Base64Abi.encodeUrl_eq"
+
+[modules."base64.decode_url"]
+version = "1.0.0"
+shape = "abi"
+impl_modules = ["Launch.Base64Abi", "Launch.Base64"]
+proof_modules = ["Launch.Proof.Base64Abi", "Launch.Proof.Base64"]
+impl = "Launch.Base64Abi.decodeUrl"
+proof = "Launch.Proof.Base64Abi.decodeUrl_eq"

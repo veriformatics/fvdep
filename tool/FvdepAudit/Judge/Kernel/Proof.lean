@@ -172,25 +172,39 @@ theorem shape_status (s : KernelStatus) :
 
 /-! ## K2 -/
 
-/-- U7 K2 `kernelStatusExact`. -/
-theorem kernelStatus_exact (k : Kernel) (r : KernelRun) :
+/-- The previous K2 infrastructure predicate (any code), for `kernelStatus_cases`. -/
+def IsInfraAny (r : KernelRun) : Prop :=
+  (∃ d, r.outcome = .setupFailed d) ∨
+    r.outcome = .protocol ∨
+    ∃ n,
+      r.outcome = .exited n ∧
+        (r.frame = .invalid ∨
+          r.frame = .overflow ∨
+          ∃ ch f full,
+            r.frame = .ok ch f full ∧
+              (ch.helperExit ≠ n ∨ f ≠ 0 ∨ full = true ∨ ∃ w, ch = .notStarted w))
+
+theorem helperCode_eq (c : Child) : helperCode c = c.helperExit := by cases c <;> rfl
+
+/-- K2's five categories (the infrastructure conjunct without its code). -/
+theorem kernelStatus_cases (k : Kernel) (r : KernelRun) :
     ((kernelStatus k r).shape = .accept ↔
         ∃ c, Exited r c ∧ r.whole = true ∧ Accepts k c r.stdout r.stderr) ∧
       ((kernelStatus k r).shape = .reject ↔ ∃ c, Exited r c ∧ Rejects k c r.stdout r.stderr) ∧
       ((kernelStatus k r).shape = .decline ↔ ∃ c, Exited r c ∧ Declines k c r.stderr) ∧
-      ((∃ code, (kernelStatus k r).shape = .infra code) ↔ IsInfra r) ∧
+      ((∃ code, (kernelStatus k r).shape = .infra code) ↔ IsInfraAny r) ∧
       ∀ s, (kernelStatus k r).shape = .timeout s ↔ r.outcome = .timedOut ∧ s = r.deadline := by
   rcases r with ⟨outcome, frame, out, err, whole, dl⟩
   cases outcome with
-  | setupFailed d => simp [kernelStatus, KResult.shape, Exited, IsInfra]
-  | protocol => simp [kernelStatus, KResult.shape, Exited, IsInfra]
+  | setupFailed d => simp [kernelStatus, KResult.shape, Exited, IsInfraAny]
+  | protocol => simp [kernelStatus, KResult.shape, Exited, IsInfraAny]
   | timedOut =>
-    simp [kernelStatus, KResult.shape, Exited, IsInfra]
+    simp [kernelStatus, KResult.shape, Exited, IsInfraAny]
     exact fun _ => eq_comm
   | exited n =>
     cases frame with
-    | invalid => simp [kernelStatus, KResult.shape, Exited, IsInfra]
-    | overflow => simp [kernelStatus, KResult.shape, Exited, IsInfra]
+    | invalid => simp [kernelStatus, KResult.shape, Exited, IsInfraAny]
+    | overflow => simp [kernelStatus, KResult.shape, Exited, IsInfraAny]
     | ok child files full =>
       by_cases h1 : child.helperExit = n
       · by_cases h2 : files = 0
@@ -198,12 +212,12 @@ theorem kernelStatus_exact (k : Kernel) (r : KernelRun) :
           cases full
           · cases child with
             | notStarted w =>
-              simp [kernelStatus, KResult.shape, Exited, IsInfra, h1]
+              simp [kernelStatus, KResult.shape, Exited, IsInfraAny, h1]
               exact ⟨_, _, ⟨rfl, rfl⟩, Or.inr (Or.inr ⟨w, rfl⟩)⟩
             | signaled sg =>
               simp only [Child.helperExit] at h1
               subst h1
-              simp [kernelStatus, KResult.shape, Exited, IsInfra, Child.helperExit]
+              simp [kernelStatus, KResult.shape, Exited, IsInfraAny, Child.helperExit]
             | exited c =>
               simp only [Child.helperExit] at h1
               subst h1
@@ -218,21 +232,90 @@ theorem kernelStatus_exact (k : Kernel) (r : KernelRun) :
               · simp [Exited]
               · simp [Exited]
               · simp only [si, exists_false, false_iff]
-                simp [IsInfra, Child.helperExit]
+                simp [IsInfraAny, Child.helperExit]
               · intro t
                 rw [st]
                 simp [table_ne_timeout]
-          · simp [kernelStatus, KResult.shape, Exited, IsInfra, h1]
-        · simp [kernelStatus, KResult.shape, Exited, IsInfra, h1, h2]
+          · simp [kernelStatus, KResult.shape, Exited, IsInfraAny, h1]
+        · simp [kernelStatus, KResult.shape, Exited, IsInfraAny, h1, h2]
           refine ⟨child, files, ?_⟩
           cases full <;> simp [h2]
       · have hne : child ≠ .exited n := fun hc =>
           h1
             (by
               rw [hc]; rfl)
-        simp [kernelStatus, KResult.shape, Exited, IsInfra, h1, hne]
+        simp [kernelStatus, KResult.shape, Exited, IsInfraAny, h1, hne]
         refine ⟨child, files, ?_⟩
         cases full <;> simp [h1]
+
+/-- K2's infrastructure with its code: `sandboxSetup` for a setup or protocol failure, `io` for the
+step's frame faults. -/
+theorem kernelStatus_infra (k : Kernel) (r : KernelRun) (code : Infra) :
+    (kernelStatus k r).shape = .infra code ↔ IsInfra r code := by
+  rcases r with ⟨outcome, frame, out, err, whole, dl⟩
+  cases outcome with
+  | setupFailed d => simp [kernelStatus, KResult.shape, IsInfra, @eq_comm _ Infra.sandboxSetup]
+  | protocol => simp [kernelStatus, KResult.shape, IsInfra, @eq_comm _ Infra.sandboxSetup]
+  | timedOut => simp [kernelStatus, KResult.shape, IsInfra]
+  | exited n =>
+    cases frame with
+    | invalid => simp [kernelStatus, KResult.shape, IsInfra, @eq_comm _ Infra.io]
+    | overflow => simp [kernelStatus, KResult.shape, IsInfra, @eq_comm _ Infra.io]
+    | ok child files
+      full =>
+      have hio :
+        IsInfra ⟨.exited n, .ok child files full, out, err, whole, dl⟩ code ↔
+          (child.helperExit ≠ n ∨ files ≠ 0 ∨ full = true ∨ ∃ w, child = .notStarted w) ∧
+            code = .io := by
+        simp only [IsInfra, helperCode_eq]
+        constructor
+        · rintro (⟨⟨d, hd⟩ | hd, _⟩ | ⟨⟨m, hm, hf⟩, hc⟩)
+          · cases hd
+          · cases hd
+          · injection hm with hm
+            subst hm
+            refine ⟨?_, hc⟩
+            rcases hf with hf | hf | ⟨ch, f, fl, hf, h⟩
+            · cases hf
+            · cases hf
+            · injection hf with e1 e2 e3
+              subst e1
+              subst e2
+              subst e3
+              exact h
+        · rintro ⟨h, hc⟩
+          exact Or.inr ⟨⟨n, rfl, Or.inr (Or.inr ⟨child, files, full, rfl, h⟩)⟩, hc⟩
+      rw [hio]
+      by_cases h1 : child.helperExit = n
+      · by_cases h2 : files = 0
+        · subst h2
+          cases full
+          · cases child with
+            | notStarted w => simp [kernelStatus, KResult.shape, h1, @eq_comm _ Infra.io]
+            | signaled sg => simp [kernelStatus, KResult.shape, h1]
+            | exited c =>
+              simp only [Child.helperExit] at h1
+              subst h1
+              have hk :
+                kernelStatus k ⟨.exited c, .ok (.exited c) 0 false, out, err, whole, dl⟩ =
+                  .status (kernelTable k c out err whole) := by
+                simp [kernelStatus, Child.helperExit]
+              rw [hk]
+              simp [(shape_status (kernelTable k c out err whole)).2.2.2.2 code, Child.helperExit]
+          · simp [kernelStatus, KResult.shape, h1, @eq_comm _ Infra.io]
+        · simp [kernelStatus, KResult.shape, h1, h2, @eq_comm _ Infra.io]
+      · simp [kernelStatus, KResult.shape, h1, @eq_comm _ Infra.io]
+
+/-- U7 K2 `kernelStatusExact`. -/
+theorem kernelStatus_exact (k : Kernel) (r : KernelRun) :
+    ((kernelStatus k r).shape = .accept ↔
+        ∃ c, Exited r c ∧ r.whole = true ∧ Accepts k c r.stdout r.stderr) ∧
+      ((kernelStatus k r).shape = .reject ↔ ∃ c, Exited r c ∧ Rejects k c r.stdout r.stderr) ∧
+      ((kernelStatus k r).shape = .decline ↔ ∃ c, Exited r c ∧ Declines k c r.stderr) ∧
+      (∀ code, (kernelStatus k r).shape = .infra code ↔ IsInfra r code) ∧
+      ∀ s, (kernelStatus k r).shape = .timeout s ↔ r.outcome = .timedOut ∧ s = r.deadline := by
+  have h := kernelStatus_cases k r
+  exact ⟨h.1, h.2.1, h.2.2.1, fun code => kernelStatus_infra k r code, h.2.2.2.2⟩
 
 /-! ## K4 -/
 
