@@ -45,11 +45,14 @@ def VProfile.kernel (p : VProfile) : Kernel → VKernel
 def VProfile.limits (p : VProfile) (k : Kernel) : Limits :=
   { p.step with deadline := (p.kernel k).deadline }
 
+/-- V1's id (V3: the freeze record names it; a change of the frozen content = a new id). -/
+def verificationId : String := "fvdep/verification/1"
+
 /-- V1: the deadlines + W = Q1's (contract Q1: the launch cases' maxima × 10, deadlines floored at
-60 s); the opaque list + the canary digest stay provisional until C's canaries (U7-F, Q2); the pins
-+ the fingerprint = the release's (contract K4). -/
+60 s); `canaries` = the SHA-256 of `tests/canaries/MANIFEST.tsv` (C1's inputs, their pins + expected
+vectors); the pins + the fingerprint = the release's (contract K4). -/
 def v1 : VProfile :=
-  { id := "fvdep/verification/1"
+  { id := verificationId
     toolchain := "v4.35.0"
     githash := "eb6cafb7290e8bd5f2937522d8d804f58f02bafc"
     fingerprint := "7cf789f4243d0c8da1ee0bb456a58be0502ab817c5374bf7628edd065f3d6038"
@@ -62,7 +65,7 @@ def v1 : VProfile :=
     step := {}
     opaques := [`String.Internal.append]
     work := 21359400
-    canaries := "" }
+    canaries := "206c94d34b70c6b14b78b2abf26cc781dd12d7e706f5eccd7e3f6fd0ec98f9bd" }
 
 /-- K4: the pins hold — T1's toolchain fingerprint, then each kernel binary's SHA-256 (hex; `none` =
 D3's stub: its own pin skipped) = the profile's; else the first mismatch (infrastructure

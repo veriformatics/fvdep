@@ -2618,10 +2618,9 @@ def residue : List Residue :=
         "external checkers fvdep runs, trusted by diversity (Decisions `Verification profile`: " ++
           "Lean's default kernel, con-leche's machine-checked consistency theorem for " ++
           "`--verified`, NanoDa an independent implementation); K2's table maps each exit code " ++
-          "+ output (texts from the 4.35 sources + measured outputs: accepts on the pinned " ++
-          "binaries, rejects + declines on another packaging of the same release until C's raw " ++
-          "controls run the pinned ones, U7-F); C's canaries run each against known-good + " ++
-          "known-false inputs"
+          "+ output (texts from the 4.35 sources, each class measured on the pinned binaries: " ++
+          "C's raw controls, stage `verification-canaries`, + `R.forged`); C's canaries run " ++
+          "each against known-good + known-false inputs"
       ruling := "kernels (diversity above)"
       boundary := [] },
     { id := "toolchain-install"

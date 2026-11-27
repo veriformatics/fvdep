@@ -6,6 +6,10 @@ usage: edit.py header IN OUT            — the header line alone
        edit.py drop IN OUT NAME         — without NAME's declaration record
        edit.py swap-value IN OUT D FROM — D's `value` = FROM's (two definitions)
        edit.py collide IN OUT P C       — P's declaration renamed to C, C's own dropped
+       edit.py retype IN OUT D FROM     — D's `type` = FROM's (two non-inductive declarations)
+       edit.py refield IN OUT D FIELD   — D's FIELD (`type` | `value`) = the one of the nearest earlier
+                                          level-free declaration holding another (its index precedes
+                                          D's line: X's reader binds a reference only backwards)
 """
 import json
 import sys
@@ -62,6 +66,31 @@ def main() -> int:
                 out.append(line)
             if hits != 1:
                 raise SystemExit(f"edit.py: {sys.argv[4]}: not exactly one declaration")
+        elif op == "retype":
+            frm = idx[sys.argv[5]]
+            ty = next(d["type"] for r in recs if (d := decl_of(r)) and d["name"] == frm)
+            out = lines[:1]
+            hits = 0
+            for line, r in zip(lines[1:], recs, strict=True):
+                d = decl_of(r)
+                if d is not None and d["name"] == target:
+                    d["type"] = ty
+                    hits += 1
+                    line = json.dumps(r, ensure_ascii=False, separators=(",", ":"))
+                out.append(line)
+            if hits != 1:
+                raise SystemExit(f"edit.py: {sys.argv[4]}: not exactly one declaration")
+        elif op == "refield":
+            field = sys.argv[5]
+            at = next(k for k, r in enumerate(recs) if (d := decl_of(r)) and d["name"] == target)
+            mine = decl_of(recs[at])
+            assert mine is not None
+            donor = next(d[field] for r in reversed(recs[:at])
+                         if (d := decl_of(r)) and field in d and not d["levelParams"]
+                         and d[field] != mine[field])
+            mine[field] = donor
+            out = lines[:1] + [json.dumps(r, ensure_ascii=False, separators=(",", ":")) if k == at
+                               else line for k, (line, r) in enumerate(zip(lines[1:], recs, strict=True))]
         elif op == "collide":
             new = idx[sys.argv[5]]
             out = lines[:1]

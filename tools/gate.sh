@@ -110,6 +110,7 @@ profile-suite lean
 profile-witness lean
 acceptance  suites
 judge-suite suites
+verification-canaries lean
 index       lean
 index-history lean
 imports     checks
@@ -138,7 +139,7 @@ GATE_WEIGHTS='index-suite=9 acceptance=10 coverage=5 lean-style=4 index=4 oracle
 
 # The iteration subset tools/fast-gate.sh runs (build-consuming stages after lean-build).
 # shellcheck disable=SC2034
-FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite index index-history'
+FAST_STAGES='imports preview spec shell python fanout vendor deps renovate meta lean-build lean-style lean-test cli coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite verification-canaries index index-history'
 
 # Every Lake target of both packages (stage `meta` holds this list = the lakefiles' declarations).
 ROOT_TARGETS=(Fvdep FvdepPreview FvdepProofs)
@@ -220,12 +221,14 @@ cli() { bash tests/cli/smoke.sh "$root/tool/.lake/build/bin/fvdep"; }
 # docs/verification.md = the rendering. Verdict reused like a suite's in the fast gate (input
 # closure = the tool package, the library, the doc + `.agent/spec.md`: `noCaller` names its rows).
 # The checker loads `FvdepLedger.Rows` at run time (`lake exe` builds its own imports alone) ⇒ the
-# rows' build first: a row edit or plant is checked as written, never a stale `.olean`. + U6 Q2's
-# freeze: docs/profile-freeze.txt = `<profileId> <digest>` of the profile's normative content.
+# rows' build first: a row edit or plant is checked as written, never a stale `.olean`. + the two
+# freezes: docs/profile-freeze.txt (U6 Q2) + docs/verification-freeze.txt (U7 V3) = `<id> <digest>`
+# of each profile's normative content.
 coverage() {
     suite coverage "$(stage_key coverage)" "" \
         bash -c 'cd tool && lake build -q FvdepLedger &&
-            lake exe fvdep-ledger --check ../docs/verification.md --freeze ../docs/profile-freeze.txt'
+            lake exe fvdep-ledger --check ../docs/verification.md --freeze ../docs/profile-freeze.txt \
+                --vfreeze ../docs/verification-freeze.txt'
 }
 
 # SHA-256 over the tracked + untracked-unignored files under PATH…, both Lake configs + toolchain
@@ -355,6 +358,15 @@ judge_suite() {
         bash tests/judge/run.sh ${FVDEP_JUDGE_CASE:+--case "$FVDEP_JUDGE_CASE"}
 }
 
+# The canaries (U7 C1): the raw controls (`tests/canaries/MANIFEST.tsv`: pinned Lean Kernel Arena
+# inputs + their expected vectors) through the three pinned kernels alone (`fvdep-dev judge
+# kernels`). Its steps run fvdep-step ⇒ tests/canaries/run.sh refuses outside a PID namespace of the
+# job's own.
+verification_canaries() {
+    suite verification-canaries "$(stage_key verification-canaries)" "${FVDEP_CANARY_CASE:-}" \
+        bash tests/canaries/run.sh ${FVDEP_CANARY_CASE:+--case "$FVDEP_CANARY_CASE"}
+}
+
 # The blind profile suite (tester-8; U6 P, C, I, K, R, B, D1–D3): `fvdep-dev profile check` +
 # `fvdep-dev phase check … --profile` over planted modules, records + child faults, each case on its
 # own FVDEP_CACHE (a toolchain record seeded once per run). Its steps run fvdep-step + fvdep-parse ⇒
@@ -391,11 +403,14 @@ index_key() { shipped_closure index.json tool/Main.lean; }
 
 # Each keyed stage's input-closure key (its `suite` mark holds it): one place, read by the stage +
 # by `marks`.
-KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite index'
+KEYED_STAGES='lean-style coverage ledger-suite codec-suite manifest-suite library-suite index-suite fuzz-replay sys-suite sandbox-suite isolation oracle-suite profile-suite profile-witness acceptance judge-suite verification-canaries index'
 stage_key() { # NAME
     case "$1" in
     lean-style) closure_key '*.lean' .lean-fmt.toml tool/.lean-fmt.toml tools/lean-style.sh tools/lean-fmt ;;
-    coverage) shipped_closure tool docs/verification.md docs/profile-freeze.txt .agent/spec.md ;;
+    coverage)
+        shipped_closure tool docs/verification.md docs/profile-freeze.txt docs/verification-freeze.txt \
+            .agent/spec.md
+        ;;
     ledger-suite) ledger_suite_key ;;
     codec-suite)
         { shipped_closure tests/codec tests/sha256; awk '$1 == "jq"' tools/tools.lock; } |
@@ -414,6 +429,7 @@ stage_key() { # NAME
     profile-suite | profile-witness) sandbox_closure tests/profile tool/Main.lean tool/ParseMain.lean ;;
     acceptance) shipped_closure tests/acceptance tool/Main.lean ;;
     judge-suite) sandbox_closure tests/judge examples/launch tool/Main.lean tool/ParseMain.lean ;;
+    verification-canaries) sandbox_closure tests/canaries ;;
     index) index_key ;;
     *)
         printf 'stage_key: %s is no keyed stage\n' "$1" >&2

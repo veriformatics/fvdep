@@ -3291,6 +3291,11 @@ def ioCases : List (String × IO Bool) :=
           trustedRoots r == (exportRoots1 r).filter (· != `I.impl) &&
           !(trustedRoots r).contains `I.impl &&
           (trustedRoots r).contains `A.shape),
+    ("judge C1: v1's canary digest = the SHA-256 of `tests/canaries/MANIFEST.tsv` (the raw " ++
+        "controls' pins + their expected vectors)",
+      do
+      let b ← IO.FS.readBinFile (".." / "tests" / "canaries" / "MANIFEST.tsv")
+      return FvdepCore.Hash.hex (FvdepIO.Hash.sha256 b) == v1.canaries),
     ("judge K4: fvdep's toolchain = v1's pins (the three kernel binaries + T1's fingerprint; on " ++
         "every host the gate runs: vflab + CI)",
       do

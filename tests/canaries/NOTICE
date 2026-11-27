@@ -1,0 +1,11 @@
+The files under raw/ are unmodified test inputs of the Lean Kernel Arena
+(https://github.com/leanprover/lean-kernel-arena), round 2026-09: commit
+5d7ca987618f1136aaa296057b50a2c10c4ce77a, release asset lean-arena-round-2026-09-tests.tar.gz
+(SHA-256 98a69742b538296c5f413d0527dfeef8c4d1815fe64b12c8623cd33de63bee0d): good/tutorial/001_basicDef,
+good/other/nat-lit-add, bad/tutorial/002_badDef, bad/tutorial/052_inductWrongCtorResLevel,
+bad/tutorial/073_BogusRecursor. Licensed under the Apache License, Version 2.0; each file's SHA-256 is
+pinned in MANIFEST.tsv.
+
+raw/axiom-extra.ndjson is fvdep's own: Lean 4.35.0's leanexport of a two-line module (an axiom
+`Canary.extra : False`, a theorem using it) — the decline vector (con-leche --verified declines a
+non-standard axiom; NanoDa in strict axiom mode rejects it; leanchecker has no axiom policy).

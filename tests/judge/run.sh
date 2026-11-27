@@ -41,6 +41,8 @@ R.d2.header|header||SIMULATION NOT PROVEN judge: the proof does not prove the re
 R.d2.spec|swap-value Fvdep.Base64.Encode.V1_0_0.encode Launch.Base64.encode||SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM)|  detail: the solution redefines Fvdep.Base64.Encode.V1_0_0.encode
 R.d2.propext|drop propext||SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM)|  detail: the solution lacks propext
 R.d2.collision|collide Launch.Proof.Base64.encode_eq Fvdep.Base64.Encode.V1_0_0.encode|--proof-as Fvdep.Base64.Encode.V1_0_0.encode|SIMULATION NOT PROVEN judge: the proof does not prove the required statement $SIM)|  detail: the proof's name Fvdep.Base64.Encode.V1_0_0.encode is a trusted constant
+R.d2.propext-type|refield propext type||SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM)|  detail: the solution redefines propext
+R.d2.prelude|refield Nat.add value||SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM)|  detail: the solution redefines Nat.add
 R.d2.budget-s|none|--limit judge.work=5|SIMULATION NOT PROVEN judge: the proof does not prove the required statement $SIM, --limit judge.work)|  detail: the comparison passes its work budget
 R.d2.budget-g|none|--limit judge.work=1000|SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM, --limit judge.work)|  detail: the comparison passes its work budget"
 one() {

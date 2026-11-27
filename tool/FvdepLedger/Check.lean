@@ -552,10 +552,13 @@ structure Args where
   freeze : Option System.FilePath := none
   freezeWrite : Bool := false
   freezePrint : Bool := false
+  vfreeze : Option System.FilePath := none
+  vfreezeWrite : Bool := false
 
 def usage : String :=
   "usage: fvdep-ledger (--check|--write) <doc> [--module <M>] [--ledger <decl>] [--spec <file>] " ++
-    "[--freeze <record> | --freeze-write <record>] | --freeze-print [--module <M>]"
+    "[--freeze <record> | --freeze-write <record>] " ++
+    "[--vfreeze <record> | --vfreeze-write <record>] | --freeze-print [--module <M>]"
 
 def parse : List String → Option Args → Option Args
   | [], acc => acc
@@ -572,6 +575,12 @@ def parse : List String → Option Args → Option Args
       (some
         { a with
           freeze := some f, freezeWrite := true })
+  | "--vfreeze" :: f :: rest, some a => parse rest (some { a with vfreeze := some f })
+  | "--vfreeze-write" :: f :: rest, some a =>
+    parse rest
+      (some
+        { a with
+          vfreeze := some f, vfreezeWrite := true })
   | _, _ => none
 
 /-- `t` without its line feeds (a record line as printed in a finding). -/
@@ -630,13 +639,22 @@ unsafe def main (argv : List String) : IO UInt32 := do
       return 2
   let mut fs := findings env l spec (← axiomsOf env l)
   fs := fs ++ (← replay env)
-  if let some fr := a.freeze then
-    match Freeze.current env with
+  -- U6 Q2 + U7 V3: each frozen profile's record = its id + the digest of its normative content.
+  let records : List (String × Freeze.Spec × System.FilePath × Bool × String) :=
+    (a.freeze.map fun fr =>
+            [("profile", Freeze.profileSpec, fr, a.freezeWrite, "contract U6 Q2")]).getD
+        [] ++
+      (a.vfreeze.map fun fr =>
+            [("verification", Freeze.verificationSpec, fr, a.vfreezeWrite, "contract U7 V3")]).getD
+        []
+  for (label, sp, fr, wr, cite) in records do
+    match Freeze.currentOf env sp with
     | .error e =>
-      fs := fs.push ⟨"profile", "freeze", e⟩
+      fs := fs.push ⟨label, "freeze", e⟩
     | .ok (id, hex) =>
       let line := s!"{id} {hex}\n"
-      if a.freezeWrite then
+      let rewrite := if label == "profile" then "`--freeze-write`" else "`--vfreeze-write`"
+      if wr then
         IO.FS.writeFile fr line
       else
         let old ←
@@ -647,10 +665,10 @@ unsafe def main (argv : List String) : IO UInt32 := do
         unless old == line do
           fs :=
             fs.push
-              ⟨"profile", "freeze",
-                s!"{fr} records {oneLine old}, the profile is {oneLine line}: a rule or " ++
-                  "datum changed under the same id — a new version id + requalification " ++
-                  "(contract U6 Q2), or `--freeze-write` while v1 is unfrozen"⟩
+              ⟨label, "freeze",
+                s!"{fr} records {oneLine old}, the {label} profile is {oneLine line}: a rule " ++
+                  s!"or datum changed under the same id — a new version id + requalification " ++
+                  s!"({cite}), or a review-ruled re-record ({rewrite})"⟩
   let text ← render env l a.ledger
   unless fs.isEmpty do
     for f in fs do

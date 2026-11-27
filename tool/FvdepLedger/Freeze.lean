@@ -54,8 +54,8 @@ def terms (env : Environment) (n : Name) : List Expr :=
 
 /-- The digest over `deep` (closure inside profile modules) + `shallow` (own terms alone); a
 closure past `bound` steps fails closed (a digest over part of it would vouch for less). -/
-def digest (env : Environment) (deep shallow : List Name) (bound : Nat := 1000000) :
-    Except String UInt64 :=
+def digest (env : Environment) (deep shallow : List Name) (bound : Nat := 1000000)
+    (own : Name → Bool := profileModule) : Except String UInt64 :=
   Id.run do
     let mut seen : NameSet := {}
     let mut todo := deep
@@ -70,7 +70,7 @@ def digest (env : Environment) (deep shallow : List Name) (bound : Nat := 100000
         todo := rest
         unless seen.contains n do
           seen := seen.insert n
-          let bodied := deep.contains n || (moduleOf env n).any profileModule
+          let bodied := deep.contains n || (moduleOf env n).any own
           if bodied then
             let ts := terms env n
             lines := lines.push (n, ts.foldl (fun h e => mixHash h e.hash) 7)
@@ -83,30 +83,69 @@ def digest (env : Environment) (deep shallow : List Name) (bound : Nat := 100000
           else
             lines := lines.push (n, 0)
     if !todo.isEmpty then
-      return .error s!"the profile's closure passes {bound} steps"
+      return .error s!"the closure passes {bound} steps"
     for n in shallow do
       lines := lines.push (`shallow ++ n, (terms env n).foldl (fun h e => mixHash h e.hash) 11)
     let sorted := lines.qsort fun a b => a.1.toString < b.1.toString
     return .ok (sorted.foldl (fun h x => mixHash (mixHash h (hash x.1)) x.2) (hash Lean.githash))
 
-/-- The profile's id (`profileId`'s string literal) + its digest, or why they cannot be read. -/
-def current (env : Environment) : Except String (String × String) := do
-  let some (.defnInfo d) := env.find? `FvdepCore.Profile.profileId
-    | throw "FvdepCore.Profile.profileId not found"
+/-- One frozen profile: its id constant (a string literal), the modules whose constants are its own
+(hashed by body when reached), its deep-root modules + names, its claim namespaces (shallow). -/
+structure Spec where
+  idConst : Name
+  own : Name → Bool
+  rootMods : List Name
+  roots : List Name
+  claims : List Name
+
+/-- U6 Q2: the implementation profile. -/
+def profileSpec : Spec :=
+  { idConst := `FvdepCore.Profile.profileId
+    own := profileModule
+    rootMods := rootModules
+    roots := rootNames
+    claims := [claimNamespace] }
+
+/-- U7 V3: the verification profile — the value (pins, deadlines, W, the allowlist, G5's list, the
+canary digest), K's table + texts + step layout + NanoDa's config, J's stages + J3's export roots,
+the reader (X), S/G/A's code + G1's inventory, their claim statements; the IO interpreter (residue)
+outside it. -/
+def verificationSpec : Spec :=
+  { idConst := `FvdepCore.Judge.verificationId
+    own := fun m =>
+      [`FvdepCore.Judge, `FvdepAudit.Judge, `FvdepCore.Export].any fun p => p.isPrefixOf m
+    rootMods :=
+      [`FvdepCore.Judge.Profile, `FvdepCore.Judge.Kernel, `FvdepCore.Judge.Plan,
+        `FvdepCore.Judge.Statement, `FvdepCore.Judge.Graph, `FvdepCore.Judge.Axioms,
+        `FvdepCore.Judge.Compare, `FvdepCore.Judge.View, `FvdepCore.Judge.Template,
+        `FvdepCore.Export]
+    roots := [`FvdepCore.Judge.v1, `FvdepCore.Judge.verificationId]
+    claims :=
+      [`FvdepLedger.Rows.ExportClaims, `FvdepLedger.Rows.JudgeClaims,
+        `FvdepLedger.Rows.StatementClaims, `FvdepLedger.Rows.GraphClaims,
+        `FvdepLedger.Rows.KernelClaims, `FvdepLedger.Rows.JudgePlanClaims] }
+
+/-- A profile's id (its id constant's string literal) + its digest, or why they cannot be read. -/
+def currentOf (env : Environment) (sp : Spec) : Except String (String × String) := do
+  let some (.defnInfo d) := env.find? sp.idConst
+    | throw s!"{sp.idConst} not found"
   let .lit (.strVal id) := d.value.consumeMData
-    | throw "FvdepCore.Profile.profileId is not a string literal"
+    | throw s!"{sp.idConst} is not a string literal"
   let consts :=
     env.constants.fold (init := #[]) fun acc n _ =>
-      if (moduleOf env n).any (rootModules.contains ·) then acc.push n else acc
-  let deep := consts.toList ++ rootNames
+      if (moduleOf env n).any (sp.rootMods.contains ·) then acc.push n else acc
+  let deep := consts.toList ++ sp.roots
   for n in deep do
     unless env.contains n do
       throw s!"root {n} not found"
   let shallow :=
     (env.constants.fold (init := #[]) fun acc n _ =>
-        if claimNamespace.isPrefixOf n && !n.isInternal then acc.push n else acc).toList
-  let h ← digest env deep shallow
+        if sp.claims.any (·.isPrefixOf n) && !n.isInternal then acc.push n else acc).toList
+  let h ← digest env deep shallow (own := sp.own)
   let hex := String.ofList ((Nat.toDigits 16 h.toNat).leftpad 16 '0')
   return (id, hex)
+
+/-- U6 Q2's profile id + digest. -/
+def current (env : Environment) : Except String (String × String) := currentOf env profileSpec
 
 end FvdepLedger.Freeze

@@ -552,8 +552,12 @@ probe coverage plant_doc_drift "ledger: root: doc:" bash -c 'source tools/gate.s
 plant_freeze() {
     sed -i 's/rule "Lean.Parser.Command.open" \["open"\],/rule "Lean.Parser.Command.open" ["open", "probe"],/' \
         tool/FvdepCore/Profile/Table.lean
+    # U7 V3 (one coverage run, both freezes): a K2 text drifts under the verification profile's id
+    sed -i 's/^def nanodaReject : String := "Error: export file declares unpermitted axiom"$/def nanodaReject : String := "Error: export file declares unpermitted axiom!"/' \
+        tool/FvdepCore/Judge/Kernel.lean
 }
-probe coverage-freeze plant_freeze "ledger: profile: freeze:" bash -c 'source tools/gate.sh; coverage'
+probe coverage-freeze plant_freeze $'ledger: profile: freeze:\nledger: verification: freeze:' \
+    bash -c 'source tools/gate.sh; coverage'
 
 # coverage, extra roots: a further executable's entry not shaped `fun a => interpreter (plan a)`
 # (one root per shipped executable, U2 L1 + L4; the helper's root bent to `Cli.plan`) → the `root`
@@ -707,6 +711,14 @@ plant_judge_case() {
 }
 probe judge-suite plant_judge_case "FAIL E.fn.parse" \
     env FVDEP_JUDGE_CASE=E.fn.parse bash -c 'source tools/gate.sh; judge_suite'
+
+# verification-canaries: a bad control expecting acceptance fails, named (one case).
+plant_canary_case() {
+    sed -i 's/^\(raw\/bad\/002_badDef\.ndjson\t[0-9a-f]*\t\).*/\1accept accept accept/' \
+        tests/canaries/MANIFEST.tsv
+}
+probe verification-canaries plant_canary_case "FAIL raw/bad/002_badDef.ndjson" \
+    env FVDEP_CANARY_CASE=raw/bad/002_badDef.ndjson bash -c 'source tools/gate.sh; verification_canaries'
 
 # profile-suite: a usage case expecting the outcome of a run fails, named (one case, no launch).
 plant_profile_case() {

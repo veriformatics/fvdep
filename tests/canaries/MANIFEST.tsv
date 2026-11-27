@@ -1,0 +1,7 @@
+# U7 C1 raw controls (contract docs/contracts/U7-judge.md C1): path, SHA-256, the expected kernel vector (lean, con-leche, nanoda) pinned from the input's logical class before any measurement
+raw/good/001_basicDef.ndjson	82023f63efe0d75e9966621bfc69033ccd1333e8d0d989b3d54a79859e9da0ce	accept accept accept
+raw/good/nat-lit-add.ndjson	f30784ee87c3d61f73ca7036295dea1034f1d8796b574ab232ab45999cae7faa	accept accept accept
+raw/bad/002_badDef.ndjson	d1342aceb5741fc040523d3b4bd5e1ae3160dc17213d1dc0f6d766559a93a227	reject reject crash
+raw/bad/052_inductWrongCtorResLevel.ndjson	3f29bd3a753caa056cc45c20cd8aeb734bc44cfc6b3828a6c6ec855737f596f3	reject reject crash
+raw/bad/073_BogusRecursor.ndjson	7f166e26d8b79ca496b066644bbe199faefa4c5fb3c6ded01e35ff4ec628a309	reject reject crash
+raw/axiom-extra.ndjson	9c2538ccc70e904f906e2d8739b32c6372f42fe9e0b844ea9d85e3558bc0b5e3	accept decline reject
