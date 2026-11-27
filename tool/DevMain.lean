@@ -1,6 +1,7 @@
 import FvdepDev.Cache
 import FvdepDev.Export
 import FvdepDev.Index
+import FvdepDev.Judge
 import FvdepDev.Library
 import FvdepDev.Oracle
 import FvdepDev.Phase
@@ -16,7 +17,7 @@ U5b Q3: the shipped oracle under T overrides); `fvdep-dev index decode <file>`
 (contract U4 C9); `fvdep-dev sandbox run …` (contract U5 D2); `fvdep-dev cache …` (contract U5
 D3); `fvdep-dev phase check …` (contract U5 D1); `fvdep-dev export read …` (contract U5b X);
 `fvdep-dev library tree|plan|batch|fetch …` (contract U5b L2–L7); `fvdep-dev profile kinds …`
-(contract U6 Q); never shipped. -/
+(contract U6 Q); `fvdep-dev judge profile` (contract U7 V2); never shipped. -/
 def main (args : List String) : IO UInt32 :=
   match args with
   | "sys" :: "run" :: ops => FvdepDev.Sys.run ops
@@ -30,6 +31,7 @@ def main (args : List String) : IO UInt32 :=
   | "export" :: rest => FvdepDev.Export.run rest
   | "library" :: rest => FvdepDev.Library.run rest
   | "profile" :: rest => FvdepDev.Profile.run rest
+  | "judge" :: rest => FvdepDev.Judge.run rest
   | _ => do
     IO.eprint
         (FvdepDev.Sys.usage ++ FvdepDev.Resources.usage ++ FvdepDev.Oracle.usage ++
@@ -39,5 +41,6 @@ def main (args : List String) : IO UInt32 :=
           FvdepDev.Phase.usage ++
           FvdepDev.Export.usage ++
           FvdepDev.Library.usage ++
-          FvdepDev.Profile.usage)
+          FvdepDev.Profile.usage ++
+          FvdepDev.Judge.usage)
     return 2

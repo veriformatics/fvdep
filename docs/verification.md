@@ -2982,6 +2982,54 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Judge.Kernel`
+
+- Contract: U7 K1–K3
+- Claim: `kernelStatus`: U5's step observation first (setup + protocol failures, an unreadable or over-cap frame, a status the helper contradicts, a data file, a full tmpfs, a child that never started → infrastructure; the deadline → `timeout`), then each kernel's table over the child's exit code + the bytes it printed: accept exactly on the kernel's accept line(s) with both streams whole + stderr empty, reject + decline on their prefixes, every other outcome a crash (`kernelStatusExact`); the kernels' texts = the named constants (reviewed against K2's measurements); K1's step layout + argv + K3's config bytes = tested data; each kernel's own verdict = residue `kernels` (U7-D2).
+- Subject: `FvdepCore.Judge.kernelStatus`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.KernelClaims.kernelStatusExact` (hash 0xdbc49105), proved by `FvdepAudit.Judge.Proof.kernelStatus_exact`:
+
+  ```lean
+  ∀ (k : FvdepCore.Evidence.Kernel) (r : FvdepCore.Judge.KernelRun),
+    ((FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.accept ↔
+        ∃ c,
+          FvdepAudit.Judge.Kernel.Spec.Exited r c ∧
+            r.whole = true ∧ FvdepAudit.Judge.Kernel.Spec.Accepts k c r.stdout r.stderr) ∧
+      ((FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.reject ↔
+          ∃ c,
+            FvdepAudit.Judge.Kernel.Spec.Exited r c ∧
+              FvdepAudit.Judge.Kernel.Spec.Rejects k c r.stdout r.stderr) ∧
+        ((FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.decline ↔
+            ∃ c,
+              FvdepAudit.Judge.Kernel.Spec.Exited r c ∧
+                FvdepAudit.Judge.Kernel.Spec.Declines k c r.stderr) ∧
+          ((∃ code, (FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.infra code) ↔
+              FvdepAudit.Judge.Kernel.Spec.IsInfra r) ∧
+            ∀ (s : Nat),
+              (FvdepCore.Judge.kernelStatus k r).shape = FvdepCore.Judge.KShape.timeout s ↔
+                r.outcome = FvdepCore.Sandbox.Outcome.timedOut ∧ s = r.deadline
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
+## `FvdepCore.Judge.Profile`
+
+- Contract: U7 V1–V2
+- Claim: `v1`: the compiled-in profile (pins, deadlines, threads, the step limits, the allowlist, G5's opaque names, W, the implementation profile's freeze) — U2's challenge profile from it = its id + exactly the standard three axioms (`profileBridge`); its kernels = U2's `kernels`, one entry each by construction; the persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested data: `lake test` compares the bytes + the freeze record's digest).
+- Subject: `FvdepCore.Judge.v1`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.KernelClaims.profileBridge` (hash 0x937b604c), proved by `FvdepAudit.Judge.Proof.profile_bridge`:
+
+  ```lean
+  FvdepCore.Judge.v1.evidence =
+    { id := "fvdep/verification/1", allowedAxioms := ["propext", "Classical.choice", "Quot.sound"] }
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepCore.Project`
 
 - Contract: U5b P1–P3

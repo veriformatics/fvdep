@@ -13,6 +13,7 @@ import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Judge.Graph.Proof
 import FvdepAudit.Judge.Graph.Proof.Stop
+import FvdepAudit.Judge.Kernel.Proof
 import FvdepAudit.Judge.Proof
 import FvdepAudit.Judge.Statement.Proof
 import FvdepAudit.Judge.Template.Proof
@@ -1846,6 +1847,30 @@ def graphInfra : Prop :=
       (∃ d, o.1 = .infra d) ∨ o.1 = .exhausted
 
 end FvdepLedger.Rows.GraphClaims
+
+namespace FvdepLedger.Rows.KernelClaims
+
+open FvdepCore.Evidence FvdepCore.Phase FvdepCore.Sandbox FvdepCore.Judge
+  FvdepAudit.Judge.Kernel.Spec
+
+/-- U7 K2: the status of one kernel step = the table — accept exactly on a clean exit whose code +
+whole streams are the kernel's accept, reject + decline on theirs, infrastructure exactly on
+`IsInfra`, a timeout exactly at the deadline (crash = every other outcome). -/
+def kernelStatusExact : Prop :=
+  ∀ (k : Kernel) (r : KernelRun),
+    ((kernelStatus k r).shape = .accept ↔
+        ∃ c, Exited r c ∧ r.whole = true ∧ Accepts k c r.stdout r.stderr) ∧
+      ((kernelStatus k r).shape = .reject ↔ ∃ c, Exited r c ∧ Rejects k c r.stdout r.stderr) ∧
+      ((kernelStatus k r).shape = .decline ↔ ∃ c, Exited r c ∧ Declines k c r.stderr) ∧
+      ((∃ code, (kernelStatus k r).shape = .infra code) ↔ IsInfra r) ∧
+      ∀ s, (kernelStatus k r).shape = .timeout s ↔ r.outcome = .timedOut ∧ s = r.deadline
+
+/-- U7 V2: the challenge profile U2 judges by (E1) = v1's id + exactly the standard three axioms
+(A2's allowlisted strings). -/
+def profileBridge : Prop :=
+  v1.evidence = ⟨"fvdep/verification/1", ["propext", "Classical.choice", "Quot.sound"]⟩
+
+end FvdepLedger.Rows.KernelClaims
 
 namespace FvdepLedger.Rows.LibraryClaims
 
@@ -3972,6 +3997,44 @@ def judgeAxiomsRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 K1–K3: one kernel step's layout, status + NanoDa's config. -/
+def judgeKernelRow : Row :=
+  { component := `FvdepCore.Judge.Kernel
+    contract := "U7 K1–K3"
+    claim :=
+      "`kernelStatus`: U5's step observation first (setup + protocol failures, an unreadable or " ++
+        "over-cap frame, a status the helper contradicts, a data file, a full tmpfs, a child " ++
+        "that never started → infrastructure; the deadline → `timeout`), then each kernel's " ++
+        "table over the child's exit code + the bytes it printed: accept exactly on the " ++
+        "kernel's accept line(s) with both streams whole + stderr empty, reject + decline on " ++
+        "their prefixes, every other outcome a crash (`kernelStatusExact`); the kernels' texts " ++
+        "= the named constants (reviewed against K2's measurements); K1's step layout + argv + " ++
+        "K3's config bytes = tested data; each kernel's own verdict = residue `kernels` (U7-D2)."
+    claims := [(``KernelClaims.kernelStatusExact, ``FvdepAudit.Judge.Proof.kernelStatus_exact)]
+    subject := ``FvdepCore.Judge.kernelStatus
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
+/-- U7 V1–V2: the verification profile v1. -/
+def judgeProfileRow : Row :=
+  { component := `FvdepCore.Judge.Profile
+    contract := "U7 V1–V2"
+    claim :=
+      "`v1`: the compiled-in profile (pins, deadlines, threads, the step limits, the " ++
+        "allowlist, G5's opaque names, W, the implementation profile's freeze) — U2's " ++
+        "challenge profile from it = its id + exactly the standard three axioms " ++
+        "(`profileBridge`); its kernels = U2's `kernels`, one entry each by construction; the " ++
+        "persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested " ++
+        "data: `lake test` compares the bytes + the freeze record's digest)."
+    claims := [(``KernelClaims.profileBridge, ``FvdepAudit.Judge.Proof.profile_bridge)]
+    subject := ``FvdepCore.Judge.v1
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U5b P3: project selection (U8 reuses it). -/
 def projectSelectRow : Row :=
   { component := `FvdepCore.Project
@@ -5066,15 +5129,16 @@ def ledger : Ledger :=
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
-        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, projectSelectRow, librarySourceRow,
-        libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow,
-        libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow,
-        wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
-        wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow,
-        wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
-        oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
-        stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
-        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
+        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgeProfileRow,
+        projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow, libraryBatchRow,
+        libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow, libraryToolchainRow,
+        protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow, wireNativeByteArrayRow,
+        wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow, wireNativeIntRow,
+        wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow, wirePlainAnswerRow,
+        wireOptionAnswerRow, wireResultServeRow, wireArgServeRow, oracleMergeRow, gitRunRow,
+        librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow,
+        stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow,
+        bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
         profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,

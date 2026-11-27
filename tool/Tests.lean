@@ -2942,6 +2942,157 @@ def gCases : List (String × (Unit → Bool)) :=
         FvdepCore.Judge.axiomText (.str .anonymous (String.ofList (List.replicate 300 'z'))) ==
           "«" ++ String.ofList (List.replicate 255 'z') ++ "»")]
 
+/-! ### K + V (contract U7 K1–K3, V1–V2, D3): the kernel step's layout, status table + config; the
+profile's persisted form. Each expected text = K2's measured kernel output. -/
+
+def kText (s : String) : ByteArray := s.toUTF8
+
+/-- One kernel step: bwrap's exit = the frame's child status, no data file, no full tmpfs. -/
+def kExit (c : Nat) (out err : String) (whole : Bool := true) : KernelRun :=
+  ⟨.exited c, .ok (.exited c) 0 false, kText out, kText err, whole, 600⟩
+
+def kShape (k : FvdepCore.Evidence.Kernel) (r : KernelRun) : KShape := (kernelStatus k r).shape
+
+def leanAcc : String := "Lean default kernel accepts the solution\n"
+
+def kCases : List (String × (Unit → Bool)) :=
+  [("judge K2: each kernel's exact accept → accept (leanchecker's line, con-leche's count line, " ++
+        "NanoDa silent; stderr empty)",
+      fun _ =>
+      kShape .lean (kExit 0 leanAcc "") == .accept &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 3509 declarations (--verified)\n" "") ==
+          .accept &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 0 declarations (--verified)\n" "") ==
+          .accept &&
+        kShape .nanoda (kExit 0 "" "") == .accept),
+    ("judge K2: an accept needs the exact text, exit 0, stderr empty + both streams whole " ++
+        "(else crash)",
+      fun _ =>
+      kShape .lean (kExit 0 (leanAcc ++ "Quotient post-check rejects the solution: e\n") "") ==
+          .crash &&
+        kShape .lean (kExit 0 "Lean default kernel accepts the solution" "") == .crash &&
+        kShape .lean (kExit 0 leanAcc "warning\n") == .crash &&
+        kShape .lean (kExit 0 leanAcc "" false) == .crash &&
+        kShape .lean (kExit 1 leanAcc "") == .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted  declarations (--verified)\n" "") ==
+          .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted -3 declarations (--verified)\n" "") ==
+          .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 12a declarations (--verified)\n" "") ==
+          .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 7 declarations (--verified)\nx\n" "") ==
+          .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 7 declarations\n" "") == .crash &&
+        kShape .conLeche (kExit 0 "con-leche: accepted 7 declarations (--verified)\n" "" false) ==
+          .crash &&
+        kShape .nanoda (kExit 0 "x" "") == .crash &&
+        kShape .nanoda (kExit 0 "" "x") == .crash &&
+        kShape .nanoda (kExit 0 "" "" false) == .crash &&
+        kShape .lean (kExit 0 "" "") == .crash),
+    ("judge K2: rejects — leanchecker's multi-line rejection or its post-check's on stdout, " ++
+        "con-leche's + NanoDa's on stderr, each at exit 1; a truncated stream still rejects",
+      fun _ =>
+      let forged :=
+        "Lean default kernel rejects the solution: while replaying declaration " ++
+          "'KernelProbe.forged':\n(kernel) declaration type mismatch, 'KernelProbe.forged' has " ++
+          "type\n  True\nbut it is expected to have type\n  False\n"
+      kShape .lean (kExit 1 forged "") == .reject &&
+        kShape .lean (kExit 1 forged "" false) == .reject &&
+        kShape .lean (kExit 1 forged "trailing\n") == .reject &&
+        kShape .lean (kExit 1 (leanAcc ++ "Quotient post-check rejects the solution: e\nf\n") "") ==
+          .reject &&
+        kShape .lean (kExit 1 "" "uncaught exception: bad export\n") == .crash &&
+        kShape .lean (kExit 0 forged "") == .crash &&
+        kShape .lean (kExit 1 "Quotient post-check rejects the solution: e\n" "") == .crash &&
+        kShape .conLeche (kExit 1 "" "con-leche: invalid: type mismatch t=0.0s\n") == .reject &&
+        kShape .conLeche (kExit 1 "" "") == .crash &&
+        kShape .conLeche (kExit 1 "con-leche: invalid: x\n" "") == .crash &&
+        kShape .nanoda (kExit 1 "" "Error: export file declares unpermitted axiom \"sorryAx\"\n") ==
+          .reject &&
+        kShape .nanoda (kExit 1 "" "Error: something else\n") == .crash &&
+        kShape .nanoda (kExit 101 "" "thread 'main' panicked\n") == .crash),
+    ("judge K2: con-leche's decline (exit 2) → decline, its first stderr line without the run " ++
+        "time; other exits + kernels → crash",
+      fun _ =>
+      let d1 := kExit 2 "" "con-leche: not implemented yet: nested inductives t=0.1s\nmore\n"
+      let d2 := kExit 2 "" "con-leche: not implemented yet: nested inductives t=2.7s\n"
+      let head := "con-leche: not implemented yet: "
+      let decl (e : String) : KernelRun := kExit 2 "" (head ++ e)
+      let says (e : String) : KResult := .status (.decline (head ++ e))
+      kernelStatus .conLeche d1 ==
+          .status (.decline "con-leche: not implemented yet: nested inductives") &&
+        kernelStatus .conLeche d1 == kernelStatus .conLeche d2 &&
+        kernelStatus .conLeche (kExit 2 "" "con-leche: not implemented yet: a t=1 b t=2\n") ==
+          .status (.decline "con-leche: not implemented yet: a t=1 b") &&
+        kernelStatus .conLeche (decl "x\nmore\n") == says "x" &&
+        kernelStatus .conLeche (decl "x t=1s\nsecond t=2s\n") == says "x" &&
+        kernelStatus .conLeche (decl (String.ofList (List.replicate 2000 'y'))) ==
+          says (String.ofList (List.replicate 989 'y') ++ "...") &&
+        kShape .conLeche (kExit 2 "" "") == .crash &&
+        kShape .lean (kExit 2 "" "con-leche: not implemented yet: x\n") == .crash &&
+        kShape .conLeche (kExit 3 "" "con-leche: fuel exhausted\n") == .crash &&
+        kShape .conLeche (kExit 3 "" "con-leche: not implemented yet: x\n") == .crash &&
+        kShape .conLeche (kExit 1 "" "con-leche: not implemented yet: x\n") == .crash &&
+        kShape .conLeche (kExit 2 "con-leche: not implemented yet: x\n" "") == .crash),
+    ("judge K2/D3: the step's observation first — setup, protocol, a bad or over-cap frame, a " ++
+        "contradicting status, a data file, a full tmpfs, a child never started → " ++
+        "infrastructure; the deadline → timeout; a signal → crash",
+      fun _ =>
+      let run (o : FvdepCore.Sandbox.Outcome) (f : KFrame) : KernelRun :=
+        ⟨o, f, kText leanAcc, kText "", true, 600⟩
+      let ok (c : FvdepCore.Phase.Child) (files : Nat) (full : Bool) : KFrame := .ok c files full
+      kShape .lean (run (.setupFailed "bwrap: x") (ok (.exited 0) 0 false)) ==
+          .infra .sandboxSetup &&
+        kShape .lean (run .protocol (ok (.exited 0) 0 false)) == .infra .sandboxSetup &&
+        kernelStatus .nanoda (run .timedOut .invalid) == .status (.timeout 600) &&
+        kShape .lean (run (.exited 0) .invalid) == .infra .io &&
+        kShape .lean (run (.exited 0) .overflow) == .infra .io &&
+        kShape .lean (run (.exited 0) (ok (.exited 1) 0 false)) == .infra .io &&
+        kShape .lean (run (.exited 0) (ok (.exited 0) 1 false)) == .infra .io &&
+        kShape .lean (run (.exited 0) (ok (.exited 0) 0 true)) == .infra .io &&
+        kernelStatus .lean (run (.exited 127) (ok (.notStarted "exec failed") 0 false)) ==
+          .infra .io "the step did not start: exec failed" &&
+        kShape .lean (run (.exited 137) (ok (.signaled 9) 0 false)) == .crash &&
+        kShape .lean (run (.exited 0) (ok (.signaled 9) 0 false)) == .infra .io &&
+        kShape .lean (run (.exited 0) (ok (.exited 0) 0 false)) == .accept),
+    ("judge K1: each kernel's argv + the step's layout (toolchain, helper, staged e2 + config; " ++
+        "`LEAN_ABORT_ON_PANIC=1` alone; the helper's per-file cap)",
+      fun _ =>
+      let e2 := "/fvdep/src/e2.ndjson"
+      kernelArgv 2 .lean == ["/fvdep/sysroot/bin/leanchecker", "--from-export", e2] &&
+        kernelArgv 3 .conLeche == ["/fvdep/sysroot/bin/con-leche", "--verified", "--jobs=3", e2] &&
+        kernelArgv 2 .nanoda == ["/fvdep/sysroot/bin/nanoda_bin", "/fvdep/src/nanoda.json"] &&
+        kernelSpec "/t" "/h" "/x" {} 1 .lean ==
+          { ro := [("/t", .sysroot), ("/h", .step), ("/x", .src)]
+            env := [("LEAN_ABORT_ON_PANIC", "1")]
+            workBytes := 1073741824
+            tmpBytes := 268435456
+            argv :=
+              ["--file-bytes", "134217728", "--", "/fvdep/sysroot/bin/leanchecker", "--from-export",
+                e2] }),
+    ("judge K3: NanoDa's config = canonical J: the staged export, the allowlist, strict axioms, " ++
+        "the threads, both extensions, no stdin",
+      fun _ =>
+      String.fromUTF8! (nanodaConfig ["propext", "Classical.choice", "Quot.sound"] 2) ==
+        "{\"export_file_path\":\"/fvdep/src/e2.ndjson\",\"nat_extension\":true," ++
+          "\"num_threads\":2,\"permitted_axioms\":[\"propext\",\"Classical.choice\"," ++
+          "\"Quot.sound\"],\"string_extension\":true,\"unpermitted_axiom_hard_error\":true," ++
+          "\"use_stdin\":false}"),
+    ("judge V1: v1's kernels in U2's order, each step under its own deadline; its text = " ++
+        "canonical J (decode then print = the same bytes)",
+      fun _ =>
+      let p :=
+        { v1 with
+          step :=
+            { v1.step with
+              deadline := 5, workBytes := 77 } }
+      FvdepCore.Evidence.kernels.map (fun k => (v1.kernel k).threads) == [1, 2, 2] &&
+        (p.limits .conLeche).deadline == (p.kernel .conLeche).deadline &&
+        (p.limits .nanoda).workBytes == 77 &&
+        match FvdepCore.Json.decode (FvdepCore.Json.print v1.toJson) with
+        | .ok v => (FvdepCore.Json.print v).data == (FvdepCore.Json.print v1.toJson).data
+        | .error _ => false)]
+
 def ioCases : List (String × IO Bool) :=
   [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
         "export-decode corpus input, every field (U7 X9)",
@@ -2952,7 +3103,14 @@ def ioCases : List (String × IO Bool) :=
       let o ← IO.Process.output { cmd := dev.toString, args := #["export", "compare"] ++ paths }
       let lines := o.stdout.splitOn "\n"
       return o.exitCode == 0 && (lines.filter (·.startsWith "same ")).length ≥ 10 &&
-          (lines.filter (·.startsWith "differ ")).isEmpty)]
+          (lines.filter (·.startsWith "differ ")).isEmpty),
+    ("judge V2: `docs/verification-profile.json` = v1's persisted form; v1 pins the " ++
+        "implementation profile's recorded freeze (`docs/profile-freeze.txt`)",
+      do
+      let file ← IO.FS.readBinFile (".." / "docs" / "verification-profile.json")
+      let freeze ← IO.FS.readFile (".." / "docs" / "profile-freeze.txt")
+      return file.data == v1.text.data &&
+          freeze == FvdepCore.Profile.profileId ++ " " ++ v1.implementationFreeze ++ "\n")]
 
 end JudgeX
 
@@ -4919,6 +5077,7 @@ def main : IO UInt32 := do
                   JudgeX.cases ++
                   JudgeX.sCases ++
                   JudgeX.gCases ++
+                  JudgeX.kCases ++
                   LibraryT.cases seed ++
                   LibraryR.cases seed ++
                   WireT.cases seed ++
