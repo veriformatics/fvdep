@@ -45,12 +45,13 @@ def VProfile.kernel (p : VProfile) : Kernel → VKernel
 def VProfile.limits (p : VProfile) (k : Kernel) : Limits :=
   { p.step with deadline := (p.kernel k).deadline }
 
-/-- V1 (provisional until Q: deadlines, W, opaques, canaries; fingerprint measured at U7-D2). -/
+/-- V1 (provisional until Q: deadlines, W, opaques, canaries; the pins + fingerprint = the
+release's: contract K4). -/
 def v1 : VProfile :=
   { id := "fvdep/verification/1"
     toolchain := "v4.35.0"
     githash := "eb6cafb7290e8bd5f2937522d8d804f58f02bafc"
-    fingerprint := ""
+    fingerprint := "7cf789f4243d0c8da1ee0bb456a58be0502ab817c5374bf7628edd065f3d6038"
     exportFormat := "3.1.0"
     allowlist := ["propext", "Classical.choice", "Quot.sound"]
     implementationFreeze := "c6d7118cf6d7abef"
@@ -61,6 +62,25 @@ def v1 : VProfile :=
     opaques := [`String.Internal.append]
     work := 100000000
     canaries := "" }
+
+/-- K4: the pins hold — T1's toolchain fingerprint, then each kernel binary's SHA-256 (hex; `none` =
+D3's stub: its own pin skipped) = the profile's; else the first mismatch (infrastructure
+`tool_missing`). -/
+def pinCheck (p : VProfile) (fingerprint : String) (digest : Kernel → Option String) :
+    Option String :=
+  if fingerprint != p.fingerprint then
+    some
+      s!"the toolchain fingerprint is {fingerprint}; the verification profile pins {p.fingerprint}"
+  else
+    kernels.findSome? fun k =>
+      match digest k with
+      | some d =>
+        if d != (p.kernel k).sha256 then
+          some
+            (s!"the kernel binary bin/{kernelBin k} has SHA-256 {d}; the verification profile " ++
+              s!"pins {(p.kernel k).sha256}")
+        else none
+      | none => none
 
 /-- U2's view of the profile: its id + allowlist (E1's `Profile`). -/
 def VProfile.evidence (p : VProfile) : Profile := ⟨p.id, p.allowlist⟩

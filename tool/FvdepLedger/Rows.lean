@@ -36,6 +36,7 @@ import FvdepAudit.Protocol.Proof.Sig
 import FvdepAudit.Sandbox.Proof
 import FvdepAudit.Step.Proof
 import FvdepAudit.Sys.Proof.Claims
+import FvdepIO.Judge
 import FvdepIO.Library
 import FvdepIO.Profile
 import FvdepIO.Project
@@ -1865,6 +1866,13 @@ def kernelStatusExact : Prop :=
       ((∃ code, (kernelStatus k r).shape = .infra code) ↔ IsInfra r) ∧
       ∀ s, (kernelStatus k r).shape = .timeout s ↔ r.outcome = .timedOut ∧ s = r.deadline
 
+/-- U7 K4: the pins hold exactly when T1's fingerprint is the profile's + every kernel binary hashed
+(a stub's `none` skipped) has the profile's SHA-256. -/
+def pinCheckExact : Prop :=
+  ∀ (p : VProfile) (f : String) (d : Kernel → Option String),
+    pinCheck p f d = none ↔
+      f = p.fingerprint ∧ ∀ k ∈ kernels, ∀ h, d k = some h → h = (p.kernel k).sha256
+
 /-- U7 V2: the challenge profile U2 judges by (E1) = v1's id + exactly the standard three axioms
 (A2's allowlisted strings). -/
 def profileBridge : Prop :=
@@ -2560,6 +2568,40 @@ def residue : List Residue :=
           "(U5-C)"
       ruling := "the build cache's filesystem effects"
       boundary := [``FvdepIO.Cache.link, ``FvdepIO.Cache.touch] },
+    { id := "kernels"
+      what :=
+        "the three kernels as processes — leanchecker, con-leche `--verified`, NanoDa in " ++
+          "strict axiom mode: each one's verdict on e2 + the bytes it prints"
+      reason :=
+        "external checkers fvdep runs, trusted by diversity (Decisions `Verification profile`: " ++
+          "Lean's default kernel, con-leche's machine-checked consistency theorem for " ++
+          "`--verified`, NanoDa an independent implementation); K2's table maps each exit code " ++
+          "+ output (texts measured on the pinned binaries, `lake test`); C's canaries run each " ++
+          "against known-good + known-false inputs"
+      ruling := "kernels (diversity above)"
+      boundary := [] },
+    { id := "toolchain-install"
+      what :=
+        "the toolchain install the kernel steps bind read-only: the files T1 fingerprinted + K4 " ++
+          "hashed stay those bytes from the check through each step's bind within one command"
+      reason :=
+        "the user's own files (contract U7 K4: a concurrent modification of one's own " ++
+          "toolchain is outside the threat model); T1's stat stamp + K4's per-command rehash of " ++
+          "the three binaries"
+      ruling := "premise `toolchain-install`"
+      boundary := [] },
+    { id := "kernel-steps"
+      what :=
+        "`FvdepIO.Judge`'s IO: the three kernel binaries hashed, e2 + NanoDa's config + D3's " ++
+          "stubs staged into a fresh directory (the copy re-hashed), each kernel step through " ++
+          "`FvdepIO.Sandbox.run`"
+      reason :=
+        "filesystem + process effects without a Lean model; the pin decision (`pinCheck`) + " ++
+          "the status table (`kernelStatus`) are pure + claimed; the IO is tested by `lake " ++
+          "test`'s `judge D3` stub kernels through the real runner + `judge K4` on the " ++
+          "installed toolchain (vflab + CI)"
+      ruling := "the IO interpreter's effect → primitive mapping (tested)"
+      boundary := [] },
     { id := "sandbox-spawn"
       what :=
         "the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by " ++
@@ -4017,18 +4059,41 @@ def judgeKernelRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 K1 + K4: the kernel phase's IO. -/
+def judgeKernelStepRow : Row :=
+  { component := `FvdepIO.Judge
+    contract := "U7 K1, K4"
+    claim :=
+      "`run`: K4's pins before any step — T1's fingerprint, then the three kernel binaries' " ++
+        "SHA-256 against `v1` (`pinCheck`, the profile row's `pinCheckExact`); e2 + NanoDa's " ++
+        "config staged into a fresh " ++
+        "source directory (the copy's SHA-256 = the frozen export's); then each kernel alone " ++
+        "through U5's runner in U2's order, every one run whatever another reported, each " ++
+        "observation judged by K2's `kernelStatus` (`kframeOf` + `kernelRunOf`: tested)."
+    claims := []
+    subject := ``FvdepIO.Judge.run
+    path := []
+    noCaller := "U7"
+    residue :=
+      ["kernels", "toolchain-install", "sandbox-spawn", "hacl-sha256", "bwrap", "os", "runtime"]
+    unproven := ["kernel-steps"] }
+
 /-- U7 V1–V2: the verification profile v1. -/
 def judgeProfileRow : Row :=
   { component := `FvdepCore.Judge.Profile
-    contract := "U7 V1–V2"
+    contract := "U7 V1–V2, K4"
     claim :=
       "`v1`: the compiled-in profile (pins, deadlines, threads, the step limits, the " ++
         "allowlist, G5's opaque names, W, the implementation profile's freeze) — U2's " ++
         "challenge profile from it = its id + exactly the standard three axioms " ++
         "(`profileBridge`); its kernels = U2's `kernels`, one entry each by construction; the " ++
         "persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested " ++
-        "data: `lake test` compares the bytes + the freeze record's digest)."
-    claims := [(``KernelClaims.profileBridge, ``FvdepAudit.Judge.Proof.profile_bridge)]
+        "data: `lake test` compares the bytes + the freeze record's digest); K4's `pinCheck`: " ++
+        "the pins hold exactly when T1's fingerprint + every hashed kernel binary equal their " ++
+        "pins, a stub's own skipped (`pinCheckExact`)."
+    claims :=
+      [(``KernelClaims.profileBridge, ``FvdepAudit.Judge.Proof.profile_bridge),
+        (``KernelClaims.pinCheckExact, ``FvdepAudit.Judge.Proof.pinCheck_exact)]
     subject := ``FvdepCore.Judge.v1
     path := []
     noCaller := "U7"
@@ -5129,16 +5194,16 @@ def ledger : Ledger :=
         buildPlanRow, buildKeyRow, buildEvictRow, buildValidateRow, phaseVerdictRow, phaseDriveRow,
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
-        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgeProfileRow,
-        projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow, libraryBatchRow,
-        libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow, libraryToolchainRow,
-        protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow, wireNativeByteArrayRow,
-        wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow, wireNativeIntRow,
-        wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow, wirePlainAnswerRow,
-        wireOptionAnswerRow, wireResultServeRow, wireArgServeRow, oracleMergeRow, gitRunRow,
-        librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow,
-        stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow,
-        bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
+        judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgeKernelStepRow,
+        judgeProfileRow, projectSelectRow, librarySourceRow, libraryTreeRow, libraryPlanRow,
+        libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow, libraryHeadSelectRow,
+        libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow, wireNativeRow,
+        wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row, wireNativeNatRow,
+        wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow, wireAnswerRow,
+        wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
+        oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
+        stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
+        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
         oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
         oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
         profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,

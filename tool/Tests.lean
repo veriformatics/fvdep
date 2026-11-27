@@ -1,6 +1,7 @@
 import FvdepCore
 import FvdepCore.Oracle
 import FvdepCore.Profile.Record
+import FvdepIO.Judge
 import FvdepIO.Library
 import FvdepIO.Phase
 import FvdepIO.Profile
@@ -2953,6 +2954,18 @@ def kExit (c : Nat) (out err : String) (whole : Bool := true) : KernelRun :=
 
 def kShape (k : FvdepCore.Evidence.Kernel) (r : KernelRun) : KShape := (kernelStatus k r).shape
 
+/-- D3: a stub kernel (a shell script) in `dir`. -/
+def kStub (dir : System.FilePath) (name body : String) : IO System.FilePath := do
+  let p := dir / name
+  IO.FS.writeFile p ("#!/bin/sh\n" ++ body ++ "\n")
+  return p
+
+/-- `fvdep-dev judge <args>`: its exit code + stdout's lines. -/
+def kSeam (args : Array String) : IO (UInt32 × List String) := do
+  let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"
+  let o ← IO.Process.output { cmd := dev.toString, args := #["judge"] ++ args }
+  return (o.exitCode, (o.stdout.splitOn "\n").filter (· != ""))
+
 def leanAcc : String := "Lean default kernel accepts the solution\n"
 
 def kCases : List (String × (Unit → Bool)) :=
@@ -3091,7 +3104,48 @@ def kCases : List (String × (Unit → Bool)) :=
         (p.limits .nanoda).workBytes == 77 &&
         match FvdepCore.Json.decode (FvdepCore.Json.print v1.toJson) with
         | .ok v => (FvdepCore.Json.print v).data == (FvdepCore.Json.print v1.toJson).data
-        | .error _ => false)]
+        | .error _ => false),
+    ("judge K4: the pins — T1's fingerprint first, then each kernel binary in U2's order; a " ++
+        "stub's own pin skipped (D3), never the fingerprint",
+      fun _ =>
+      let pin (k : FvdepCore.Evidence.Kernel) : Option String := some (v1.kernel k).sha256
+      let lc := "12c38901cdbfab178f1bf6145dd30012e9a3b2c11ca695292a5884fa3cbaddb6"
+      pinCheck v1 v1.fingerprint pin == none &&
+        pinCheck v1 "ab" pin ==
+          some
+            ("the toolchain fingerprint is ab; the verification profile pins " ++ v1.fingerprint) &&
+        pinCheck v1 v1.fingerprint (fun k => if k == .conLeche then some "cd" else pin k) ==
+          some
+            ("the kernel binary bin/con-leche has SHA-256 cd; the verification profile pins " ++
+              "23a32522ea2c79f4ec8b48916272b37a423bda171e57cd83cfcf142eec50e621") &&
+        pinCheck v1 v1.fingerprint (fun k => if k == .conLeche then pin k else some "ef") ==
+          some
+            ("the kernel binary bin/leanchecker has SHA-256 ef; the verification profile pins " ++
+              lc) &&
+        pinCheck v1 v1.fingerprint (fun k => if k == .lean then none else pin k) == none &&
+        pinCheck v1 v1.fingerprint (fun _ => none) == none &&
+        (pinCheck v1 "ab" fun _ => none).isSome &&
+        v1.fingerprint == "7cf789f4243d0c8da1ee0bb456a58be0502ab817c5374bf7628edd065f3d6038"),
+    ("judge K1/K2: U5's frame → K2's view (the child, the files it carried, either tmpfs full); " ++
+        "both streams whole exactly when no byte was dropped",
+      fun _ =>
+      let st (c : FvdepCore.Phase.Child) (w t : Bool) : FvdepCore.Step.Status := ⟨c, w, t⟩
+      let o (r : FvdepIO.Sandbox.Received) (out : FvdepIO.Sandbox.Retained) :
+        FvdepIO.Sandbox.Observation :=
+        { outcome := .exited 0, stdout := out, stderr := {}, frame := r }
+      let whole : FvdepIO.Sandbox.Retained := { head := kText "ab", total := 2 }
+      let cut : FvdepIO.Sandbox.Retained := { head := kText "a", tail := kText "b", total := 3 }
+      FvdepIO.Judge.kframeOf (.ok ⟨st (.exited 0) false false, []⟩) == .ok (.exited 0) 0 false &&
+        FvdepIO.Judge.kframeOf (.ok ⟨st (.signaled 9) false true, [("x", .empty)]⟩) ==
+          .ok (.signaled 9) 1 true &&
+        FvdepIO.Judge.kframeOf (.ok ⟨st (.exited 1) true false, []⟩) == .ok (.exited 1) 0 true &&
+        FvdepIO.Judge.kframeOf .overflow == .overflow &&
+        FvdepIO.Judge.kframeOf .invalid == .invalid &&
+        (FvdepIO.Judge.kernelRunOf 7 (o .invalid whole)).whole &&
+        !(FvdepIO.Judge.kernelRunOf 7 (o .invalid cut)).whole &&
+        (FvdepIO.Judge.kernelRunOf 7 (o .invalid cut)).stdout.data == (kText "ab").data &&
+        (FvdepIO.Judge.kernelRunOf 7 (o .invalid cut)).deadline == 7 &&
+        !(FvdepIO.Judge.kernelRunOf 7 { o .invalid whole with stderr := cut }).whole)]
 
 def ioCases : List (String × IO Bool) :=
   [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
@@ -3110,7 +3164,101 @@ def ioCases : List (String × IO Bool) :=
       let file ← IO.FS.readBinFile (".." / "docs" / "verification-profile.json")
       let freeze ← IO.FS.readFile (".." / "docs" / "profile-freeze.txt")
       return file.data == v1.text.data &&
-          freeze == FvdepCore.Profile.profileId ++ " " ++ v1.implementationFreeze ++ "\n")]
+          freeze == FvdepCore.Profile.profileId ++ " " ++ v1.implementationFreeze ++ "\n"),
+    ("judge K4: fvdep's toolchain = v1's pins (the three kernel binaries + T1's fingerprint; on " ++
+        "every host the gate runs: vflab + CI)",
+      do
+      let (rc, ls) ← kSeam #["pins"]
+      return rc == 0 && ls == ["pins hold"]),
+    ("judge D3: stub kernels through U5's runner — exact accepts → accept ×3 under " ++
+        "SIMULATION; a signal, a rejection, the deadline, a decline, extra output each judged; " ++
+        "every kernel runs",
+      do
+      let dir ← IO.FS.createTempDir
+      let e2 := dir / "e2.ndjson"
+      IO.FS.writeFile e2 "{}\n"
+      let lc ← kStub dir "lc" "printf 'Lean default kernel accepts the solution\\n'"
+      let cl ← kStub dir "cl" "printf 'con-leche: accepted 3 declarations (--verified)\\n'"
+      let nd ← kStub dir "nd" "exit 0"
+      let stubs (a b c : System.FilePath) : Array String :=
+        #["--kernel-binary", s!"lean={a}", "--kernel-binary", s!"con-leche={b}", "--kernel-binary",
+          s!"nanoda={c}"]
+      let (rc1, ls1) ← kSeam (#["kernels", e2.toString] ++ stubs lc cl nd)
+      let sig ← kStub dir "sig" "kill -9 $$"
+      let rej ← kStub dir "rej" "echo 'con-leche: invalid: type mismatch t=0.0s' >&2; exit 1"
+      let slow ← kStub dir "slow" "sleep 30"
+      let (rc2, ls2) ←
+        kSeam
+            (#["kernels", e2.toString] ++ stubs sig rej slow ++
+              #["--limit", "kernel.nanoda.deadline=1"])
+      let extra ← kStub dir "extra" "printf 'Lean default kernel accepts the solution\\nx\\n'"
+      let dec ← kStub dir "dec" "echo 'con-leche: not implemented yet: nested t=0.1s' >&2; exit 2"
+      let err ← kStub dir "err" "echo note >&2; exit 0"
+      let (rc3, ls3) ← kSeam (#["kernels", e2.toString] ++ stubs extra dec err)
+      IO.FS.removeDirAll dir
+      let sim :=
+        "SIMULATION (overrides: --kernel-binary lean, --kernel-binary con-leche, " ++
+          "--kernel-binary nanoda"
+      return rc1 == 0 &&
+          ls1 ==
+            [sim ++ ")", "kernel lean accept", "kernel con-leche accept", "kernel nanoda accept"] &&
+          rc2 == 1 &&
+          ls2 ==
+            [sim ++ ", --limit kernel.nanoda.deadline)", "kernel lean crash",
+              "kernel con-leche reject", "kernel nanoda timeout 1"] &&
+          rc3 == 1 &&
+          ls3 ==
+            [sim ++ ")", "kernel lean crash",
+              "kernel con-leche decline con-leche: not implemented yet: nested",
+              "kernel nanoda crash"]),
+    ("judge D3: a stub that never starts, one writing a data file → infrastructure (exit 2), " ++
+        "the other kernel still runs; a staged copy is the bytes given; K4 inside the phase: " ++
+        "a real binary off its pin → infrastructure before any step, a stub's own pin skipped",
+      do
+      let dir ← IO.FS.createTempDir
+      let e2 := dir / "e2.ndjson"
+      IO.FS.writeFile e2 "{}\n"
+      let bad ← kStub dir "bad" "exit 0"
+      IO.FS.writeFile bad "#!/nonexistent/sh\nexit 0\n"
+      let file ←
+        kStub dir "file"
+            ("mkdir -p /fvdep/work/out && printf x > /fvdep/work/out/x; " ++
+              "printf 'con-leche: accepted 1 declarations (--verified)\\n'")
+      let nd ← kStub dir "nd" "test \"$(cat /fvdep/src/e2.ndjson)\" = '{}' || exit 9"
+      let (rc, ls) ←
+        kSeam
+            #["kernels", e2.toString, "--kernel-binary", s!"lean={bad}", "--kernel-binary",
+              s!"con-leche={file}", "--kernel-binary", s!"nanoda={nd}"]
+      let (rc2, ls2) ←
+        kSeam #["kernels", e2.toString, "--kernel-binary", s!"nanoda={nd}", "--e2-digest", "00"]
+      let (rc4, ls4) ←
+        kSeam #["kernels", e2.toString, "--kernel-binary", s!"nanoda={nd}", "--pin", "con-leche=00"]
+      let lc ← kStub dir "lc" "printf 'Lean default kernel accepts the solution\\n'"
+      let cl ← kStub dir "cl" "printf 'con-leche: accepted 3 declarations (--verified)\\n'"
+      let (rc5, ls5) ←
+        kSeam
+            #["kernels", e2.toString, "--kernel-binary", s!"lean={lc}", "--kernel-binary",
+              s!"con-leche={cl}", "--kernel-binary", s!"nanoda={nd}", "--pin", "lean=00"]
+      IO.FS.removeDirAll dir
+      let want := FvdepCore.Hash.hex (FvdepIO.Hash.sha256 "{}\n".toUTF8)
+      return rc4 == 2 &&
+          ls4 ==
+            ["SIMULATION (overrides: --kernel-binary nanoda, --pin con-leche)",
+              "infra tool_missing: the kernel binary bin/con-leche has SHA-256 " ++
+                (v1.kernel .conLeche).sha256 ++
+                "; the verification profile pins 00"] &&
+          rc5 == 0 &&
+          ls5.getLast? == some "kernel nanoda accept" &&
+          ls5.length == 4 &&
+          rc2 == 2 &&
+          ls2 ==
+            ["SIMULATION (overrides: --kernel-binary nanoda)",
+              s!"infra io: the staged e2 has SHA-256 {want}; the frozen export's is 00"] &&
+          rc == 2 &&
+          ls.length == 4 &&
+          (ls.getD 1 "").startsWith "kernel lean infra io the step did not start: " &&
+          ls.getD 2 "" == "kernel con-leche infra io the kernel step wrote a file" &&
+          ls.getD 3 "" == "kernel nanoda accept")]
 
 end JudgeX
 

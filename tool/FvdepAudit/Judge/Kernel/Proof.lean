@@ -234,6 +234,26 @@ theorem kernelStatus_exact (k : Kernel) (r : KernelRun) :
         refine ⟨child, files, ?_⟩
         cases full <;> simp [h1]
 
+/-! ## K4 -/
+
+/-- U7 K4 `pinCheckExact`. -/
+theorem pinCheck_exact (p : VProfile) (f : String) (d : Kernel → Option String) :
+    pinCheck p f d = none ↔
+      f = p.fingerprint ∧ ∀ k ∈ kernels, ∀ h, d k = some h → h = (p.kernel k).sha256 := by
+  unfold pinCheck
+  by_cases hf : f = p.fingerprint
+  · subst hf
+    simp only [bne_self_eq_false, Bool.false_eq_true, ↓reduceIte, true_and,
+      List.findSome?_eq_none_iff]
+    apply forall_congr'
+    intro k
+    apply forall_congr'
+    intro _
+    cases hd : d k with
+    | none => simp
+    | some h => by_cases e : h = (p.kernel k).sha256 <;> simp [e]
+  · simp [hf]
+
 /-! ## V2 -/
 
 /-- U7 V2 `profileBridge`. -/

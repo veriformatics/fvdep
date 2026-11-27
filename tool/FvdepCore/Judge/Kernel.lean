@@ -26,23 +26,34 @@ def kernelBin : Kernel → String
   | .conLeche => "con-leche"
   | .nanoda => "nanoda_bin"
 
-/-- K1: a kernel's command, its binary under the toolchain's `bin` at `/fvdep/sysroot`. -/
-def kernelArgv (threads : Nat) (k : Kernel) : List String :=
-  ("/fvdep/sysroot/bin/" ++ kernelBin k) ::
+/-- K1: a kernel's command with its binary at `bin`. -/
+def kernelArgvAt (bin : String) (threads : Nat) (k : Kernel) : List String :=
+  bin ::
     match k with
     | .lean => ["--from-export", e2Path]
     | .conLeche => ["--verified", "--jobs=" ++ num threads, e2Path]
     | .nanoda => [nanodaPath]
 
+/-- K1: a kernel's binary inside the step = under the toolchain's `bin` at `/fvdep/sysroot`. -/
+def kernelPath (k : Kernel) : String := "/fvdep/sysroot/bin/" ++ kernelBin k
+
+/-- K1: a kernel's command. -/
+def kernelArgv (threads : Nat) (k : Kernel) : List String := kernelArgvAt (kernelPath k) threads k
+
+/-- D3: a stub kernel's binary inside the step = staged beside e2 (a test seam; never PROVEN). -/
+def stubPath (k : Kernel) : String := "/fvdep/src/stub-" ++ kernelBin k
+
 /-- K1: one kernel step — the toolchain at `/fvdep/sysroot`, the helper at `/fvdep/step`, the staged
 e2 + NanoDa's config at `/fvdep/src`, nothing else (no project or proof view); the environment =
-`LEAN_ABORT_ON_PANIC=1` alone; the helper's per-file cap, then the kernel's command. -/
-def kernelSpec (sysroot step src : String) (lim : Limits) (threads : Nat) (k : Kernel) : Spec :=
+`LEAN_ABORT_ON_PANIC=1` alone; the helper's per-file cap, then the kernel's command (its binary at
+`bin`: the toolchain's, or D3's stub). -/
+def kernelSpec (sysroot step src : String) (lim : Limits) (threads : Nat) (k : Kernel)
+    (bin : String := kernelPath k) : Spec :=
   { ro := [(sysroot, .sysroot), (step, .step), (src, .src)]
     env := [("LEAN_ABORT_ON_PANIC", "1")]
     workBytes := lim.workBytes
     tmpBytes := lim.tmpBytes
-    argv := ["--file-bytes", num lim.fileCap, "--"] ++ kernelArgv threads k }
+    argv := ["--file-bytes", num lim.fileCap, "--"] ++ kernelArgvAt bin threads k }
 
 /-! ## K2 -/
 
