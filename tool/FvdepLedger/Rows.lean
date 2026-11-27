@@ -12,6 +12,7 @@ import FvdepAudit.Index.Proof.Claims
 import FvdepAudit.Index.Statuses.Proof.Files
 import FvdepAudit.Json.Proof.Access
 import FvdepAudit.Judge.Graph.Proof
+import FvdepAudit.Judge.Graph.Proof.Stop
 import FvdepAudit.Judge.Proof
 import FvdepAudit.Judge.Statement.Proof
 import FvdepAudit.Judge.Template.Proof
@@ -1752,7 +1753,7 @@ def statementExact : Prop :=
       statement (viewOf t1) (viewOf t2) r fuel seen = o →
       ((∃ c, o.1 = .infra c) ↔ ¬∃ T, Target t1 r T) ∧
         (o.1 = .matched → Holds t1 t2 r ∧ ∀ p, o.2.2.contains p = true → PairEq t1 t2 p) ∧
-        (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget")
+        (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .exhausted)
 
 /-- U7 S0: the challenge key's statement digest hashes exactly the template's bytes (its
 separation = the hash's collision resistance over them, never premised). -/
@@ -1766,6 +1767,24 @@ def templateInjective : Prop :=
     (∀ s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof], s.utf8ByteSize ≤ 65536) →
       (∀ s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof], s.utf8ByteSize ≤ 65536) →
       templateBytes x = templateBytes y → x = y
+
+/-- U7 S0: the template bytes = the canonical J text of exactly six members — `abi` (the ABI shape
+constant, or null), `form` = `fvdep/statement/1`, `impl`, `proof`, `shape` (`fn` | `abi`), `spec` —
+over the names as written. -/
+def templateLayout : Prop :=
+  ∀ (x : Template),
+    templateBytes x =
+      FvdepCore.Json.print
+        (.obj
+          [("abi", x.abi.elim .null .str), ("form", .str "fvdep/statement/1"),
+            ("impl", .str x.impl), ("proof", .str x.proof),
+            ("shape", .str (if x.shape = .fn then "fn" else "abi")), ("spec", .str x.spec)])
+
+/-- U7 X7 + S4: `statement` reports `exhausted` only with no work unit left. -/
+def statementStop : Prop :=
+  ∀ (v1 v2 : View) (r : Request) (fuel : Nat) (seen : Std.HashSet Pair)
+    (o : Outcome × Nat × Std.HashSet Pair),
+    statement v1 v2 r fuel seen = o → o.1 = .exhausted → o.2.1 = 0
 
 end FvdepLedger.Rows.StatementClaims
 
@@ -1795,15 +1814,36 @@ def graphExact : Prop :=
             o.2.1.Nodup ∧ ∀ p, o.2.2.2.contains p = true → PairEq t1 t2 p) ∧
         (∀ d, o.1 = .infra d → ∃ c, Reach t1 (graphRoots r) c ∧ ∀ e, ¬Named t1 c e) ∧
         (GraphHolds t1 t2 r →
-          OpaqueHolds t1 r opaques →
-          ProofHolds t2 r →
-          o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget")
+          OpaqueHolds t1 r opaques → ProofHolds t2 r → o.1 = .matched ∨ o.1 = .exhausted)
 
 /-- U7 A2: an axiom's text is an allowlisted string exactly when its structured name is one of the
 standard three (no other name renders as one: NanoDa #37 flattens names). -/
 def axiomTextExact : Prop :=
   ∀ (n : Lean.Name),
     axiomText n ∈ ["propext", "Classical.choice", "Quot.sound"] ↔ n ∈ FvdepCore.Index.Statuses.std
+
+/-- U7 X7 + G3 + G6: `graph` reports `exhausted` only with no work unit left. -/
+def graphStop : Prop :=
+  ∀ (v1 v2 : View) (r : Request) (opaques : List Lean.Name) (fuel : Nat) (seen : Std.HashSet Pair)
+    (o : Outcome × List Lean.Name × Nat × Std.HashSet Pair),
+    graph v1 v2 r opaques fuel seen = o → o.1 = .exhausted → o.2.2.1 = 0
+
+/-- U7 G3: on two exports the reader accepts, a sound memo in: when every reached constant e1
+declares agrees with e2 field for field and a reached name is missing in e1, `graph` reports
+infrastructure or `exhausted` — a trusted-side fault is never the solution's mismatch. -/
+def graphInfra : Prop :=
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tables) (r : Request)
+    (opaques : List Lean.Name) (fuel : Nat) (seen : Std.HashSet Pair)
+    (o : Outcome × List Lean.Name × Nat × Std.HashSet Pair),
+    readTables githash version b1 = .ok t1 →
+      readTables githash version b2 = .ok t2 →
+      (∀ p, seen.contains p = true → PairEq t1 t2 p) →
+      graph (viewOf t1) (viewOf t2) r opaques fuel seen = o →
+      (∀ c,
+        Reach t1 (graphRoots r) c →
+          ∀ e1, Named t1 c e1 → ∃ e2, Named t2 c e2 ∧ EntryEq t1 t2 e1 e2) →
+      (∃ c, Reach t1 (graphRoots r) c ∧ ∀ e, ¬Named t1 c e) →
+      (∃ d, o.1 = .infra d) ∨ o.1 = .exhausted
 
 end FvdepLedger.Rows.GraphClaims
 
@@ -3858,9 +3898,12 @@ def judgeStatementRow : Row :=
         "`@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` " ++
         "(T = the codomain of the shape's closed nondependent arrow type), u = the proof's own " ++
         "`Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks " ++
-        "T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or the budget's " ++
-        "mismatch (`statementExact`); the causes' texts = J4's tested detail lines."
-    claims := [(``StatementClaims.statementExact, ``FvdepAudit.Judge.Proof.statement_exact)]
+        "T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` " ++
+        "(`statementExact`); `exhausted` only with no work unit left (`statementStop`); the " ++
+        "causes' texts = J4's tested detail lines."
+    claims :=
+      [(``StatementClaims.statementExact, ``FvdepAudit.Judge.Proof.statement_exact),
+        (``StatementClaims.statementStop, ``FvdepAudit.Judge.Proof.statement_stop)]
     subject := ``FvdepCore.Judge.statement
     path := []
     noCaller := "U7"
@@ -3873,12 +3916,13 @@ def judgeTemplateRow : Row :=
     contract := "U7 S0"
     claim :=
       "`statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the " ++
-        "request's names as written (shape, impl, spec, proof, ABI shape: " ++
-        "`statementDigestExact`); on names within J's string bound the bytes determine the " ++
+        "request's names as written — its six members spelled in `templateLayout` — " ++
+        "(`statementDigestExact`); on names within J's string bound the bytes determine the " ++
         "request (`templateInjective`); the digest's separation = SHA-256's collision " ++
         "resistance over those bytes (never premised)."
     claims :=
-      [(``StatementClaims.statementDigestExact, ``FvdepAudit.Judge.Proof.statementDigest_exact),
+      [(``StatementClaims.templateLayout, ``FvdepAudit.Judge.Proof.template_layout),
+        (``StatementClaims.statementDigestExact, ``FvdepAudit.Judge.Proof.statementDigest_exact),
         (``StatementClaims.templateInjective, ``FvdepAudit.Judge.Proof.template_injective)]
     subject := ``FvdepCore.Judge.statementDigest
     path := []
@@ -3898,9 +3942,14 @@ def judgeGraphRow : Row :=
         "the reviewed list); then G6 (the proof's closure in e2 declared, its axioms recorded): " ++
         "`.matched` ⇒ `GraphHolds` ∧ `OpaqueHolds` ∧ `ProofHolds` + the axioms returned = " ++
         "exactly the reached ones, once each; infrastructure ⇒ e1 lacks a reached name; all " ++
-        "three ⇒ matched or the budget's mismatch (`graphExact`); the walk order + the causes' " ++
-        "texts = J4's tested detail lines."
-    claims := [(``GraphClaims.graphExact, ``FvdepAudit.Judge.Proof.graph_exact)]
+        "three ⇒ matched or `exhausted` (`graphExact`); every reached constant e1 declares " ++
+        "agreeing with e2 + a reached name e1 lacks ⇒ infrastructure or `exhausted` " ++
+        "(`graphInfra`); `exhausted` only with no work unit left (`graphStop`); the walk order " ++
+        "+ the causes' texts = J4's tested detail lines."
+    claims :=
+      [(``GraphClaims.graphExact, ``FvdepAudit.Judge.Proof.graph_exact),
+        (``GraphClaims.graphInfra, ``FvdepAudit.Judge.Proof.graph_infra),
+        (``GraphClaims.graphStop, ``FvdepAudit.Judge.Proof.graph_stop)]
     subject := ``FvdepCore.Judge.graph
     path := []
     noCaller := "U7"

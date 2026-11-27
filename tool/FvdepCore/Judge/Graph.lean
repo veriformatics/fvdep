@@ -84,13 +84,13 @@ structure Walk where
 /-- G3, at most `steps` names (one unit of fuel each): each name not yet checked — missing in e1
 = infrastructure, missing in e2 or not `declEq` = mismatch — then its uses (in e1) join. -/
 def graphWalk (v1 v2 : View) : Nat → Walk → Outcome × Walk
-  | 0, w => if w.todo.isEmpty then (.matched, w) else (.mismatch budget, w)
+  | 0, w => if w.todo.isEmpty then (.matched, w) else (.exhausted, w)
   | steps + 1, w =>
     match w.todo with
     | [] => (.matched, w)
     | c :: rest =>
       match w.fuel with
-      | 0 => (.mismatch budget, w)
+      | 0 => (.exhausted, w)
       | fuel + 1 =>
         if w.checked.contains c then
           graphWalk v1 v2 steps
@@ -115,13 +115,13 @@ def graphWalk (v1 v2 : View) : Nat → Walk → Outcome × Walk
                   { w with
                     todo := rest, fuel := f, memo := m })
               | (.exhausted, f, m) =>
-                (.mismatch budget,
+                (.exhausted,
                   { w with
                     todo := rest, fuel := f, memo := m })
               | (.equal, f, m) =>
                 match usesOf v1.t e1 f w.seen with
                 | none =>
-                  (.mismatch budget,
+                  (.exhausted,
                     { w with
                       todo := rest, fuel := 0, memo := m })
                 | some (ns, f', s') =>
@@ -135,8 +135,8 @@ def graphWalk (v1 v2 : View) : Nat → Walk → Outcome × Walk
 
 /-- G5's refusal text. -/
 def opaqueCause (c : Lean.Name) : String :=
-  s!"the implementation reaches {c}, an opaque or partial definition: its compiled code is not " ++
-    "the checked term"
+  s!"the checked declaration graph reaches {c}, an opaque definition outside this profile's " ++
+    "exceptions"
 
 /-- G5: the first name (in `cs`' order) of an `opaque` constant of e1 outside the reviewed list. -/
 def firstOpaque (v1 : View) (allowed : List Lean.Name) : List Lean.Name → Option Lean.Name
@@ -162,13 +162,13 @@ def recordAxiom (c : Lean.Name) : Entry → List Lean.Name → List Lean.Name
 
 /-- G6: the proof's closure in e2 — every reached name declared there, each axiom recorded. -/
 def proofWalk (v2 : View) : Nat → ProofWalk → Outcome × ProofWalk
-  | 0, w => if w.todo.isEmpty then (.matched, w) else (.mismatch budget, w)
+  | 0, w => if w.todo.isEmpty then (.matched, w) else (.exhausted, w)
   | steps + 1, w =>
     match w.todo with
     | [] => (.matched, w)
     | c :: rest =>
       match w.fuel with
-      | 0 => (.mismatch budget, w)
+      | 0 => (.exhausted, w)
       | fuel + 1 =>
         if w.checked.contains c then
           proofWalk v2 steps
@@ -183,7 +183,7 @@ def proofWalk (v2 : View) : Nat → ProofWalk → Outcome × ProofWalk
           | some e =>
             match usesOf v2.t e fuel w.seen with
             | none =>
-              (.mismatch budget,
+              (.exhausted,
                 { w with
                   todo := rest, fuel := 0 })
             | some (ns, f, s) =>

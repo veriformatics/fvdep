@@ -9,9 +9,21 @@ namespace FvdepAudit.Judge.Statement.Spec
 
 open FvdepCore.Export FvdepCore.Judge FvdepCore.Index.Rules FvdepAudit.Judge.Spec
 
-/-- A constant of `t` named `n` (X6's per-constant records; X8: at most one per name). -/
+/-- X6: `e` is one of declaration record `d`'s constants, every field as the record gives it: a
+single declaration's own fields; an inductive block's type, constructor or recursor record. -/
+def EntryOf : DeclF → Entry → Prop
+  | .axiom u lps n ty, e => e = .axiom u lps n ty
+  | .defn all h lps n s ty v, e => e = .defn all h lps n s ty v
+  | .thm all lps n ty v, e => e = .thm all lps n ty v
+  | .opaque all u lps n ty v, e => e = .opaque all u lps n ty v
+  | .quot q lps n ty, e => e = .quot q lps n ty
+  | .induct cs rs ts, e =>
+    (∃ x ∈ ts, e = .induct x) ∨ (∃ c ∈ cs, e = .ctor c) ∨ ∃ r ∈ rs, e = .recursor r
+
+/-- A constant of `t` named `n`: one of a read declaration record's constants (X6), its name record
+denoting `n` (X8: at most one per name). -/
 def Named (t : Tables) (n : Lean.Name) (e : Entry) : Prop :=
-  e ∈ t.rawDecls.toList.flatMap entries ∧ t.names[e.name]? = some n
+  (∃ d ∈ t.rawDecls.toList, EntryOf d e) ∧ t.names[e.name]? = some n
 
 /-- S1: a safe definition of `t` without level parameters, named `n`, of type `T`. -/
 def SafeDefn (t : Tables) (n : Lean.Name) (T : Lean.Expr) : Prop :=

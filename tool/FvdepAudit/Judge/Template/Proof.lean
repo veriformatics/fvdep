@@ -51,6 +51,16 @@ theorem template_injective (x y : Template) :
   rcases y with ⟨sy, iy, py, pry, ay⟩
   cases sx <;> cases sy <;> cases ax <;> cases ay <;> simp_all [templateValue, shapeText]
 
+/-- U7 S0 `templateLayout`: the template's bytes = the canonical J text of S0's six members. -/
+theorem template_layout (x : Template) :
+    templateBytes x =
+      print
+        (.obj
+          [("abi", x.abi.elim .null .str), ("form", .str "fvdep/statement/1"),
+            ("impl", .str x.impl), ("proof", .str x.proof),
+            ("shape", .str (if x.shape = .fn then "fn" else "abi")), ("spec", .str x.spec)]) := by
+  rcases x with ⟨_ | _, _, _, _, _ | _⟩ <;> rfl
+
 /-- U7 S0 `statementDigestExact`: the digest hashes exactly the template's bytes. -/
 theorem statementDigest_exact (h : ByteArray → String) (x : Template) :
     statementDigest h x = h (templateBytes x) := rfl

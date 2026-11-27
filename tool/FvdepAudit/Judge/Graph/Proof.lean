@@ -158,7 +158,7 @@ theorem graphWalk_spec {g v : String} {b1 b2 : ByteArray} {t1 t2 : Tables}
         (o = .matched → GraphInv t1 t2 R w' ∧ w'.todo = []) ∧
           (∀ d, o = .infra d → ∃ c, Reach t1 R c ∧ ∀ e, ¬Named t1 c e) ∧
           ((∀ c, Reach t1 R c → ∃ e1 e2, Named t1 c e1 ∧ Named t2 c e2 ∧ EntryEq t1 t2 e1 e2) →
-            o = .matched ∨ o = .mismatch budget) := by
+            o = .matched ∨ o = .exhausted) := by
   intro steps
   induction steps with
   | zero =>
@@ -412,7 +412,7 @@ theorem proofWalk_spec {g v : String} {b2 : ByteArray} {t2 : Tables}
         proofWalk (viewOf t2) steps w = (o, w') →
         (o = .matched → ProofInv t2 p0 w' ∧ w'.todo = []) ∧
           (∀ d, o ≠ .infra d) ∧
-          ((∀ c, Reach t2 [p0] c → ∃ e, Named t2 c e) → o = .matched ∨ o = .mismatch budget) := by
+          ((∀ c, Reach t2 [p0] c → ∃ e, Named t2 c e) → o = .matched ∨ o = .exhausted) := by
   intro steps
   induction steps with
   | zero =>
@@ -496,9 +496,7 @@ theorem graph_exact (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tabl
             o.2.1.Nodup ∧ ∀ p, o.2.2.2.contains p = true → PairEq t1 t2 p) ∧
         (∀ d, o.1 = .infra d → ∃ c, Reach t1 (graphRoots r) c ∧ ∀ e, ¬Named t1 c e) ∧
         (GraphHolds t1 t2 r →
-          OpaqueHolds t1 r opaques →
-          ProofHolds t2 r →
-          o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget") := by
+          OpaqueHolds t1 r opaques → ProofHolds t2 r → o.1 = .matched ∨ o.1 = .exhausted) := by
   intro hb1 hb2 hs ho
   unfold graph at ho
   rcases hw : graphWalk (viewOf t1) (viewOf t2) (fuel + 1) (walkStart r fuel seen) with ⟨o1, w⟩
@@ -511,8 +509,11 @@ theorem graph_exact (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tabl
     refine ⟨fun hm => (nomatch hm), fun _ hd => (nomatch hd), fun hg _ _ => ?_⟩
     rcases gc hg with h | h
     · exact nomatch h
-    · cases h
-      exact Or.inr rfl
+    · exact nomatch h
+  | exhausted =>
+    simp only [hw] at ho
+    subst ho
+    exact ⟨fun hm => (nomatch hm), fun _ hd => (nomatch hd), fun _ _ _ => Or.inr rfl⟩
   | infra d =>
     simp only [hw] at ho
     subst ho
@@ -553,8 +554,11 @@ theorem graph_exact (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tabl
         refine ⟨fun hm => (nomatch hm), fun _ hd => (nomatch hd), fun _ _ hph => ?_⟩
         rcases pc hph with h | h
         · exact nomatch h
-        · cases h
-          exact Or.inr rfl
+        · exact nomatch h
+      | exhausted =>
+        simp only [hp] at ho
+        subst ho
+        exact ⟨fun hm => (nomatch hm), fun _ hd => (nomatch hd), fun _ _ _ => Or.inr rfl⟩
       | infra d => exact absurd rfl (pb d)
     · simp only [hfo] at ho
       subst ho

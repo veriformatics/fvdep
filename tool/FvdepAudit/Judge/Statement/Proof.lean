@@ -70,7 +70,7 @@ theorem safeDefn_unique {g v : String} {b : ByteArray} {t : Tables} (h : readTab
 /-- A named constant's type is bound. -/
 theorem named_typed {g v : String} {b : ByteArray} {t : Tables} (h : readTables g v b = .ok t)
     {n : Lean.Name} {e : Entry} (hN : Named t n e) : ∃ T, t.exprs[entryType e]? = some T :=
-  Option.isSome_iff_exists.1 (entriesOk_typed (entriesOk_read h) e hN.1)
+  Option.isSome_iff_exists.1 (entriesOk_typed (entriesOk_read h) e (named_iff.1 hN).1)
 
 /-- The shape test of `target`: an ABI shape's index + its codomain's. -/
 theorem shape_some {g v : String} {b : ByteArray} {t : Tables} (h : readTables g v b = .ok t)
@@ -306,8 +306,7 @@ theorem statement_exact (githash version : String) (b1 b2 : ByteArray) (t1 t2 : 
       statement (viewOf t1) (viewOf t2) r fuel seen = o →
       ((∃ c, o.1 = .infra c) ↔ ¬∃ T, Target t1 r T) ∧
         (o.1 = .matched → Holds t1 t2 r ∧ ∀ p, o.2.2.contains p = true → PairEq t1 t2 p) ∧
-        (Holds t1 t2 r →
-          o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget") := by
+        (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .exhausted) := by
   intro hb1 hb2 hs ho
   have h2 := rawOk_read hb2
   unfold statement at ho
@@ -329,8 +328,7 @@ theorem statement_exact (githash version : String) (b1 b2 : ByteArray) (t1 t2 : 
           (¬Holds t1 t2 r) →
           ((∃ c, o.1 = .infra c) ↔ ¬∃ T, Target t1 r T) ∧
             (o.1 = .matched → Holds t1 t2 r ∧ ∀ p, o.2.2.contains p = true → PairEq t1 t2 p) ∧
-            (Holds t1 t2 r →
-              o.1 = .matched ∨ o.1 = .mismatch "the comparison passes its work budget") := by
+            (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .exhausted) := by
       intro m f s' hm hnot
       subst hm
       exact

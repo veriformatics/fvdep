@@ -2653,9 +2653,9 @@ def sCases : List (String × (Unit → Bool)) :=
           (stmt e1Fn (edit e2Fn 12 "\"name\":1" "\"name\":2")) &&
         isMismatch "the proof does not prove the required statement"
           (stmt e1Fn (edit e2Fn 14 "\"us\":[]" "\"us\":[1]"))),
-    ("judge S: a budget too small for the template's type = mismatch, never a pass", fun _ =>
-      isMismatch "the comparison passes its work budget" (stmt e1Fn e2Fn reqFn 0) &&
-        stmt e1Fn e2Fn reqFn 3 == some .matched),
+    ("judge S: a budget too small for the template's type = exhausted (no verdict), never a pass",
+      fun _ =>
+      stmt e1Fn e2Fn reqFn 0 == some .exhausted && stmt e1Fn e2Fn reqFn 3 == some .matched),
     ("judge S0: the template's bytes = the canonical J text over the names as written; distinct " ++
         "requests → distinct bytes",
       fun _ =>
@@ -2832,8 +2832,8 @@ def gIs (o : FvdepCore.Judge.Outcome) : Option (FvdepCore.Judge.Outcome × List 
   | none => false
 
 def gOpaqueCause : String :=
-  "the implementation reaches aux, an opaque or partial definition: its compiled code is not " ++
-    "the checked term"
+  "the checked declaration graph reaches aux, an opaque definition outside this profile's " ++
+    "exceptions"
 
 def gCases : List (String × (Unit → Bool)) :=
   [("judge G: e1's closure declared alike in e2 → matched; the axioms = the proof's, in the " ++
@@ -2919,18 +2919,16 @@ def gCases : List (String × (Unit → Bool)) :=
       fun _ =>
       gIs (.mismatch "the solution lacks Nat.gcd")
         (gRun gBase (gProof (gBase.filter (· != gAxiom `Nat.gcd))))),
-    ("judge G3: the walk out of budget = mismatch, never a pass", fun _ =>
+    ("judge G3: the walk out of budget = exhausted (no verdict), never a pass", fun _ =>
       match tbl gBase with
       | some t =>
         let v := FvdepCore.Judge.viewOf t
-        (FvdepCore.Judge.graphWalk v v 1 (FvdepCore.Judge.walkStart reqFn 0 {})).1 ==
-            .mismatch FvdepCore.Judge.budget &&
-          (FvdepCore.Judge.graphWalk v v 0 (FvdepCore.Judge.walkStart reqFn 5 {})).1 ==
-            .mismatch FvdepCore.Judge.budget
+        (FvdepCore.Judge.graphWalk v v 1 (FvdepCore.Judge.walkStart reqFn 0 {})).1 == .exhausted &&
+          (FvdepCore.Judge.graphWalk v v 0 (FvdepCore.Judge.walkStart reqFn 5 {})).1 == .exhausted
       | none => false),
-    ("judge G: a budget too small = mismatch, never a pass", fun _ =>
-      gIs (.mismatch "the comparison passes its work budget") (gRun gBase gProof reqFn [] 0) &&
-        gIs (.mismatch "the comparison passes its work budget") (gRun gBase gProof reqFn [] 40) &&
+    ("judge G: a budget too small = exhausted (no verdict), never a pass", fun _ =>
+      gIs .exhausted (gRun gBase gProof reqFn [] 0) &&
+        gIs .exhausted (gRun gBase gProof reqFn [] 40) &&
         gIs .matched (gRun gBase gProof reqFn [] 100000)),
     ("judge A2: an allowlisted axiom → its plain name; any other → `«…»` over its escaped " ++
         "components, at most 255 characters inside",

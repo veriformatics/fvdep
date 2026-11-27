@@ -18,16 +18,15 @@ structure Request where
   abi : Option Lean.Name
   deriving DecidableEq, Repr
 
-/-- A stage's outcome (S, G): the solution meets it, fails it, or the trusted side broke; each
-with its cause (J4's detail line). -/
+/-- A stage's outcome (S, G): the solution meets it, fails it, the trusted side broke (each with
+its cause: J4's detail line), or the work budget ran out first (no verdict: J counts it a failure,
+detail `the comparison passes its work budget`). -/
 inductive Outcome where
   | matched
   | mismatch (cause : String)
   | infra (cause : String)
+  | exhausted
   deriving DecidableEq, Repr
-
-/-- S + G's cause once the work budget runs out (J4's detail line). -/
-def budget : String := "the comparison passes its work budget"
 
 /-- A safe definition without level parameters: its type's index. -/
 def safeType? : Option Entry → Option Nat
@@ -147,6 +146,6 @@ def statement (v1 v2 : View) (r : Request) (fuel : Nat) (seen : Std.HashSet Pair
                     | (.equal, f, s) => (.matched, f, s)
                     | (.differ, f, s) =>
                       (.mismatch "the proof does not prove the required statement", f, s)
-                    | (.exhausted, f, s) => (.mismatch budget, f, s)
+                    | (.exhausted, f, s) => (.exhausted, f, s)
 
 end FvdepCore.Judge

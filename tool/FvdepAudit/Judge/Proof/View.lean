@@ -212,6 +212,27 @@ theorem nameIndex_fold (t : Tables) :
       | none =>
         simp only [Std.HashMap.getElem?_insert, beq_iff_eq, hxn, ↓reduceIte]
 
+/-- X6's split = `EntryOf`: a record's constants are exactly its own fields' constants. -/
+theorem mem_entries (d : DeclF) (e : Entry) : e ∈ entries d ↔ EntryOf d e := by
+  cases d with
+  | induct cs rs ts =>
+    simp only [entries, EntryOf, List.mem_append, List.mem_map]
+    constructor
+    · rintro ((⟨x, hx, rfl⟩ | ⟨c, hc, rfl⟩) | ⟨r, hr, rfl⟩)
+      · exact Or.inl ⟨x, hx, rfl⟩
+      · exact Or.inr (Or.inl ⟨c, hc, rfl⟩)
+      · exact Or.inr (Or.inr ⟨r, hr, rfl⟩)
+    · rintro (⟨x, hx, rfl⟩ | ⟨c, hc, rfl⟩ | ⟨r, hr, rfl⟩)
+      · exact Or.inl (Or.inl ⟨x, hx, rfl⟩)
+      · exact Or.inl (Or.inr ⟨c, hc, rfl⟩)
+      · exact Or.inr ⟨r, hr, rfl⟩
+  | _ => simp [entries, EntryOf]
+
+/-- `Named` = membership in the records' constants (the index's input). -/
+theorem named_iff {t : Tables} {n : Lean.Name} {e : Entry} :
+    Named t n e ↔ e ∈ t.rawDecls.toList.flatMap entries ∧ t.names[e.name]? = some n := by
+  simp only [Named, List.mem_flatMap, mem_entries]
+
 /-- On an export the reader accepts, the index finds exactly the named constant. -/
 theorem viewOf_get {g v : String} {b : ByteArray} {t : Tables} (h : readTables g v b = .ok t)
     (n : Lean.Name) (e : Entry) : (viewOf t).byName[n]? = some e ↔ Named t n e := by
@@ -223,7 +244,8 @@ theorem viewOf_get {g v : String} {b : ByteArray} {t : Tables} (h : readTables g
     rw [List.nodup_iff_pairwise_ne, List.pairwise_map]
     exact h2.imp fun hne heq => hne (Option.some.inj heq)
   have key := @inj_of_nodup_map _ _ _ _ hn
-  show (nameIndex t (t.rawDecls.toList.flatMap entries))[n]? = some e ↔ Named t n e
+  rw [named_iff]
+  show (nameIndex t (t.rawDecls.toList.flatMap entries))[n]? = some e ↔ _
   unfold nameIndex
   rw [nameIndex_fold t _ {} hn (entriesOk_bound ho) n]
   constructor

@@ -2807,10 +2807,10 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Judge.Statement`
 
 - Contract: U7 S1–S4
-- Claim: `statement`: e2's proof constant vs the template over e1's trusted constants — fn `@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` (T = the codomain of the shape's closed nondependent arrow type), u = the proof's own `Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or the budget's mismatch (`statementExact`); the causes' texts = J4's tested detail lines.
+- Claim: `statement`: e2's proof constant vs the template over e1's trusted constants — fn `@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` (T = the codomain of the shape's closed nondependent arrow type), u = the proof's own `Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` (`statementExact`); `exhausted` only with no work unit left (`statementStop`); the causes' texts = J4's tested detail lines.
 - Subject: `FvdepCore.Judge.statement`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.StatementClaims.statementExact` (hash 0x4ce8ebf2), proved by `FvdepAudit.Judge.Proof.statement_exact`:
+- Statement `FvdepLedger.Rows.StatementClaims.statementExact` (hash 0xd2258a59), proved by `FvdepAudit.Judge.Proof.statement_exact`:
 
   ```lean
   ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
@@ -2830,8 +2830,16 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                     ∀ (p : FvdepCore.Judge.Pair),
                       o.snd.snd.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) ∧
                 (FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r →
-                  o.fst = FvdepCore.Judge.Outcome.matched ∨
-                    o.fst = FvdepCore.Judge.Outcome.mismatch "the comparison passes its work budget")
+                  o.fst = FvdepCore.Judge.Outcome.matched ∨ o.fst = FvdepCore.Judge.Outcome.exhausted)
+  ```
+- Statement `FvdepLedger.Rows.StatementClaims.statementStop` (hash 0xc52e9793), proved by `FvdepAudit.Judge.Proof.statement_stop`:
+
+  ```lean
+  ∀ (v1 v2 : FvdepCore.Judge.View) (r : FvdepCore.Judge.Request) (fuel : Nat)
+    (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (o : FvdepCore.Judge.Outcome × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Judge.statement v1 v2 r fuel seen = o →
+      o.fst = FvdepCore.Judge.Outcome.exhausted → o.snd.fst = 0
   ```
 - Uninterpreted: none
 - Residue: none
@@ -2840,9 +2848,24 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Judge.Template`
 
 - Contract: U7 S0
-- Claim: `statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the request's names as written (shape, impl, spec, proof, ABI shape: `statementDigestExact`); on names within J's string bound the bytes determine the request (`templateInjective`); the digest's separation = SHA-256's collision resistance over those bytes (never premised).
+- Claim: `statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the request's names as written — its six members spelled in `templateLayout` — (`statementDigestExact`); on names within J's string bound the bytes determine the request (`templateInjective`); the digest's separation = SHA-256's collision resistance over those bytes (never premised).
 - Subject: `FvdepCore.Judge.statementDigest`
 - Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.StatementClaims.templateLayout` (hash 0x42e95a91), proved by `FvdepAudit.Judge.Proof.template_layout`:
+
+  ```lean
+  ∀ (x : FvdepCore.Judge.Template),
+    FvdepCore.Judge.templateBytes x =
+      FvdepCore.Json.print
+        (FvdepCore.Json.Value.obj
+          [("abi", x.abi.elim FvdepCore.Json.Value.null FvdepCore.Json.Value.str),
+            ("form", FvdepCore.Json.Value.str "fvdep/statement/1"),
+            ("impl", FvdepCore.Json.Value.str x.impl), ("proof", FvdepCore.Json.Value.str x.proof),
+            ("shape",
+              FvdepCore.Json.Value.str
+                (if x.shape = FvdepCore.Evidence.Shape.fn then "fn" else "abi")),
+            ("spec", FvdepCore.Json.Value.str x.spec)])
+  ```
 - Statement `FvdepLedger.Rows.StatementClaims.statementDigestExact` (hash 0x725535fa), proved by `FvdepAudit.Judge.Proof.statementDigest_exact`:
 
   ```lean
@@ -2864,10 +2887,10 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Judge.Graph`
 
 - Contract: U7 G1–G6
-- Claim: `graph`: G3 walks e1 from G1's roots (the template's constants + the mandatory inventory) through each constant's uses (G2: Lean's `runForUsedConsts` over the raw records, each expression scanned once per export), every reached name declared in e2 field for field (`declEq`, S's memo + budget); then G5 (no reached `opaque` outside the reviewed list); then G6 (the proof's closure in e2 declared, its axioms recorded): `.matched` ⇒ `GraphHolds` ∧ `OpaqueHolds` ∧ `ProofHolds` + the axioms returned = exactly the reached ones, once each; infrastructure ⇒ e1 lacks a reached name; all three ⇒ matched or the budget's mismatch (`graphExact`); the walk order + the causes' texts = J4's tested detail lines.
+- Claim: `graph`: G3 walks e1 from G1's roots (the template's constants + the mandatory inventory) through each constant's uses (G2: Lean's `runForUsedConsts` over the raw records, each expression scanned once per export), every reached name declared in e2 field for field (`declEq`, S's memo + budget); then G5 (no reached `opaque` outside the reviewed list); then G6 (the proof's closure in e2 declared, its axioms recorded): `.matched` ⇒ `GraphHolds` ∧ `OpaqueHolds` ∧ `ProofHolds` + the axioms returned = exactly the reached ones, once each; infrastructure ⇒ e1 lacks a reached name; all three ⇒ matched or `exhausted` (`graphExact`); every reached constant e1 declares agreeing with e2 + a reached name e1 lacks ⇒ infrastructure or `exhausted` (`graphInfra`); `exhausted` only with no work unit left (`graphStop`); the walk order + the causes' texts = J4's tested detail lines.
 - Subject: `FvdepCore.Judge.graph`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.GraphClaims.graphExact` (hash 0x74d3862d), proved by `FvdepAudit.Judge.Proof.graph_exact`:
+- Statement `FvdepLedger.Rows.GraphClaims.graphExact` (hash 0xea7db0ea), proved by `FvdepAudit.Judge.Proof.graph_exact`:
 
   ```lean
   ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
@@ -2900,8 +2923,43 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                   FvdepAudit.Judge.Graph.Spec.OpaqueHolds t1 r opaques →
                     FvdepAudit.Judge.Graph.Spec.ProofHolds t2 r →
                       o.fst = FvdepCore.Judge.Outcome.matched ∨
-                        o.fst =
-                          FvdepCore.Judge.Outcome.mismatch "the comparison passes its work budget")
+                        o.fst = FvdepCore.Judge.Outcome.exhausted)
+  ```
+- Statement `FvdepLedger.Rows.GraphClaims.graphInfra` (hash 0xb9cdae4f), proved by `FvdepAudit.Judge.Proof.graph_infra`:
+
+  ```lean
+  ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
+    (r : FvdepCore.Judge.Request) (opaques : List Lean.Name) (fuel : Nat)
+    (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (o : FvdepCore.Judge.Outcome × List Lean.Name × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Export.readTables githash version b1 = Except.ok t1 →
+      FvdepCore.Export.readTables githash version b2 = Except.ok t2 →
+        (∀ (p : FvdepCore.Judge.Pair),
+            seen.contains p = true → FvdepAudit.Judge.Spec.PairEq t1 t2 p) →
+          FvdepCore.Judge.graph (FvdepCore.Judge.viewOf t1) (FvdepCore.Judge.viewOf t2) r opaques fuel
+                seen =
+              o →
+            (∀ (c : Lean.Name),
+                FvdepAudit.Judge.Graph.Spec.Reach t1 (FvdepCore.Judge.graphRoots r) c →
+                  ∀ (e1 : FvdepCore.Judge.Entry),
+                    FvdepAudit.Judge.Statement.Spec.Named t1 c e1 →
+                      ∃ e2,
+                        FvdepAudit.Judge.Statement.Spec.Named t2 c e2 ∧
+                          FvdepAudit.Judge.Spec.EntryEq t1 t2 e1 e2) →
+              (∃ c,
+                  FvdepAudit.Judge.Graph.Spec.Reach t1 (FvdepCore.Judge.graphRoots r) c ∧
+                    ∀ (e : FvdepCore.Judge.Entry), ¬FvdepAudit.Judge.Statement.Spec.Named t1 c e) →
+                (∃ d, o.fst = FvdepCore.Judge.Outcome.infra d) ∨
+                  o.fst = FvdepCore.Judge.Outcome.exhausted
+  ```
+- Statement `FvdepLedger.Rows.GraphClaims.graphStop` (hash 0x4e15f07), proved by `FvdepAudit.Judge.Proof.graph_stop`:
+
+  ```lean
+  ∀ (v1 v2 : FvdepCore.Judge.View) (r : FvdepCore.Judge.Request) (opaques : List Lean.Name)
+    (fuel : Nat) (seen : Std.HashSet FvdepCore.Judge.Pair)
+    (o : FvdepCore.Judge.Outcome × List Lean.Name × Nat × Std.HashSet FvdepCore.Judge.Pair),
+    FvdepCore.Judge.graph v1 v2 r opaques fuel seen = o →
+      o.fst = FvdepCore.Judge.Outcome.exhausted → o.snd.snd.fst = 0
   ```
 - Uninterpreted: none
 - Residue: none
