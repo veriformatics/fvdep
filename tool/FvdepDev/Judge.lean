@@ -268,9 +268,10 @@ partial def parseRun (o : RunOptions) : List String → Except String RunOptions
     if x.startsWith "--" then .error s!"unexpected argument {x}"
     else parseRun { o with files := o.files ++ [x] } rest
 
-/-- D2: J on two given exports (their digests = their own bytes'; each at most T's export cap,
-checked before any read): the stages, then K, then U2's verdict over the phases' observations as
-if both built — always SIMULATION (a given e1 is no phase 1's), the request named `judge`. -/
+/-- D2: J on two given exports (each read once through a bounded handle — at most T's export cap
+— into a private copy; their digests = those bytes'): the stages, then K, then U2's verdict over
+the phases' observations as if both built — always SIMULATION (a given e1 is no phase 1's), the
+request named `judge`. -/
 def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
   withTools fun bwrap sys run fp => do
     let some decl :=
@@ -301,32 +302,34 @@ def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
       verdictBlock "judge" impl ("given e1 + e2" :: o.k.overrides)
         (result key (all.map fun x => ⟨key, x⟩)) details
     let cap := ({} : FvdepCore.Sandbox.Limits).exportCap
-    let intake (f : String) : IO (Except String String) :=
-      tryCatch
-        (do
-          let m ← System.FilePath.metadata f
-          if cap < m.byteSize.toNat then
-            return .error s!"the export {f} passes the export cap of {cap} bytes"
-          return .ok (FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File f)))
-        fun ex => pure (.error s!"the export {f} could not be read: {ex}")
     let refuse (why : String) : IO UInt32 := do
       let (ls, rc) := block [.infra .io why] []
       say ls
       return rc
+    -- Each given file read once through a bounded handle into a private copy: the judge reads the
+    -- copy (digest = the bytes read), never the given path again.
+    let intake (f : String) (copy : System.FilePath) : IO (Except String String) := do
+      match ← FvdepIO.Judge.readCapped f cap with
+      | .error why =>
+        return .error s!"the export {f}: {why}"
+      | .ok b =>
+        IO.FS.writeBinFile copy b
+        return .ok (FvdepIO.Hash.sha256Hex b)
+    let (c1, c2) := (run / "given-e1.ndjson", run / "given-e2.ndjson")
     let d1 ←
-      match ← intake e1 with
+      match ← intake e1 c1 with
       | .ok d =>
         pure d
       | .error why =>
         return ← refuse why
     let d2 ←
-      match ← intake e2 with
+      match ← intake e2 c2 with
       | .ok d =>
         pure d
       | .error why =>
         return ← refuse why
     let jo ←
-      FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p r e1 e2 d1 d2 o.k.stubs
+      FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p r c1 c2 d1 d2 o.k.stubs
     let (ls, rc) :=
       block ([.implProfile none, .phase1 (.ok d1), .phase2 d1 (.ok d2)] ++ jo.obs) jo.details
     say (jo.obs.map judgeLine ++ [s!"judge work {jo.used}"] ++ ls)

@@ -49,8 +49,8 @@ R.d2.prelude|refield Nat.add value||1|SIMULATION NOT PROVEN judge: the implement
 R.d2.budget-s|none|--limit judge.work=5|1|SIMULATION NOT PROVEN judge: the proof does not prove the required statement $SIM, --limit judge.work)|  detail: the comparison passes its work budget
 R.d2.budget-g|none|--limit judge.work=1000|1|SIMULATION NOT PROVEN judge: the implementation changed between phases $SIM, --limit judge.work)|  detail: the comparison passes its work budget
 R.d2.long-cause|none|--proof-as $long|1|SIMULATION NOT PROVEN judge: the proof does not prove the required statement $SIM)|  detail: ${lcause:0:1021}...
-R.d2.missing|missing||2|~^SIMULATION infra io: the export .*/e2\.R\.d2\.missing could not be read: .* \(overrides: given e1 \+ e2\)\$|-
-R.d2.over-cap|sparse 134217729||2|~^SIMULATION infra io: the export .*/e2\.R\.d2\.over-cap passes the export cap of 134217728 bytes \(overrides: given e1 \+ e2\)\$|-"
+R.d2.missing|missing||2|~^SIMULATION infra io: the export .*/e2\.R\.d2\.missing: .* \(overrides: given e1 \+ e2\)\$|-
+R.d2.over-cap|sparse 134217729||2|~^SIMULATION infra io: the export .*/e2\.R\.d2\.over-cap: e2\.R\.d2\.over-cap passes the export cap of 134217728 bytes \(overrides: given e1 \+ e2\)\$|-"
 # D1's own refusals, early stops + overrides (contract U7 D1, J3): name|project (`launch` =
 # examples/launch's base64.encode, `launch-parse` = its semver.parse; else a fresh base64.encode
 # project: `impl-spec` names the spec as the implementation, `theorem` + `ill-typed` append a
@@ -58,8 +58,8 @@ R.d2.over-cap|sparse 134217729||2|~^SIMULATION infra io: the export .*/e2\.R\.d2
 # (`;`-separated EREs)|a line start absent (`-` = none).
 XCASES="X.dup-explicit|launch|--roots1 Eq Eq|2|^fvdep-dev: phase 1's export roots name Eq twice\$|phase1 
 X.dup-default|impl-spec||2|^fvdep-dev: phase 1's export roots name Fvdep\.Base64\.Encode\.V1_0_0\.encode twice\$|phase1 
-X.refused|theorem||1|^NOT PROVEN base64\.encode@1\.0\.0: Launch\.Base64 [0-9]+:0 kind Lean\.Parser\.Command\.theorem\$|phase1 
-X.ill-typed|ill-typed||1|^phase1 failed: ;^NOT PROVEN base64\.encode@1\.0\.0: .|statement 
+X.refused|theorem||1|^NOT PROVEN base64\.encode@1\.0\.0: Launch\.Base64 [0-9]+:0 kind Lean\.Parser\.Command\.theorem\$;^  detail: Launch\.Base64 [0-9]+:0 kind Lean\.Parser\.Command\.theorem\$|phase1 
+X.ill-typed|ill-typed||1|^phase1 failed: ;^NOT PROVEN base64\.encode@1\.0\.0: .;^  detail: implementation build failed \(Launch/Base64\.lean:[0-9]+: |statement 
 X.override|launch-parse|--limit depth=4096 --deadline 600|0|^SIMULATION PROVEN semver\.parse@1\.0\.0 Launch\.Semver\.parse \(overrides: --limit depth, --deadline\)\$|-"
 one() {
     local name=$1 id=$2 mf=$3 sm=$4 sc=$5 am=$6 ac=$7 impl=$8 abi=() s rc
@@ -86,7 +86,9 @@ selected=$(printf '%s\n' "$CASES" | while IFS='|' read -r name rest; do
     printf '%s|%s\n' "$name" "$rest"
 done)
 rnames=" $(printf '%s\n' "$RCASES" "$DCASES" "$XCASES" | cut -d'|' -f1 | tr '\n' ' ')"
-[ -n "$selected" ] || [[ "$rnames" == *" $only "* ]] || { echo "judge-suite: no case ${only:-}"; exit 2; }
+enames=" $(printf '%s\n' "$CASES" | cut -d'|' -f1 | sed 's/^/E./' | tr '\n' ' ')"
+# a requested id must name a declared case before a prerequisite (E.fn.encode for R.d2.*) joins it
+[ -z "$only" ] || [[ "$rnames$enames" == *" $only "* ]] || { echo "judge-suite: no case $only"; exit 2; }
 touch "$logs/out"
 if [ -n "$selected" ]; then
     # shellcheck disable=SC2016 # the fields expand in the child bash that xargs starts
@@ -184,7 +186,13 @@ xcase() {
     [ -n "$tmp" ] && rm -rf "$tmp"
     [ "$rc" = "$code" ] || ok=0
     IFS=';' read -ra ps <<<"$present"
-    for p in "${ps[@]}"; do command grep -qE "$p" "$logs/$name" || ok=0; done
+    local nd=0
+    for p in "${ps[@]}"; do
+        command grep -qE "$p" "$logs/$name" || ok=0
+        [[ "$p" == "^  detail: "* ]] && nd=$((nd + 1))
+    done
+    # the block's `  detail:` lines = exactly the ones listed (J4: one per listed reason)
+    [ "$(command grep -c '^  detail: ' "$logs/$name")" = "$nd" ] || ok=0
     if [ "$absent" != - ]; then
         while IFS= read -r line; do [[ "$line" == "$absent"* ]] && ok=0; done <"$logs/$name"
     fi

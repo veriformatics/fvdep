@@ -192,6 +192,12 @@ def refusalOf (f : FvdepCore.Profile.Refusal) : FvdepCore.Evidence.Refusal × St
     | _, _ => .profileConstruct
   (code, s!"{f.module} {f.line}:{f.column} {" ".intercalate (f.rule :: f.detail)}")
 
+/-- D1: the cause each failed phase recorded (an early stop's `  detail:` lines, J4's cap). -/
+def stopCauses (obs : List Obs) : List String :=
+  obs.filterMap fun
+    | .phase1 (.failed r) | .phase2 _ (.failed r) => some (FvdepCore.Profile.cutDetail r)
+    | _ => none
+
 def check (o : Options) : IO UInt32 := do
   let usageError (why : String) : IO UInt32 := do
     IO.eprint s!"fvdep-dev: {why}\n{usage}"
@@ -322,12 +328,12 @@ def check (o : Options) : IO UInt32 := do
       head := head ++ s!"request {digest}" :: ls
       unless verdict matches .accepted _ do
         if o.judge then
-          let seen : Obs :=
+          let (seen, causes) : Obs × List String :=
             match verdict with
-            | .refused _ f => .implProfile (some (refusalOf f))
-            | .infra c d => .infra c d
-            | .accepted _ => .implProfile none
-          let (block, brc) := finalize [seen] []
+            | .refused _ f => (.implProfile (some (refusalOf f)), [(refusalOf f).2])
+            | .infra c d => (.infra c d, [])
+            | .accepted _ => (.implProfile none, [])
+          let (block, brc) := finalize [seen] (causes.map FvdepCore.Profile.cutDetail)
           say (head ++ block)
           return brc
         say head
@@ -382,7 +388,8 @@ def check (o : Options) : IO UInt32 := do
         do
           let jo ←
             FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp jp jr
-                (run / "exports" / "e1.ndjson") (run / "exports" / "e2.ndjson") d1 d2
+                (run / "exports" / "e1.ndjson") (run / "exports" / "e2.ndjson") d1 d2 (cap :=
+                o.limits.exportCap)
           let (block, rc) := finalize (.implProfile none :: obs ++ jo.obs) jo.details
           let times :=
             jo.kernels.map fun x => s!"time kernel {FvdepCore.Evidence.kernelName x.kernel} {x.ms}"
@@ -390,7 +397,7 @@ def check (o : Options) : IO UInt32 := do
               (jo.obs.map FvdepDev.Judge.judgeLine ++ [s!"judge work {jo.used}"] ++ times ++ block,
                 some rc)
       | true, _ =>
-        let (block, rc) := finalize (.implProfile none :: obs) []
+        let (block, rc) := finalize (.implProfile none :: obs) (stopCauses obs)
         pure (block, some rc)
       | false, _ =>
         pure ([], none)

@@ -3291,6 +3291,29 @@ def ioCases : List (String × IO Bool) :=
           trustedRoots r == (exportRoots1 r).filter (· != `I.impl) &&
           !(trustedRoots r).contains `I.impl &&
           (trustedRoots r).contains `A.shape),
+    ("judge J1: an export read stops at its cap — `cap` bytes read whole, a `cap + 1`-th byte " ++
+        "= over the cap, no size looked up first (what is read is what is judged)",
+      do
+      let dir ← IO.FS.createTempDir
+      IO.FS.writeFile (dir / "e.ndjson") "12345"
+      let h := FvdepCore.Hash.hex (FvdepIO.Hash.sha256 "12345".toUTF8)
+      let fits ← FvdepIO.Judge.readCapped (dir / "e.ndjson") 5
+      let over ← FvdepIO.Judge.readCapped (dir / "e.ndjson") 4
+      let read ← FvdepIO.Judge.readExport (dir / "e.ndjson") h 4
+      let whole ← FvdepIO.Judge.readExport (dir / "e.ndjson") h 5
+      IO.FS.removeDirAll dir
+      return (match fits with
+          | .ok b => b.data == "12345".toUTF8.data
+          | .error _ => false) &&
+          (match over with
+          | .error d => d == "e.ndjson passes the export cap of 4 bytes"
+          | .ok _ => false) &&
+          (match read with
+          | .error d => d == "e.ndjson passes the export cap of 4 bytes"
+          | .ok _ => false) &&
+          match whole with
+          | .ok b => b.size == 5
+          | .error _ => false),
     ("judge C1: v1's canary digest = the SHA-256 of `tests/canaries/MANIFEST.tsv` (the raw " ++
         "controls' pins + their expected vectors)",
       do

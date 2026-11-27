@@ -24,14 +24,20 @@ while IFS=$'\t' read -r path sum want; do
     fi
     out=$(FVDEP_CACHE=$cache "$dev" judge kernels "$f" 2>&1)
     rc=$?
-    got=$(printf '%s\n' "$out" | sed -n 's/^kernel \([a-z-]*\) \([a-z]*\).*/\1 \2/p' | paste -sd';' -)
+    # every `kernel ` line parsed whole: `kernel <label> <class>` (+ a decline's or timeout's or
+    # infra's detail after one space), else malformed — a malformed line or a fourth one fails
+    klines=$(printf '%s\n' "$out" | command grep -c '^kernel ')
+    bad=$(printf '%s\n' "$out" | command grep '^kernel ' |
+        command grep -cvE '^kernel (lean|con-leche|nanoda) (accept|reject|crash|decline( .*)?|timeout [0-9]+|infra .*)$')
+    got=$(printf '%s\n' "$out" | command grep '^kernel ' | sed 's/^kernel \([^ ]*\) \([^ ]*\).*/\1 \2/' |
+        paste -sd';' -)
     read -r a b c <<<"$want"
     exp="lean $a;con-leche $b;nanoda $c"
     code=1; [ "$want" = "accept accept accept" ] && code=0
-    if [ "$got" = "$exp" ] && [ "$rc" = "$code" ]; then
+    if [ "$got" = "$exp" ] && [ "$rc" = "$code" ] && [ "$klines" = 3 ] && [ "$bad" = 0 ]; then
         echo "PASS $path ($got)"; pass=$((pass + 1))
     else
-        echo "FAIL $path: kernels ($got) exit $rc, expected ($exp) exit $code"
+        echo "FAIL $path: kernels ($got) exit $rc ($klines kernel lines, $bad malformed), expected ($exp) exit $code"
         printf '%s\n' "$out" | tail -5 | sed 's/^/    /'
         fail=$((fail + 1))
     fi

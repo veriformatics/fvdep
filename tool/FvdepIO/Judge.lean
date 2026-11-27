@@ -137,16 +137,34 @@ def run (bwrap : String) (sys stepDir src : System.FilePath) (fingerprint : Stri
   runWith (fun spec lim => FvdepIO.Sandbox.run bwrap spec lim) sys stepDir src fingerprint p e2
     digest stubs
 
-/-- J1 + X8: an export's bytes, read once + checked against the digest its phase recorded. -/
-def readExport (path : System.FilePath) (digest : String) : IO Read := do
-  try
-    let b ← IO.FS.readBinFile path
+/-- At most `cap` bytes of the file at `path` through one handle: a `cap + 1`-th byte ends the
+read as over the cap (the file is never read whole first); a read failure = its error text. -/
+def readCapped (path : System.FilePath) (cap : Nat) : IO (Except String ByteArray) :=
+  tryCatch
+    (IO.FS.withFile path .read fun h => do
+      let mut acc := ByteArray.empty
+      repeat
+        let chunk ← h.read 1048576
+        if chunk.isEmpty then
+          break
+        acc := acc ++ chunk
+        if cap < acc.size then
+          return .error s!"{path.fileName.getD ""} passes the export cap of {cap} bytes"
+      return .ok acc)
+    fun e => pure (.error s!"{e}")
+
+/-- J1 + X8: an export's bytes, read once (at most `cap` bytes: T's export cap) + checked against
+the digest its phase recorded. -/
+def readExport (path : System.FilePath) (digest : String)
+    (cap : Nat := ({} : FvdepCore.Sandbox.Limits).exportCap) : IO Read := do
+  match ← readCapped path cap with
+  | .error why =>
+    return .error why
+  | .ok b =>
     let h := FvdepIO.Hash.sha256Hex b
     if h != digest then
       return .error s!"{path.fileName.getD ""} has SHA-256 {h}; its phase recorded {digest}"
     return .ok b
-  catch e =>
-    return .error s!"{e}"
 
 /-- J's result: the observations (U2 E2), J4's causes in U2's reason order, W's units S + G took,
 the kernels' steps (empty unless K ran). -/
@@ -162,9 +180,10 @@ failing names, then each non-accepting kernel's own line, each cut to 1,024 byte
 `cutDetail`; the kernel lines are cut in bytes already). -/
 def judge (bwrap : String) (sys step src : System.FilePath) (fingerprint : String) (p : VProfile)
     (r : Request) (e1 e2 : System.FilePath) (d1 d2 : String)
-    (stubs : List (Kernel × System.FilePath) := []) : IO JudgeOut := do
-  let b1 ← readExport e1 d1
-  let b2 ← readExport e2 d2
+    (stubs : List (Kernel × System.FilePath) := [])
+    (cap : Nat := ({} : FvdepCore.Sandbox.Limits).exportCap) : IO JudgeOut := do
+  let b1 ← readExport e1 d1 cap
+  let b2 ← readExport e2 d2 cap
   let pre := stages p Lean.githash Lean.versionString r d1 d2 b1 b2
   let causes := pre.details.map FvdepCore.Profile.cutDetail
   if !pre.kernels then

@@ -108,7 +108,8 @@ def profileSpec : Spec :=
 
 /-- U7 V3: the verification profile — the value (pins, deadlines, W, the allowlist, G5's list, the
 canary digest), K's table + texts + step layout (+ the per-file cap + the helper's exit rule it
-reads) + NanoDa's config, J's stages + J3's export roots, P4's export request (`stepCommand`'s
+reads, + U2's kernel order K1 runs + V2 prints) + NanoDa's config, J's stages + J3's export roots,
+P4's export request (`stepCommand`'s
 argv, `exportRequestImports`' order, the export cap), the reader (X), S/G/A's code + G1's
 inventory, the claims' spec modules (deep: a spec edit changes what a claim says) + their
 statements; the IO interpreter (residue) outside it. -/
@@ -126,7 +127,8 @@ def verificationSpec : Spec :=
     roots :=
       [`FvdepCore.Judge.v1, `FvdepCore.Judge.verificationId, `FvdepCore.Sandbox.Limits.fileCap,
         `FvdepCore.Sandbox.Limits.exportCap, `FvdepCore.Phase.Child.helperExit,
-        `FvdepIO.Phase.stepCommand, `FvdepIO.Phase.exportRequestImports]
+        `FvdepIO.Phase.stepCommand, `FvdepIO.Phase.exportRequestImports,
+        `FvdepCore.Evidence.kernels]
     claims :=
       [`FvdepLedger.Rows.ExportClaims, `FvdepLedger.Rows.JudgeClaims,
         `FvdepLedger.Rows.StatementClaims, `FvdepLedger.Rows.GraphClaims,
