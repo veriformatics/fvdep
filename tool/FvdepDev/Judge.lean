@@ -18,6 +18,8 @@ open FvdepCore.Evidence FvdepCore.Judge
 
 def usage : String :=
   "usage: fvdep-dev judge profile\n" ++ "       fvdep-dev judge pins\n" ++
+    "       fvdep-dev judge run <e1> <e2> --spec <c> --impl <c> --proof <c> [--abi <c>] " ++
+    "[--limit judge.work=<n>] [--limit kernel.<k>.deadline=<s>]… [--kernel-binary <k>=<path>]…\n" ++
     "       fvdep-dev judge kernels <e2> [--kernel-binary <k>=<path>]… " ++
     "[--limit kernel.<k>.deadline=<s>]… [--pin <k>=<sha256>]… [--e2-digest <hex>]\n"
 
@@ -166,11 +168,11 @@ def kernelsCmd (o : Options) (e2 : String) : IO UInt32 :=
       say (head ++ [s!"infra {FvdepCore.Oracle.Command.infraWord c}: {d}"])
       return 2
     | .ok rs =>
-      say (head ++ rs.map fun r => s!"kernel {kernelName r.1} {statusText r.2.1}")
-      if rs.any fun r => r.2.1 matches .infra .. then
+      say (head ++ rs.map fun r => s!"kernel {kernelName r.kernel} {statusText r.result}")
+      if rs.any fun r => r.result matches .infra .. then
         return 2
       else
-        if rs.all fun r => r.2.1 == .status .accept then
+        if rs.all fun r => r.result == .status .accept then
           return 0
         else
           return 1
@@ -225,11 +227,102 @@ def verdictBlock (id impl : String) (sim : List String) (r : Result) (details : 
     ([s!"{head}NOT PROVEN {id}: {(rs.head?.map (·.detail)).getD ""}{tail}"] ++ dl rs.length, 1)
   | .infra c ns => ([s!"{head}infra {codeWord c.code}: {c.detail}{tail}"] ++ dl ns.length, 2)
 
+/-- D2's request: the names + D3's overrides (`kernels`' options) + `--limit judge.work`. -/
+structure RunOptions where
+  files : List String := []
+  spec : Option String := none
+  impl : Option String := none
+  proof : Option String := none
+  abi : Option String := none
+  work : Option Nat := none
+  k : Options := {}
+
+partial def parseRun (o : RunOptions) : List String → Except String RunOptions
+  | [] => .ok o
+  | "--spec" :: v :: rest => parseRun { o with spec := some v } rest
+  | "--impl" :: v :: rest => parseRun { o with impl := some v } rest
+  | "--proof" :: v :: rest => parseRun { o with proof := some v } rest
+  | "--abi" :: v :: rest => parseRun { o with abi := some v } rest
+  | "--limit" :: v :: rest =>
+    match v.splitOn "=" with
+    | ["judge.work", n] =>
+      match n.toNat? with
+      | some w =>
+        if o.work.isSome then .error "--limit judge.work given twice"
+        else
+          parseRun
+            { o with
+              work := some w
+              k := { o.k with overrides := o.k.overrides ++ ["--limit judge.work"] } }
+            rest
+      | none => .error s!"--limit judge.work takes a number: {v}"
+    | _ =>
+      match parse o.k ["--limit", v] with
+      | .ok k => parseRun { o with k } rest
+      | .error e => .error e
+  | "--kernel-binary" :: v :: rest =>
+    match parse o.k ["--kernel-binary", v] with
+    | .ok k => parseRun { o with k } rest
+    | .error e => .error e
+  | x :: rest =>
+    if x.startsWith "--" then .error s!"unexpected argument {x}"
+    else parseRun { o with files := o.files ++ [x] } rest
+
+/-- D2: J on two given exports (their digests = their own bytes'): the stages, then K, then U2's
+verdict over the phases' observations as if both built — always SIMULATION (a given e1 is no phase
+1's). -/
+def runCmd (o : RunOptions) (e1 e2 spec impl proof : String) : IO UInt32 :=
+  withTools fun bwrap sys run fp => do
+    let some decl :=
+      (FvdepCore.Ids.ModuleId.parse "judge.given").bind fun m =>
+        (FvdepCore.Ids.EntryVersion.parse "1.0.0").map fun v =>
+          ({  module := m, version := v, shape := some (if o.abi.isSome then .abi else .fn)
+              kind := .proof, impl := some impl, proof := some proof, adapter := none } : Decl) |
+      do
+        say ["infra io: internal: no request key"]
+        return 2
+    let d1 := FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File e1)
+    let d2 := FvdepCore.Hash.hex (← FvdepIO.Hash.sha256File e2)
+    let r : Request :=
+      { impl := impl.toName
+        spec := spec.toName
+        proof := proof.toName
+        abi := o.abi.map String.toName }
+    let p := withJudgeLimits (overridden o.k) o.work []
+    let jo ←
+      FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p r e1 e2 d1 d2 o.k.stubs
+    let key : ChallengeKey :=
+      { request :=
+          { decl
+            specClosure := ""
+            implSources := some ""
+            proofSources := some ""
+            adapter := none }
+        library := ⟨List.replicate 40 0, List.length_replicate⟩
+        profile := p.evidence
+        statement := "" }
+    let all := [.implProfile none, .phase1 (.ok d1), .phase2 d1 (.ok d2)] ++ jo.obs
+    let res := result key (all.map fun x => ⟨key, x⟩)
+    let (block, rc) := verdictBlock "judge" impl ("given e1 + e2" :: o.k.overrides) res jo.details
+    say (jo.obs.map judgeLine ++ [s!"judge work {jo.used}"] ++ block)
+    return rc
+
 def run : List String → IO UInt32
   | ["profile"] => do
     (← IO.getStdout).write v1.text
     return 0
   | ["pins"] => pins
+  | "run" :: rest =>
+    match parseRun {} rest with
+    | .ok o =>
+      match o.files, o.spec, o.impl, o.proof with
+      | [e1, e2], some spec, some impl, some proof => runCmd o e1 e2 spec impl proof
+      | _, _, _, _ => do
+        IO.eprint s!"fvdep-dev: judge run takes <e1> <e2> --spec --impl --proof\n{usage}"
+        return 2
+    | .error why => do
+      IO.eprint s!"fvdep-dev: {why}\n{usage}"
+      return 2
   | "kernels" :: rest =>
     match parse {} rest with
     | .ok o =>

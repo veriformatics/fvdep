@@ -4161,8 +4161,9 @@ def judgeProfileRow : Row :=
         "persisted form `docs/verification-profile.json` = `toJson`'s canonical text (tested " ++
         "data: `lake test` compares the bytes + the freeze record's digest); K4's `pinCheck`: " ++
         "the pins hold exactly when T1's fingerprint + every hashed kernel binary equal their " ++
-        "pins, a stub's own skipped (`pinCheckExact`: the pass iff; the first mismatch named + " ++
-        "`none` supplied for D3's stubs alone = tested, `judge K4` + `judge D3`)."
+        "pins, a digest given as `none` skipped (`pinCheckExact`: the pass iff; the first " ++
+        "mismatch named + K4's order = tested, `judge K4` + `judge D3`: `pins` passes one " ++
+        "binary's digest per call, `none` for the rest + D3's stubs)."
     claims :=
       [(``KernelClaims.profileBridge, ``FvdepAudit.Judge.Proof.profile_bridge),
         (``KernelClaims.pinCheckExact, ``FvdepAudit.Judge.Proof.pinCheck_exact)]

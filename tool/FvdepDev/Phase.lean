@@ -327,7 +327,7 @@ def check (o : Options) : IO UInt32 := do
       | true, [.phase1 (.ok d1), .phase2 _ (.ok d2)] =>
         do
           let p := FvdepDev.Judge.withJudgeLimits FvdepCore.Judge.v1 o.judgeWork o.kernelDeadlines
-          let (jobs, details) ←
+          let jo ←
             FvdepIO.Judge.judge bwrap sys (run / "step") (run / "kernel-src") fp p jr
                 (run / "exports" / "e1.ndjson") (run / "exports" / "e2.ndjson") d1 d2
           let key : FvdepCore.Evidence.ChallengeKey :=
@@ -340,11 +340,16 @@ def check (o : Options) : IO UInt32 := do
               library := ⟨List.replicate 40 0, List.length_replicate⟩
               profile := p.evidence
               statement := "" }
-          let all := FvdepCore.Evidence.Obs.implProfile none :: obs ++ jobs
+          let all := FvdepCore.Evidence.Obs.implProfile none :: obs ++ jo.obs
           let res := FvdepCore.Evidence.result key (all.map fun x => ⟨key, x⟩)
           let (block, rc) :=
-            FvdepDev.Judge.verdictBlock s!"{o.id}@{entry.decl.version}" impl o.simulated res details
-          pure (jobs.map FvdepDev.Judge.judgeLine ++ block, some rc)
+            FvdepDev.Judge.verdictBlock s!"{o.id}@{entry.decl.version}" impl o.simulated res
+              jo.details
+          let times :=
+            jo.kernels.map fun x => s!"time kernel {FvdepCore.Evidence.kernelName x.kernel} {x.ms}"
+          pure
+              (jo.obs.map FvdepDev.Judge.judgeLine ++ [s!"judge work {jo.used}"] ++ times ++ block,
+                some rc)
       | _, _ =>
         pure ([], none)
     say

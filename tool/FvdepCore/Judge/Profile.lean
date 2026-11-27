@@ -3,8 +3,8 @@ import FvdepCore.Judge.Kernel
 
 /-! U7 V (contract `docs/contracts/U7-judge.md` V1–V3): the verification profile v1 — compiled-in
 data the judge runs under (kernels + their pins, the allowlist, the step limits, W, G5's reviewed
-opaque names) + its persisted form (V2) + K4's pin check. Pure. v1's deadlines, W, opaque list +
-canary digest stay provisional until Q qualifies them (V3: the freeze records then); the pins + the
+opaque names) + its persisted form (V2) + K4's pin check. Pure. v1's deadlines + W = Q1's; its
+opaque list + canary digest stay provisional until C (V3: the freeze records then); the pins + the
 fingerprint = the release's own bytes (contract K4). -/
 
 namespace FvdepCore.Judge
@@ -45,8 +45,9 @@ def VProfile.kernel (p : VProfile) : Kernel → VKernel
 def VProfile.limits (p : VProfile) (k : Kernel) : Limits :=
   { p.step with deadline := (p.kernel k).deadline }
 
-/-- V1 (provisional until Q: deadlines, W, opaques, canaries; the pins + fingerprint = the
-release's: contract K4). -/
+/-- V1: the deadlines + W = Q1's (contract Q1: the launch cases' maxima × 10, deadlines floored at
+60 s); the opaque list + the canary digest stay provisional until C's canaries (U7-F, Q2); the pins
++ the fingerprint = the release's (contract K4). -/
 def v1 : VProfile :=
   { id := "fvdep/verification/1"
     toolchain := "v4.35.0"
@@ -55,12 +56,12 @@ def v1 : VProfile :=
     exportFormat := "3.1.0"
     allowlist := ["propext", "Classical.choice", "Quot.sound"]
     implementationFreeze := "c6d7118cf6d7abef"
-    lean := ⟨"12c38901cdbfab178f1bf6145dd30012e9a3b2c11ca695292a5884fa3cbaddb6", 600, 1⟩
-    conLeche := ⟨"23a32522ea2c79f4ec8b48916272b37a423bda171e57cd83cfcf142eec50e621", 600, 2⟩
-    nanoda := ⟨"cbf13950fc4a48f635a0beceeb5ed32dd82568b870cfd081b6391c1f2cf02ba5", 600, 2⟩
+    lean := ⟨"12c38901cdbfab178f1bf6145dd30012e9a3b2c11ca695292a5884fa3cbaddb6", 60, 1⟩
+    conLeche := ⟨"23a32522ea2c79f4ec8b48916272b37a423bda171e57cd83cfcf142eec50e621", 64, 2⟩
+    nanoda := ⟨"cbf13950fc4a48f635a0beceeb5ed32dd82568b870cfd081b6391c1f2cf02ba5", 60, 2⟩
     step := {}
     opaques := [`String.Internal.append]
-    work := 100000000
+    work := 21359400
     canaries := "" }
 
 /-- K4: the pins hold — T1's toolchain fingerprint, then each kernel binary's SHA-256 (hex; `none` =

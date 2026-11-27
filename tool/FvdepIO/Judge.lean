@@ -86,12 +86,20 @@ another). -/
 abbrev StepRunner :=
   FvdepCore.Sandbox.Spec → FvdepCore.Sandbox.Limits → IO (Except String FvdepIO.Sandbox.Observation)
 
+/-- One kernel's step as K1 ran it: K2's result, J4's line, its wall-clock in ms (Q1's measure). -/
+structure KernelOut where
+  kernel : Kernel
+  result : KResult
+  line : String
+  ms : Nat
+
 /-- K1: each kernel alone in U2's order — every one run whatever another reported — its binary the
 toolchain's, or D3's stub staged in `src`; each with J4's line (the kernel's own message). -/
 def kernelPhaseWith (step : StepRunner) (sys stepDir src : System.FilePath) (p : VProfile)
-    (stubs : List Kernel) : IO (List (Kernel × KResult × String)) := do
+    (stubs : List Kernel) : IO (List KernelOut) := do
   let mut out := []
   for k in kernels do
+    let t0 ← IO.monoMsNow
     let bin := if stubs.contains k then stubPath k else kernelPath k
     let spec :=
       kernelSpec sys.toString stepDir.toString src.toString p.step (p.kernel k).threads k bin
@@ -105,15 +113,14 @@ def kernelPhaseWith (step : StepRunner) (sys stepDir src : System.FilePath) (p :
             | .error e =>
               pure (.infra .sandboxSetup e, e))
           fun ex => pure (.infra .io s!"the kernel step failed: {ex}", s!"{ex}")
-    out := out ++ [(k, r)]
+    out := out ++ [⟨k, r.1, r.2, (← IO.monoMsNow) - t0⟩]
   return out
 
 /-- The kernel phase: K4's pins, the staged source directory `src`, then the three steps;
 infrastructure before any step = `.error (code, detail)`. -/
 def runWith (step : StepRunner) (sys stepDir src : System.FilePath) (fingerprint : String)
     (p : VProfile) (e2 : System.FilePath) (digest : String)
-    (stubs : List (Kernel × System.FilePath)) :
-    IO (Except (Infra × String) (List (Kernel × KResult × String))) := do
+    (stubs : List (Kernel × System.FilePath)) : IO (Except (Infra × String) (List KernelOut)) := do
   let stubKs := stubs.map (·.1)
   if let some why← pins sys fingerprint p stubKs then
     return .error (.toolMissing, why)
@@ -126,7 +133,7 @@ def runWith (step : StepRunner) (sys stepDir src : System.FilePath) (fingerprint
 /-- The kernel phase through U5's runner. -/
 def run (bwrap : String) (sys stepDir src : System.FilePath) (fingerprint : String) (p : VProfile)
     (e2 : System.FilePath) (digest : String) (stubs : List (Kernel × System.FilePath)) :
-    IO (Except (Infra × String) (List (Kernel × KResult × String))) :=
+    IO (Except (Infra × String) (List KernelOut)) :=
   runWith (fun spec lim => FvdepIO.Sandbox.run bwrap spec lim) sys stepDir src fingerprint p e2
     digest stubs
 
@@ -141,26 +148,35 @@ def readExport (path : System.FilePath) (digest : String) : IO Read := do
   catch e =>
     return .error s!"{e}"
 
+/-- J's result: the observations (U2 E2), J4's causes in U2's reason order, W's units S + G took,
+the kernels' steps (empty unless K ran). -/
+structure JudgeOut where
+  obs : List Obs
+  details : List String
+  used : Nat
+  kernels : List KernelOut
+
 /-- J: the judge over one request's frozen exports (`e1`, `e2` + the digests their phases
-recorded): the stages, then — reached — the kernel phase on e2; the observations (U2 E2) + J4's
-causes in U2's reason order (S's or G's cause, A's failing names, each non-accepting kernel's own
-line). -/
+recorded): the stages, then — reached — the kernel phase on e2; J4's causes = S's or G's cause, A's
+failing names, then each non-accepting kernel's own line. -/
 def judge (bwrap : String) (sys step src : System.FilePath) (fingerprint : String) (p : VProfile)
-    (r : Request) (e1 e2 : System.FilePath) (d1 d2 : String) : IO (List Obs × List String) := do
+    (r : Request) (e1 e2 : System.FilePath) (d1 d2 : String)
+    (stubs : List (Kernel × System.FilePath) := []) : IO JudgeOut := do
   let b1 ← readExport e1 d1
   let b2 ← readExport e2 d2
   let pre := stages p Lean.githash Lean.versionString r d1 d2 b1 b2
   if !pre.kernels then
-    return (pre.obs, pre.details)
-  match ← run bwrap sys step src fingerprint p e2 d2 [] with
+    return ⟨pre.obs, pre.details, pre.used, []⟩
+  match ← run bwrap sys step src fingerprint p e2 d2 stubs with
   | .error (c, d) =>
-    return (pre.obs ++ [.infra c d], pre.details)
+    return ⟨pre.obs ++ [.infra c d], pre.details, pre.used, []⟩
   | .ok ks =>
     let lines :=
       ks.filterMap fun x =>
-        match x.2.1 with
+        match x.result with
         | .status .accept | .infra .. => none
-        | _ => some x.2.2
-    return (judgeObs pre d2 (ks.map fun x => (x.1, x.2.1)), pre.details ++ lines)
+        | _ => some x.line
+    return ⟨judgeObs pre d2 (ks.map fun x => (x.kernel, x.result)), pre.details ++ lines, pre.used,
+        ks⟩
 
 end FvdepIO.Judge

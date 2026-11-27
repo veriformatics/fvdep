@@ -3096,9 +3096,9 @@ def kCases : List (String × (Unit → Bool)) :=
         pre.obs == [.statement "d1" "d2" false] &&
           (pre.details.head?.getD "").startsWith "the solution export is unreadable: line 1: ") &&
         (go (.error "gone") junk).details.isEmpty &&
-        judgeObs ⟨[.statement "a" "b" false], ["c"], false⟩ "b" [(.lean, .status .accept)] ==
+        judgeObs ⟨[.statement "a" "b" false], ["c"], false, 0⟩ "b" [(.lean, .status .accept)] ==
           [.statement "a" "b" false] &&
-        judgeObs ⟨[.axioms "b" []], [], true⟩ "b"
+        judgeObs ⟨[.axioms "b" []], [], true, 0⟩ "b"
             [(.lean, .status .accept), (.conLeche, .infra .io "x"), (.nanoda, .status .reject)] ==
           [.axioms "b" [], .kernel "b" .lean .accept, .infra .io "x", .kernel "b" .nanoda .reject]),
     ("judge J4: a kernel's own line = the first nonblank line of stderr, else of stdout, cut in " ++
@@ -3230,11 +3230,11 @@ def ioCases : List (String × IO Bool) :=
         tryCatch (some <$> FvdepIO.Judge.kernelPhaseWith step "/s" "/h" "/x" v1 []) fun _ =>
             pure none
       return (← calls.get) == 3 &&
-          match rs with
+          let got : Option (List (FvdepCore.Evidence.Kernel × KResult)) :=
+            rs.map fun xs => xs.map fun x => (x.kernel, x.result)
+          match got with
           |
-          some
-              [(.lean, .infra .io _, _), (.conLeche, .status .accept, _),
-                (.nanoda, .status .accept, _)] =>
+          some [(.lean, .infra .io _), (.conLeche, .status .accept), (.nanoda, .status .accept)] =>
             true
           | _ => false),
     ("judge K4: the pins in K4's order while acquired — T1's fingerprint first, then each " ++
@@ -3263,6 +3263,34 @@ def ioCases : List (String × IO Bool) :=
           match r2 with
           | .error (.toolMissing, d) => d.startsWith "the toolchain fingerprint is other"
           | _ => false),
+    ("judge J1: an export read against its phase's digest — the recorded digest = its bytes', " ++
+        "else the read fails naming both; J3's trusted roots = phase 1's but the implementation",
+      do
+      let dir ← IO.FS.createTempDir
+      IO.FS.writeFile (dir / "e.ndjson") "{}\n"
+      let h := FvdepCore.Hash.hex (FvdepIO.Hash.sha256 "{}\n".toUTF8)
+      let good ← FvdepIO.Judge.readExport (dir / "e.ndjson") h
+      let bad ← FvdepIO.Judge.readExport (dir / "e.ndjson") "00"
+      let gone ← FvdepIO.Judge.readExport (dir / "none.ndjson") h
+      IO.FS.removeDirAll dir
+      let r : Request := ⟨`I.impl, `S.spec, `P.proof, some `A.shape⟩
+      return (match good with
+          | .ok b => b.data == "{}\n".toUTF8.data
+          | .error _ => false) &&
+          (match bad with
+          | .error d => d == s!"e.ndjson has SHA-256 {h}; its phase recorded 00"
+          | .ok _ => false) &&
+          (match gone with
+          | .error _ => true
+          | .ok _ => false) &&
+          exportRoots1 r ==
+            [`Quot, `Quot.mk, `Quot.lift, `Quot.ind, `Eq, `I.impl, `S.spec, `A.shape] ++
+              mandatory.drop 4 &&
+          exportRoots2 r ==
+            [`Quot, `Quot.mk, `Quot.lift, `Quot.ind, `P.proof] ++ mandatory.drop 4 &&
+          trustedRoots r == (exportRoots1 r).filter (· != `I.impl) &&
+          !(trustedRoots r).contains `I.impl &&
+          (trustedRoots r).contains `A.shape),
     ("judge K4: fvdep's toolchain = v1's pins (the three kernel binaries + T1's fingerprint; on " ++
         "every host the gate runs: vflab + CI)",
       do

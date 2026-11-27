@@ -32,6 +32,8 @@ structure Pre where
   obs : List Obs
   details : List String
   kernels : Bool
+  /-- W's units S + G took (Q1's measure). -/
+  used : Nat
   deriving DecidableEq
 
 /-- F8: an exhausted stage's cause (J4). -/
@@ -43,36 +45,38 @@ fault = infrastructure, the solution's = its stage's negative observation. -/
 def stages (p : VProfile) (githash version : String) (r : Request) (d1 d2 : Digest) (e1 e2 : Read) :
     Pre :=
   match e1 with
-  | .error why => ⟨[.infra .io s!"the trusted export could not be read: {why}"], [], false⟩
+  | .error why => ⟨[.infra .io s!"the trusted export could not be read: {why}"], [], false, 0⟩
   | .ok b1 =>
     match readTables githash version b1 with
     | .error f =>
-      ⟨[.infra .io s!"the trusted export is unreadable: line {f.line}: {f.reason}"], [], false⟩
+      ⟨[.infra .io s!"the trusted export is unreadable: line {f.line}: {f.reason}"], [], false, 0⟩
     | .ok t1 =>
       match e2 with
-      | .error why => ⟨[.infra .io s!"the solution export could not be read: {why}"], [], false⟩
+      | .error why => ⟨[.infra .io s!"the solution export could not be read: {why}"], [], false, 0⟩
       | .ok b2 =>
         match readTables githash version b2 with
         | .error f =>
           ⟨[.statement d1 d2 false],
-            [s!"the solution export is unreadable: line {f.line}: {f.reason}"], false⟩
+            [s!"the solution export is unreadable: line {f.line}: {f.reason}"], false, 0⟩
         | .ok t2 =>
           let w1 := viewOf t1
           let w2 := viewOf t2
           match statement w1 w2 r p.work {} with
-          | (.infra c, _, _) => ⟨[.infra .io c], [], false⟩
-          | (.mismatch c, _, _) => ⟨[.statement d1 d2 false], [c], false⟩
-          | (.exhausted, _, _) => ⟨[.statement d1 d2 false], [budgetCause], false⟩
+          | (.infra c, f, _) => ⟨[.infra .io c], [], false, p.work - f⟩
+          | (.mismatch c, f, _) => ⟨[.statement d1 d2 false], [c], false, p.work - f⟩
+          | (.exhausted, f, _) => ⟨[.statement d1 d2 false], [budgetCause], false, p.work - f⟩
           | (.matched, fuel, memo) =>
             match graph w1 w2 r p.opaques fuel memo with
-            | (.infra c, _, _, _) => ⟨[.statement d1 d2 true, .infra .io c], [], false⟩
-            | (.mismatch c, _, _, _) => ⟨[.statement d1 d2 true, .graph d1 d2 false], [c], false⟩
-            | (.exhausted, _, _, _) =>
-              ⟨[.statement d1 d2 true, .graph d1 d2 false], [budgetCause], false⟩
-            | (.matched, axs, _, _) =>
+            | (.infra c, _, f, _) => ⟨[.statement d1 d2 true, .infra .io c], [], false, p.work - f⟩
+            | (.mismatch c, _, f, _) =>
+              ⟨[.statement d1 d2 true, .graph d1 d2 false], [c], false, p.work - f⟩
+            | (.exhausted, _, f, _) =>
+              ⟨[.statement d1 d2 true, .graph d1 d2 false], [budgetCause], false, p.work - f⟩
+            | (.matched, axs, f, _) =>
               let names := axs.map axiomText
               ⟨[.statement d1 d2 true, .graph d1 d2 true, .axioms d2 names],
-                names.filter fun a => !p.allowlist.contains a, names.all p.allowlist.contains⟩
+                names.filter fun a => !p.allowlist.contains a, names.all p.allowlist.contains,
+                p.work - f⟩
 
 /-- J2: one kernel's observation on e2 (a per-kernel infrastructure = `infra`). -/
 def kernelObs (d2 : Digest) (k : Kernel) : KResult → Obs

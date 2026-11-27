@@ -139,6 +139,10 @@ run_probe() {
         sed 's/^/    control: /' "$pristine.control" | tail -n 10
         sed 's/^/    planted: /' "$pristine.planted" | tail -n 20
         sed 's/^/    restored: /' "$pristine.restored" | tail -n 10
+        # a suite's failing cases sit far above its stage's tail: name them (a flake stays traceable)
+        for run in control restored; do
+            command grep -E '^FAIL ' "$pristine.$run" | head -n 8 | sed "s/^/    $run FAIL: /"
+        done
     fi
     rm -rf -- "$dir" "$pristine" "$pristine".{control,planted,restored}
 }
