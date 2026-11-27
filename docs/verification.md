@@ -3082,6 +3082,24 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Judge.Reuse`
+
+- Contract: U7 Part B K5
+- Claim: `Memo`: a lookup answers exactly with the first recordable answer (a completed status: accept, reject, crash, decline — never infrastructure or a timeout) the command's run events gave under that very key (the full invocation context, the kernel, the staged e2's digest) — sound (an earlier event of this key) + local (never another key's).
+- Subject: `FvdepCore.Judge.Memo.ofEvents`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.JudgeReuseClaims.reuseExact` (hash 0xaa8c3e32), proved by `FvdepAudit.Judge.Proof.reuse_exact`:
+
+  ```lean
+  ∀ (es : List (FvdepCore.Judge.ReuseKey × FvdepCore.Judge.Answer)) (k : FvdepCore.Judge.ReuseKey),
+    (FvdepCore.Judge.Memo.ofEvents es).lookup k =
+      Option.map (fun x => x.snd)
+        (List.find? (fun e => e.fst == k && FvdepCore.Judge.recordable e.snd.fst) es)
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepIO.Judge`
 
 - Contract: U7 J1, K1, K4
@@ -3775,10 +3793,25 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: `sandbox-spawn` (the sandbox runner's IO: `c/fvdep_spawn.c`'s supervisor exports (bwrap by `posix_spawn` with four pipes above descriptor 4, every descriptor ≥ 5 closed (`closefrom`, resolved at run time: absent → `ENOSYS`, never a spawn), an empty environment, every signal at its default + unmasked; poll, kill, waitpid) + `FvdepIO.Sandbox` (the pumps, the deadline's SIGKILL + a 5 s drain bound, the observation handed to the proven `classify` + `read`))
 
+## `FvdepCore.Sandbox`
+
+- Contract: U5 T3, U7 part B L1
+- Claim: `Limits.check`: none exactly when every effective bound is usable — the deadline, the /tmp tmpfs, the diagnostic + frame caps each ≥ 1, each tmpfs size within bwrap's cap, the per-file cap ≥ 1 with eight such files inside the work tmpfs, the export cap ≥ 1 + within the per-file cap; the first failing bound's text = tested presentation.
+- Subject: `FvdepCore.Sandbox.Limits.check`
+- Path: none (a supporting component)
+- Statement `FvdepLedger.Rows.SandboxClaims.limitsCheck` (hash 0x208a0cd), proved by `FvdepAudit.Sandbox.Proof.limits_check`:
+
+  ```lean
+  ∀ (l : FvdepCore.Sandbox.Limits), l.check = none ↔ FvdepAudit.Sandbox.Spec.LimitsValid l
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepIO.Sandbox`
 
 - Contract: U5 R2–R7
-- Claim: One step = bwrap with `bwrapArgs`, stdout + stderr + the status descriptor + descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, the frame up to `frameBytes`), the deadline's SIGKILL + a bounded drain, then `classify` + `read` over what arrived.
+- Claim: One step = T3's `Limits.check` over the step's limits first (a refusal = an error before any spawn), then bwrap with `bwrapArgs`, stdout + stderr + the status descriptor + descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, the frame up to `frameBytes`), the deadline's SIGKILL + a bounded drain, then `classify` + `read` over what arrived.
 - Subject: `FvdepIO.Sandbox.run`
 - Path: none (a supporting component)
 - Uninterpreted: `FvdepIO.Spawn.bwrap`

@@ -89,4 +89,11 @@ theorem classify_exact (lines : List StatusLine) (killed : Bool) (e : String) :
     | nil => simp
     | cons m t => simp
 
+/-- U5 T3 + U7 part B L1 `limitsCheck`. -/
+theorem limits_check (l : Limits) : l.check = none ↔ LimitsValid l := by
+  unfold Limits.check LimitsValid
+  repeat' split
+  all_goals simp_all
+  all_goals omega
+
 end FvdepAudit.Sandbox.Proof

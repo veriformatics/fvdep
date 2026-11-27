@@ -16,6 +16,7 @@ import FvdepAudit.Judge.Graph.Proof.Stop
 import FvdepAudit.Judge.Kernel.Proof
 import FvdepAudit.Judge.Plan.Proof
 import FvdepAudit.Judge.Proof
+import FvdepAudit.Judge.Reuse.Proof
 import FvdepAudit.Judge.Statement.Proof
 import FvdepAudit.Judge.Template.Proof
 import FvdepAudit.Library.Proof.Batch
@@ -1339,6 +1340,9 @@ def outcomeExact : Prop :=
         classify lines killed e = .setupFailed d ↔
           lines.filterMap exitCodeOf = [] ∧ killed = false ∧ d = e
 
+/-- U5 T3 + U7 part B L1: the limits check passes exactly on usable effective bounds. -/
+def limitsCheck : Prop := ∀ (l : Limits), l.check = none ↔ LimitsValid l
+
 end FvdepLedger.Rows.SandboxClaims
 
 namespace FvdepLedger.Rows.BuildClaims
@@ -1880,6 +1884,17 @@ def profileBridge : Prop :=
   v1.evidence = ⟨"fvdep/verification/1", ["propext", "Classical.choice", "Quot.sound"]⟩
 
 end FvdepLedger.Rows.KernelClaims
+
+namespace FvdepLedger.Rows.JudgeReuseClaims
+
+open FvdepCore.Judge
+
+/-- U7 part B K5: a lookup = the first recordable answer the run events gave under that key. -/
+def reuseExact : Prop :=
+  ∀ (es : List (ReuseKey × Answer)) (k : ReuseKey),
+    (Memo.ofEvents es).lookup k = (es.find? fun e => e.1 == k && recordable e.2.1).map (·.2)
+
+end FvdepLedger.Rows.JudgeReuseClaims
 
 namespace FvdepLedger.Rows.JudgePlanClaims
 
@@ -4109,6 +4124,22 @@ def judgeKernelRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 part B K5: one command's memo of kernel answers. -/
+def judgeReuseRow : Row :=
+  { component := `FvdepCore.Judge.Reuse
+    contract := "U7 Part B K5"
+    claim :=
+      "`Memo`: a lookup answers exactly with the first recordable answer (a completed status: " ++
+        "accept, reject, crash, decline — never infrastructure or a timeout) the command's run " ++
+        "events gave under that very key (the full invocation context, the kernel, the staged " ++
+        "e2's digest) — sound (an earlier event of this key) + local (never another key's)."
+    claims := [(``JudgeReuseClaims.reuseExact, ``FvdepAudit.Judge.Proof.reuse_exact)]
+    subject := ``FvdepCore.Judge.Memo.ofEvents
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U7 J1 + J3: the judge's stages over one request. -/
 def judgePlanRow : Row :=
   { component := `FvdepCore.Judge.Plan
@@ -4667,15 +4698,32 @@ def spawnRow : Row :=
     residue := []
     unproven := ["sandbox-spawn"] }
 
+/-- U5 T3 + U7 part B L1: a step's limits checked before its spawn. -/
+def limitsRow : Row :=
+  { component := `FvdepCore.Sandbox
+    contract := "U5 T3, U7 part B L1"
+    claim :=
+      "`Limits.check`: none exactly when every effective bound is usable — the deadline, the " ++
+        "/tmp tmpfs, the diagnostic + frame caps each ≥ 1, each tmpfs size within bwrap's cap, " ++
+        "the per-file cap ≥ 1 with eight such files inside the work tmpfs, the export cap ≥ 1 " ++
+        "+ within the per-file cap; the first failing bound's text = tested presentation."
+    claims := [(``SandboxClaims.limitsCheck, ``FvdepAudit.Sandbox.Proof.limits_check)]
+    subject := ``FvdepCore.Sandbox.Limits.check
+    path := []
+    noCaller := "support"
+    residue := []
+    unproven := [] }
+
 /-- U5 R2–R7: the sandbox runner (`check` calls it from U8; today the dev driver's D2). -/
 def runnerRow : Row :=
   { component := `FvdepIO.Sandbox
     contract := "U5 R2–R7"
     claim :=
-      "One step = bwrap with `bwrapArgs`, stdout + stderr + the status descriptor + " ++
-        "descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, the frame up to " ++
-        "`frameBytes`), the deadline's SIGKILL + a bounded drain, then `classify` + `read` " ++
-        "over what arrived."
+      "One step = T3's `Limits.check` over the step's limits first (a refusal = an error " ++
+        "before any spawn), then bwrap with `bwrapArgs`, stdout + stderr + the status " ++
+        "descriptor + descriptor 4 pumped together (first + last `diagnosticBytes / 2` kept, " ++
+        "the frame up to `frameBytes`), the deadline's SIGKILL + a bounded drain, then " ++
+        "`classify` + `read` over what arrived."
     claims := []
     subject := ``FvdepIO.Sandbox.run
     path := []
@@ -5275,20 +5323,20 @@ def ledger : Ledger :=
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
         judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgePlanRow,
-        judgeKernelStepRow, judgeProfileRow, projectSelectRow, librarySourceRow, libraryTreeRow,
-        libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow, libraryPinRow,
-        libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow, wireResultRow,
-        wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
+        judgeReuseRow, judgeKernelStepRow, judgeProfileRow, projectSelectRow, librarySourceRow,
+        libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow,
+        libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow,
+        wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
         wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow,
         wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
         oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
-        stepExecuteRow, stepPlanRow, spawnRow, runnerRow, cacheRow, headerRow, toolchainRow,
-        snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow,
-        oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow,
-        oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow, versionTypeRow,
-        profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow, profileGrammarRow,
-        profileDetailRow, profileWalkRow, profileBodyRow, profileHeaderRow, profileConcludeRow,
-        profileJudgeRow, parseExecuteRow, parsePlanRow, profileStepRow]
+        stepExecuteRow, stepPlanRow, spawnRow, limitsRow, runnerRow, cacheRow, headerRow,
+        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow,
+        oracleIndexRow, oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow,
+        oracleDriverRow, oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow,
+        versionTypeRow, profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow,
+        profileGrammarRow, profileDetailRow, profileWalkRow, profileBodyRow, profileHeaderRow,
+        profileConcludeRow, profileJudgeRow, parseExecuteRow, parsePlanRow, profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

@@ -2154,6 +2154,18 @@ def cases : List (String × (Unit → Bool)) :=
                   inputs :=
                     [{ role := "etc", path := "x", size := 3, sha256 := "ab",
                        kept := true }] }.value)).isNone),
+    ("sandbox: T3's zero bounds refused in order (deadline, /tmp, diagnostic, frame), each at 1 " ++
+        "accepted; the defaults pass",
+      fun _ =>
+      ({} : Limits).check.isNone &&
+        ({ deadline := 0 } : Limits).check == some "the step deadline is 0 s" &&
+        ({ tmpBytes := 0 } : Limits).check == some "the /tmp size is 0" &&
+        ({ diagnosticBytes := 0 } : Limits).check == some "the diagnostic cap is 0" &&
+        ({ frameBytes := 0 } : Limits).check == some "the frame cap is 0" &&
+        ({ deadline := 0, tmpBytes := 0, diagnosticBytes := 0, frameBytes := 0 } : Limits).check ==
+          some "the step deadline is 0 s" &&
+        ({ deadline := 1, tmpBytes := 1, diagnosticBytes := 1, frameBytes := 1 } :
+            Limits).check.isNone),
     ("sandbox: T3's export cap ≥ 1 + ≤ the per-file cap (default = it)", fun _ =>
       ({} : Limits).exportCap == ({} : Limits).fileCap &&
         ({ exportBytes := some 0 } : Limits).check.isSome &&
@@ -3101,6 +3113,25 @@ def kCases : List (String × (Unit → Bool)) :=
         judgeObs ⟨[.axioms "b" []], [], true, 0⟩ "b"
             [(.lean, .status .accept), (.conLeche, .infra .io "x"), (.nanoda, .status .reject)] ==
           [.axioms "b" [], .kernel "b" .lean .accept, .infra .io "x", .kernel "b" .nanoda .reject]),
+    ("judge K5: the memo answers a key with its first completed answer — one hit + two misses, " ++
+        "a distinct invocation (another deadline) misses, a timeout + infrastructure are never " ++
+        "kept (the retry runs), a later answer for a kept key changes nothing",
+      fun _ =>
+      let spec : FvdepCore.Sandbox.Spec := ⟨[], [], 1, 1, []⟩
+      let inv (d : Nat) : Invocation := ⟨"fp", "pin", spec, { deadline := d }, ""⟩
+      let key (d : Nat) (k : FvdepCore.Evidence.Kernel) (e : String) : ReuseKey := ⟨inv d, k, e⟩
+      let acc : Answer := (.status .accept, "ok")
+      let rej : Answer := (.status .reject, "no")
+      let m := Memo.ofEvents [(key 60 .lean "e", acc), (key 60 .lean "e", rej)]
+      m.lookup (key 60 .lean "e") == some acc &&
+        m.lookup (key 60 .nanoda "e") == none &&
+        m.lookup (key 60 .lean "f") == none &&
+        m.lookup (key 61 .lean "e") == none &&
+        let timedOut : Answer := (.status (.timeout 60), "t")
+        (Memo.ofEvents [(key 60 .lean "e", timedOut)]).lookup (key 60 .lean "e") == none &&
+        (Memo.ofEvents [(key 60 .lean "e", (.infra .io "x", "x")), (key 60 .lean "e", acc)]).lookup
+            (key 60 .lean "e") ==
+          some acc),
     ("judge J4: a kernel's own line = the first nonblank line of stderr, else of stdout, cut in " ++
         "bytes before decoding (a later invalid byte never re-decodes it), capped",
       fun _ =>
@@ -3193,7 +3224,15 @@ def kCases : List (String × (Unit → Bool)) :=
         !(FvdepIO.Judge.kernelRunOf 7 { o .invalid whole with stderr := cut }).whole)]
 
 def ioCases : List (String × IO Bool) :=
-  [("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
+  [("sandbox: an invalid step limit refuses before any spawn (the run names the limit, never " ++
+        "bwrap)",
+      do
+      match ← FvdepIO.Sandbox.run "/nonexistent/bwrap" ⟨[], [], 1, 1, []⟩ { deadline := 0 } with
+      | .error e =>
+        return e == "the step limits are invalid: the step deadline is 0 s"
+      | .ok _ =>
+        return false),
+    ("judge: fvdep's reader = Lean's own reader (`LeanExport.parseStream`) on every accepted " ++
         "export-decode corpus input, every field (U7 X9)",
       do
       let dev := (← IO.currentDir) / ".lake" / "build" / "bin" / "fvdep-dev"

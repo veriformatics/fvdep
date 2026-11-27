@@ -65,4 +65,16 @@ def layout : List String :=
   ["/usr", "/lib", "/lib64", "/bin", "/fvdep/sysroot", "/fvdep/step", "/fvdep/src", "/fvdep/lib",
     "/fvdep/phase1", "/fvdep/prior", "/fvdep/work", "/tmp", "/proc", "/dev", "/"]
 
+/-- U5 T3 + U7 part B L1: a step's limits are usable, over the effective values (the per-file +
+export caps after their defaults): every bound ≥ 1, each tmpfs size within bwrap's cap, eight files
+at the per-file cap fit the work tmpfs, the export within the per-file cap. -/
+def LimitsValid (l : Limits) : Prop :=
+  1 ≤ l.deadline ∧
+    1 ≤ l.tmpBytes ∧
+    1 ≤ l.diagnosticBytes ∧
+    1 ≤ l.frameBytes ∧
+    l.workBytes ≤ tmpfsMax ∧
+    l.tmpBytes ≤ tmpfsMax ∧
+    1 ≤ l.fileCap ∧ 8 * l.fileCap ≤ l.workBytes ∧ 1 ≤ l.exportCap ∧ l.exportCap ≤ l.fileCap
+
 end FvdepAudit.Sandbox.Spec

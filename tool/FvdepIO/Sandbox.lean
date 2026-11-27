@@ -250,6 +250,9 @@ def firstLine (b : ByteArray) : String :=
 phase's absolute monotonic deadline, P1) else `lim.deadline` seconds from the spawn. -/
 def run (bwrap : String) (spec : Spec) (lim : Limits) (untilMs : Option Nat := none) :
     IO (Except String Observation) := do
+  -- T3 + U7 part B L1: every production step's effective limits checked before any spawn.
+  if let some why := lim.check then
+    return .error s!"the step limits are invalid: {why}"
   match ← FvdepIO.Spawn.bwrap bwrap ("bwrap" :: bwrapArgs spec).toArray with
   | .error e =>
     return .error s!"bwrap could not start: {FvdepIO.Spawn.errnoText e}"

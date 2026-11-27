@@ -188,26 +188,36 @@ tmpfs) is limited to 9223372036854775807`), like `--size 0`. -/
 @[noinline]
 def tmpfsMax : Nat := 9223372036854775807
 
-/-- T3's bounds + relation (A1): each tmpfs size ≤ `tmpfsMax`; the per-file cap ≥ 1 and 8 × it ≤
-`workBytes` ⇒ a compile's artifact family (≤ 7 files) never fills `/fvdep/work`: a file past the cap
-ends its writer by `SIGXFSZ` first (a signal death, P5's resource case); the export cap ≥ 1 and ≤
-the per-file cap (the export is one file written under it) — `none` = holds, else the reason. -/
+/-- T3's bounds + relation (A1; U7 part B L1: over the effective values): the deadline, the tmp
+tmpfs, the diagnostic + frame caps each ≥ 1 (a zero would end every step as infrastructure); each
+tmpfs size ≤ `tmpfsMax`; the per-file cap ≥ 1 and 8 × it ≤ `workBytes` ⇒ a compile's artifact
+family (≤ 7 files) never fills `/fvdep/work`: a file past the cap ends its writer by `SIGXFSZ` first
+(a signal death, P5's resource case); the export cap ≥ 1 and ≤ the per-file cap (the export is one
+file written under it) — `none` = holds, else the first failing reason. -/
 def Limits.check (l : Limits) : Option String :=
-  if tmpfsMax < l.workBytes then
-    some s!"--work-bytes {l.workBytes} is above bwrap's tmpfs cap {tmpfsMax}"
+  if l.deadline == 0 then some "the step deadline is 0 s"
   else
-    if tmpfsMax < l.tmpBytes then
-      some s!"--tmp-bytes {l.tmpBytes} is above bwrap's tmpfs cap {tmpfsMax}"
+    if l.tmpBytes == 0 then some "the /tmp size is 0"
     else
-      if l.fileCap == 0 then some "the per-file cap is 0 (--work-bytes below 8)"
+      if l.diagnosticBytes == 0 then some "the diagnostic cap is 0"
       else
-        if l.workBytes < 8 * l.fileCap then
-          some s!"--file-bytes {l.fileCap} is above --work-bytes / 8"
+        if l.frameBytes == 0 then some "the frame cap is 0"
         else
-          if l.exportCap == 0 then some "the export cap is 0"
+          if tmpfsMax < l.workBytes then
+            some s!"--work-bytes {l.workBytes} is above bwrap's tmpfs cap {tmpfsMax}"
           else
-            if l.fileCap < l.exportCap then
-              some s!"--export-bytes {l.exportCap} is above the per-file cap {l.fileCap}"
-            else none
+            if tmpfsMax < l.tmpBytes then
+              some s!"--tmp-bytes {l.tmpBytes} is above bwrap's tmpfs cap {tmpfsMax}"
+            else
+              if l.fileCap == 0 then some "the per-file cap is 0 (--work-bytes below 8)"
+              else
+                if l.workBytes < 8 * l.fileCap then
+                  some s!"--file-bytes {l.fileCap} is above --work-bytes / 8"
+                else
+                  if l.exportCap == 0 then some "the export cap is 0"
+                  else
+                    if l.fileCap < l.exportCap then
+                      some s!"--export-bytes {l.exportCap} is above the per-file cap {l.fileCap}"
+                    else none
 
 end FvdepCore.Sandbox
