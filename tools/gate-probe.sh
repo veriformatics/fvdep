@@ -850,6 +850,37 @@ ci_verdict() {
 }
 with_build=0 probe ci-verdict plant_marker "not green: checks" ci_verdict
 
+# ci-gate: a watch that ends early (a transient API error) is no verdict — `ci_await` watches again
+# until the run reports completed (control: a stub `gh` whose first watch fails like an HTTP 502);
+# a run never completed within the deadline = no verdict, named (plant).
+ci_wait() {
+    local bin rc
+    bin="$(mktemp -d)"
+    cat >"$bin/gh" <<'STUB'
+#!/usr/bin/env bash
+case "$1 $2" in
+"run watch")
+    n="$(cat "$GH_STUB/watches" 2>/dev/null || echo 0)"
+    echo $((n + 1)) >"$GH_STUB/watches"
+    [[ "$n" -ge 1 ]] || {
+        echo 'failed to get jobs: HTTP 502: Server Error' >&2
+        exit 1
+    }
+    [[ -e "$GH_STUB/never" ]] || : >"$GH_STUB/done"
+    ;;
+"run view") if [[ -e "$GH_STUB/done" ]]; then echo completed; else echo in_progress; fi ;;
+esac
+STUB
+    chmod +x "$bin/gh"
+    [[ -e .planted ]] && : >"$bin/never"
+    GH_STUB="$bin" PATH="$bin:$PATH" bash -c 'source tools/ci-gate.sh; ci_await 1 4 1' 2>"$bin/err"
+    rc=$?
+    command grep -h 'did not complete' "$bin/err"
+    rm -rf "$bin"
+    return "$rc"
+}
+with_build=0 probe ci-await plant_marker "did not complete within 4 s" ci_wait
+
 # fast gate: a failing background stage (deps: a pin without a row) fails the fast gate, named.
 probe fast-gate plant_tool "FAILED: deps" bash tools/fast-gate.sh
 

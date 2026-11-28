@@ -4582,11 +4582,13 @@ def ioCases : List (String × IO Bool) :=
         let src := d / "src"
         let _ ← library src
         let log := d / "pids"
+        -- The helper outlives any run (300 s) + the deadline (3 s) leaves a loaded host time to
+        -- start the stub: t1 - t0 < 60 s still tells the deadline's kill from a wait on the helper.
         script (d / "git")
-            ("for a in \"$@\"; do if [ \"$a\" = fetch ]; then sleep 30 & echo \"$$ $!\" > '" ++
+            ("for a in \"$@\"; do if [ \"$a\" = fetch ]; then sleep 300 & echo \"$$ $!\" > '" ++
               log.toString ++
               "'; wait; exit 1; fi; done\nexec git \"$@\"\n")
-        let s ← store d src { fetchSeconds := 2 } (d / "git").toString
+        let s ← store d src { fetchSeconds := 3 } (d / "git").toString
         let t0 ← IO.monoMsNow
         let r ← FvdepIO.Library.snapshot s none
         let t1 ← IO.monoMsNow
@@ -4600,18 +4602,20 @@ def ioCases : List (String × IO Bool) :=
           let text ← IO.FS.readFile st
           return ((text.splitOn ") ").getLastD "").startsWith "Z"
         let mut helper := false
-        for _ in [0:30] do
+        for _ in [0:100] do
           if ← stopped (pids.getD 1 0) then
             helper := true
             break
           IO.sleep 100
         let leaderGone := !(← System.FilePath.pathExists s!"/proc/{pids.getD 0 0}")
-        return errIs r "Fetch failed: git fetch passed its deadline of 2 seconds." &&
-            t1 - t0 < 10000 &&
-            pids.length == 2 &&
-            helper &&
-            leaderGone &&
-            (← s.tmp.readDir).isEmpty),
+        let checks :=
+          [("message", errIs r "Fetch failed: git fetch passed its deadline of 3 seconds."),
+            ("time", t1 - t0 < 60000), ("pids", pids.length == 2), ("helper", helper),
+            ("leader", leaderGone), ("tmp", (← s.tmp.readDir).isEmpty)]
+        for (n, ok) in checks do
+          unless ok do
+            IO.eprintln s!"  fetch-deadline case: {n} failed (t1 - t0 = {t1 - t0} ms)"
+        return checks.all (·.2)),
     ("library: git runs with exactly L3's environment + argv (init, fetch) in a private repository",
       withTmp fun d => do
         let src := d / "src"

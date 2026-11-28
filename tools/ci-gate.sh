@@ -20,6 +20,34 @@ ci_missing() {
         | if length == 1 then empty else $s end' "$@" <<<"$doc"
 }
 
+# Waits for run $1 to report `completed` (deadline $2 s, pause $3 s between watches): `gh run watch`
+# ends early on a transient API error (`failed to get jobs: HTTP 502`) while the run still runs ⇒ its
+# exit status is never the verdict; the run's own status decides. rc 1 = still not completed at the
+# deadline (no verdict). Probed with a stub `gh`.
+ci_await() {
+    local end=$((SECONDS + $2)) status=""
+    while ((SECONDS < end)); do
+        gh run watch "$1" --interval 15 >/dev/null
+        status="$(gh run view "$1" --json status --jq .status)" && [[ "$status" == completed ]] &&
+            return 0
+        printf 'ci-gate: run %s not completed after its watch (status %s); watching again\n' "$1" \
+            "${status:-unreadable}" >&2
+        sleep "$3"
+    done
+    printf 'ci-gate: run %s did not complete within %s s\n' "$1" "$2" >&2
+    return 1
+}
+
+# A read of the GitHub API, retried over transient errors (5 tries, 10 s apart).
+gh_read() {
+    local _
+    for _ in 1 2 3 4 5; do
+        "$@" && return 0
+        sleep 10
+    done
+    return 1
+}
+
 # The id of workflow $1's run (.github/workflows/$1.yml) for commit $2 on branch $3, waiting up to
 # 15 min for it to appear. Read from the repository's run list: GitHub's workflow-filtered list
 # (`gh run list -w`) has stayed empty for 5 min while the run existed + ran.
@@ -66,14 +94,21 @@ main() {
     printf 'ci-gate: gate run %s · codeql run %s · commit %s · tree %s\n' "$gate_id" "$codeql_id" \
         "${sha:0:7}" "$tree"
 
-    gh run watch "$gate_id" --exit-status --interval 15 >/dev/null
-    gate_rc=$?
-    gh run watch "$codeql_id" --exit-status --interval 15 >/dev/null
-    codeql_rc=$?
-    jobs="$(gh run view "$gate_id" --json headSha,conclusion,jobs)" || {
+    # No verdict without a completed run (branch kept): a CI job's own timeout ends a run within 4 h.
+    ci_await "$gate_id" 14400 15 || exit 2
+    ci_await "$codeql_id" 14400 15 || exit 2
+    jobs="$(gh_read gh run view "$gate_id" --json headSha,conclusion,jobs)" || {
         printf 'ci-gate: run %s unreadable\n' "$gate_id" >&2
         exit 2
     }
+    gate_rc=1
+    [[ "$(jq -r .conclusion <<<"$jobs")" == success ]] && gate_rc=0
+    codeql="$(gh_read gh run view "$codeql_id" --json conclusion --jq .conclusion)" || {
+        printf 'ci-gate: run %s unreadable\n' "$codeql_id" >&2
+        exit 2
+    }
+    codeql_rc=1
+    [[ "$codeql" == success ]] && codeql_rc=0
     jq -r '
         def secs: if .completedAt and .startedAt then ((.completedAt | fromdate) - (.startedAt | fromdate) | tostring) + "s" else "?" end;
         (.jobs[] | "\(.name) \(.conclusion // .status) \(secs)"),
@@ -86,7 +121,7 @@ main() {
     printf 'codeql: run rc %d, open alerts on %s: %s\n' "$codeql_rc" "$branch" "$alerts"
     if [[ $gate_rc -ne 0 || -n "$missing" || "$head_sha" != "$sha" || $codeql_rc -ne 0 ||
         "$alerts" != 0 ]]; then
-        printf 'ci-gate: red (gate watch rc %d; shards without a successful job: %s; run commit %s; codeql rc %d; open alerts %s); %s kept (gh run view %s --log-failed)\n' \
+        printf 'ci-gate: red (gate run not success: %d; shards without a successful job: %s; run commit %s; codeql not success: %d; open alerts %s); %s kept (gh run view %s --log-failed)\n' \
             "$gate_rc" "${missing//$'\n'/ }" "${head_sha:0:7}" "$codeql_rc" "$alerts" "$branch" "$gate_id" >&2
         exit 1
     fi
@@ -97,7 +132,7 @@ main() {
     fi
 }
 
-# Sourcing exposes ci_missing without pushing (tools/gate-probe.sh).
+# Sourcing exposes ci_missing + ci_await without pushing (tools/gate-probe.sh).
 if [[ "${BASH_SOURCE[0]}" == "${0}" ]]; then
     main "$@"
 fi
