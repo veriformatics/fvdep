@@ -2806,11 +2806,11 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 
 ## `FvdepCore.Judge.Statement`
 
-- Contract: U7 S1–S4
-- Claim: `statement`: e2's proof constant vs the template over e1's trusted constants — fn `@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` (T = the codomain of the shape's closed nondependent arrow type), u = the proof's own `Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` (`statementExact`); `exhausted` only with no work unit left (`statementStop`); the causes' texts = J4's tested detail lines.
+- Contract: U7 S1–S4 + Part B B7
+- Claim: `statement`: e2's proof constant vs the template over e1's trusted constants — fn `@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` (T = the codomain of the shape's closed nondependent arrow type), Part B's `prop` = the obligation constant itself (a safe definition of type `Prop` without level parameters), `compat` = `@Eq.{u} T new old` (T = the new spec's type), u = the proof's own `Eq` level, T compared by `eqExpr`: infrastructure exactly without the trusted data (part A: T; part B: an absent root — a present root of another form = the mismatch), `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` (`statementExact`); `exhausted` only with no work unit left (`statementStop`); the causes' texts = J4's tested detail lines.
 - Subject: `FvdepCore.Judge.statement`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.StatementClaims.statementExact` (hash 0xd2258a59), proved by `FvdepAudit.Judge.Proof.statement_exact`:
+- Statement `FvdepLedger.Rows.StatementClaims.statementExact` (hash 0xce73dcb0), proved by `FvdepAudit.Judge.Proof.statement_exact`:
 
   ```lean
   ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : FvdepCore.Export.Tables)
@@ -2824,7 +2824,7 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
                 seen =
               o →
             ((∃ c, o.fst = FvdepCore.Judge.Outcome.infra c) ↔
-                ¬∃ T, FvdepAudit.Judge.Statement.Spec.Target t1 r T) ∧
+                ¬FvdepAudit.Judge.Statement.Spec.Trusted t1 r) ∧
               (o.fst = FvdepCore.Judge.Outcome.matched →
                   FvdepAudit.Judge.Statement.Spec.Holds t1 t2 r ∧
                     ∀ (p : FvdepCore.Judge.Pair),
@@ -2848,23 +2848,29 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 ## `FvdepCore.Judge.Template`
 
 - Contract: U7 S0
-- Claim: `statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the request's names as written — its six members spelled in `templateLayout` — (`statementDigestExact`); on names within J's string bound the bytes determine the request (`templateInjective`); the digest's separation = SHA-256's collision resistance over those bytes (never premised).
+- Claim: `statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the request's names as written — its six members (the form tagging the kind: `eq`, `prop`, `compat`) + a compat's `target` spelled in `templateLayout` — (`statementDigestExact`); on names within J's string bound the bytes determine the request (`templateInjective`); the digest's separation = SHA-256's collision resistance over those bytes (never premised).
 - Subject: `FvdepCore.Judge.statementDigest`
 - Path: none yet (wired by U7)
-- Statement `FvdepLedger.Rows.StatementClaims.templateLayout` (hash 0x42e95a91), proved by `FvdepAudit.Judge.Proof.template_layout`:
+- Statement `FvdepLedger.Rows.StatementClaims.templateLayout` (hash 0xe35f0e7), proved by `FvdepAudit.Judge.Proof.template_layout`:
 
   ```lean
   ∀ (x : FvdepCore.Judge.Template),
     FvdepCore.Judge.templateBytes x =
       FvdepCore.Json.print
         (FvdepCore.Json.Value.obj
-          [("abi", x.abi.elim FvdepCore.Json.Value.null FvdepCore.Json.Value.str),
-            ("form", FvdepCore.Json.Value.str "fvdep/statement/1"),
-            ("impl", FvdepCore.Json.Value.str x.impl), ("proof", FvdepCore.Json.Value.str x.proof),
-            ("shape",
-              FvdepCore.Json.Value.str
-                (if x.shape = FvdepCore.Evidence.Shape.fn then "fn" else "abi")),
-            ("spec", FvdepCore.Json.Value.str x.spec)])
+          ([("abi", x.abi.elim FvdepCore.Json.Value.null FvdepCore.Json.Value.str),
+              ("form",
+                FvdepCore.Json.Value.str
+                  (if x.kind = FvdepCore.Judge.Kind.eq then "fvdep/statement/1"
+                  else
+                    if x.kind = FvdepCore.Judge.Kind.prop then "fvdep/statement/prop/1"
+                    else "fvdep/statement/compat/1")),
+              ("impl", FvdepCore.Json.Value.str x.impl), ("proof", FvdepCore.Json.Value.str x.proof),
+              ("shape",
+                FvdepCore.Json.Value.str
+                  (if x.shape = FvdepCore.Evidence.Shape.fn then "fn" else "abi")),
+              ("spec", FvdepCore.Json.Value.str x.spec)] ++
+            List.map (fun t => ("target", FvdepCore.Json.Value.str t)) x.target.toList))
   ```
 - Statement `FvdepLedger.Rows.StatementClaims.statementDigestExact` (hash 0x725535fa), proved by `FvdepAudit.Judge.Proof.statementDigest_exact`:
 
@@ -2872,12 +2878,14 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
   ∀ (h : ByteArray → String) (x : FvdepCore.Judge.Template),
     FvdepCore.Judge.statementDigest h x = h (FvdepCore.Judge.templateBytes x)
   ```
-- Statement `FvdepLedger.Rows.StatementClaims.templateInjective` (hash 0x1d8947f0), proved by `FvdepAudit.Judge.Proof.template_injective`:
+- Statement `FvdepLedger.Rows.StatementClaims.templateInjective` (hash 0x1fb5f727), proved by `FvdepAudit.Judge.Proof.template_injective`:
 
   ```lean
   ∀ (x y : FvdepCore.Judge.Template),
-    (∀ (s : String), s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof] → s.utf8ByteSize ≤ 65536) →
-      (∀ (s : String), s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof] → s.utf8ByteSize ≤ 65536) →
+    (∀ (s : String),
+        s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof] ++ x.target.toList → s.utf8ByteSize ≤ 65536) →
+      (∀ (s : String),
+          s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof] ++ y.target.toList → s.utf8ByteSize ≤ 65536) →
         FvdepCore.Judge.templateBytes x = FvdepCore.Judge.templateBytes y → x = y
   ```
 - Uninterpreted: none

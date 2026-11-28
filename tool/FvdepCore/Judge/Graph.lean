@@ -19,9 +19,14 @@ def mandatory : List Lean.Name :=
     `Nat.lor, `Nat.xor, `Nat.shiftLeft, `Nat.shiftRight, `String.ofList, `Char.ofNat, `List,
     `eagerReduce, `Nat, `String, `String.mk, `Char, `optParam, `autoParam, `semiOutParam, `outParam]
 
-/-- G1: the roots — the template's constants (T's join through the spec's or the shape's type),
-then the mandatory inventory. -/
-def graphRoots (r : Request) : List Lean.Name := [`Eq, r.impl, r.spec] ++ r.abi.toList ++ mandatory
+/-- G1: the roots — the template's constants (T's join through the spec's, the new spec's or the
+shape's type; Part B B7: an obligation's = its proposition constant alone, a compat's = `Eq`, new,
+old), then the mandatory inventory. -/
+def graphRoots (r : Request) : List Lean.Name :=
+  if r.kind == .prop then r.spec :: mandatory
+  else
+    if r.kind == .compat then [`Eq, r.impl, r.spec] ++ mandatory
+    else [`Eq, r.impl, r.spec] ++ r.abi.toList ++ mandatory
 
 /-- One expression record's constants (a `const`'s name, a `proj`'s structure name) +
 children. -/

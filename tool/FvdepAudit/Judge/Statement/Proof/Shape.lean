@@ -101,22 +101,91 @@ theorem constIs_iff {t : Tables} (h : RawOk t) (i : Nat) (c : Lean.Name) :
 
 /-- S3's right side as a denoted expression. -/
 def rhsExpr (r : Request) : Lean.Expr :=
-  match r.abi with
-  | none => .const r.spec []
-  | some s => .app (.const s []) (.const r.spec [])
+  if r.kind = .compat then .const r.spec []
+  else
+    match r.abi with
+    | none => .const r.spec []
+    | some s => .app (.const s []) (.const r.spec [])
 
-theorem template_eq (r : Request) (T : Lean.Expr) (u : Lean.Level) :
+theorem template_eq (r : Request) (T : Lean.Expr) (u : Lean.Level) (hk : r.kind ≠ .prop) :
     template r T u = .app (.app (.app (.const `Eq [u]) T) (.const r.impl [])) (rhsExpr r) := by
-  cases h : r.abi <;> simp [template, rhsExpr, h]
+  by_cases hc : r.kind = .compat <;> cases h : r.abi <;> simp [template, rhsExpr, h, hk, hc]
+
+theorem template_prop (r : Request) (T : Lean.Expr) (u : Lean.Level) (hk : r.kind = .prop) :
+    template r T u = .const r.spec [] := by simp [template, hk]
+
+theorem rhsExpr_cases (r : Request) :
+    rhsExpr r = .const r.spec [] ∨ ∃ s, rhsExpr r = .app (.const s []) (.const r.spec []) := by
+  unfold rhsExpr
+  by_cases hc : r.kind = .compat
+  · simp [hc]
+  · cases r.abi <;> simp [hc]
+
+/-- `isProp` = the record denotes `Sort 0`. -/
+theorem isProp_iff {t : Tables} (h : RawOk t) (i : Nat) :
+    isProp t i = true ↔ t.exprs[i]? = some (.sort .zero) := by
+  constructor
+  · intro hp
+    unfold isProp at hp
+    split at hp
+    · rename_i l hr
+      split at hp
+      · rename_i hl
+        obtain ⟨e, he, x, hx, rfl⟩ := h.expr i _ hr
+        rw [h.level0 l hl, Option.some.injEq] at hx
+        subst hx
+        exact he
+      · cases hp
+    · cases hp
+  · intro hP
+    obtain ⟨r, hr, hd⟩ := raw_of_expr h hP
+    have ht := etag_denotes hd
+    cases r with
+    | sort l =>
+      obtain ⟨x, hx, hxe⟩ := hd
+      simp only [Lean.Expr.sort.injEq] at hxe
+      subst hxe
+      have hlt : l < t.rawLevels.size := by
+        rw [h.levelsSize]
+        exact lt_of_some hx
+      cases hrl : t.rawLevels[l]? with
+      | none =>
+        rw [Array.getElem?_eq_none_iff] at hrl
+        omega
+      | some o =>
+        cases o with
+        | none => simp [isProp, hr, hrl]
+        | some f =>
+          obtain ⟨v, hv, hd'⟩ := h.level l f hrl
+          rw [hx, Option.some.injEq] at hv
+          subst hv
+          cases f <;> simp [LevelDenotes] at hd'
+    | _ => simp [etag, ftag] at ht
+
+/-- An alpha-equality with a level-free constant: the record is that constant. -/
+theorem constIs_of_alphaEq {t : Tables} (h : RawOk t) {i : Nat} {P : Lean.Expr} {c : Lean.Name}
+    (hP : t.exprs[i]? = some P) (he : alphaEq (.const c []) P = true) : constIs t i c = true := by
+  obtain ⟨n, us, xs, hr, rfl, hn, hus, hl⟩ := alphaEq_const_inv h hP he
+  have : xs = [] := by
+    cases xs with
+    | nil => rfl
+    | cons _ _ => simp [levelsEq] at hl
+  subst this
+  rw [mapM_nil_eq hus] at hr
+  simp [constIs, hr, hn]
 
 theorem rhsIs_iff {t : Tables} (h : RawOk t) (i : Nat) (r : Request) :
     rhsIs t i r = true ↔ t.exprs[i]? = some (rhsExpr r) := by
+  by_cases hc : r.kind = .compat
+  · simp only [rhsIs, rhsExpr, hc, beq_self_eq_true, ↓reduceIte]
+    exact constIs_iff h i r.spec
+  have hc' : (r.kind == .compat) = false := by simp [hc]
   cases hs : r.abi with
   | none =>
-    simp only [rhsIs, rhsExpr, hs]
+    simp only [rhsIs, rhsExpr, hs, hc, hc', Bool.false_eq_true, ↓reduceIte]
     exact constIs_iff h i r.spec
   | some s =>
-    simp only [rhsIs, rhsExpr, hs]
+    simp only [rhsIs, rhsExpr, hs, hc, hc', Bool.false_eq_true, ↓reduceIte]
     constructor
     · intro hc
       split at hc

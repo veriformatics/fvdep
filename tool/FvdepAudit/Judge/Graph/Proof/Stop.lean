@@ -243,10 +243,18 @@ theorem statement_stop (v1 v2 : View) (r : Request) (fuel : Nat) (seen : Std.Has
   intro ho he
   subst ho
   unfold statement at he ⊢
-  repeat' split at he
-  all_goals simp_all
-  rename_i heq
-  exact walk_exhausted heq
+  cases hf : front v1 r with
+  | error e =>
+    simp only [hf] at he ⊢
+    unfold front roots at hf
+    repeat' split at hf
+    all_goals simp_all
+  | ok tT =>
+    simp only [hf] at he ⊢
+    repeat' split at he
+    all_goals simp_all
+    rename_i heq
+    exact walk_exhausted heq
 
 /-! ## G3's trusted-side fault -/
 

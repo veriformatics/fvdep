@@ -1748,9 +1748,10 @@ def viewLookup : Prop :=
   ∀ (githash version : String) (b : ByteArray) (t : Tables) (n : Lean.Name) (e : Entry),
     readTables githash version b = .ok t → ((viewOf t).byName[n]? = some e ↔ Named t n e)
 
-/-- U7 S1–S4: on two exports the reader accepts, a sound memo in: `statement` reports
-infrastructure exactly when the trusted side lacks the target type; `.matched` ⇒ the template
-holds (the memo out sound); when it holds, the step fails only by exhausting its budget. -/
+/-- U7 S1–S4 + Part B B7: on two exports the reader accepts, a sound memo in: `statement` reports
+infrastructure exactly without the trusted data (part A: the target type; part B: the kind's roots
+in e1, a present root of another form = the mismatch); `.matched` ⇒ the template holds (the memo
+out sound); when it holds, the step fails only by exhausting its budget. -/
 def statementExact : Prop :=
   ∀ (githash version : String) (b1 b2 : ByteArray) (t1 t2 : Tables) (r : Request) (fuel : Nat)
     (seen : Std.HashSet Pair) (o : Outcome × Nat × Std.HashSet Pair),
@@ -1758,7 +1759,7 @@ def statementExact : Prop :=
       readTables githash version b2 = .ok t2 →
       (∀ p, seen.contains p = true → PairEq t1 t2 p) →
       statement (viewOf t1) (viewOf t2) r fuel seen = o →
-      ((∃ c, o.1 = .infra c) ↔ ¬∃ T, Target t1 r T) ∧
+      ((∃ c, o.1 = .infra c) ↔ ¬Trusted t1 r) ∧
         (o.1 = .matched → Holds t1 t2 r ∧ ∀ p, o.2.2.contains p = true → PairEq t1 t2 p) ∧
         (Holds t1 t2 r → o.1 = .matched ∨ o.1 = .exhausted)
 
@@ -1768,24 +1769,33 @@ def statementDigestExact : Prop :=
   ∀ (h : ByteArray → String) (x : Template), statementDigest h x = h (templateBytes x)
 
 /-- U7 S0: on names within J's string bound, the template's canonical bytes determine the request
-(shape, names, ABI shape). -/
+(shape, names, ABI shape, kind, a compat's target). -/
 def templateInjective : Prop :=
   ∀ (x y : Template),
-    (∀ s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof], s.utf8ByteSize ≤ 65536) →
-      (∀ s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof], s.utf8ByteSize ≤ 65536) →
+    (∀ s ∈ x.abi.toList ++ [x.impl, x.spec, x.proof] ++ x.target.toList, s.utf8ByteSize ≤ 65536) →
+      (∀ s ∈ y.abi.toList ++ [y.impl, y.spec, y.proof] ++ y.target.toList, s.utf8ByteSize ≤ 65536) →
       templateBytes x = templateBytes y → x = y
 
-/-- U7 S0: the template bytes = the canonical J text of exactly six members — `abi` (the ABI shape
-constant, or null), `form` = `fvdep/statement/1`, `impl`, `proof`, `shape` (`fn` | `abi`), `spec` —
-over the names as written. -/
+/-- U7 S0: the template bytes = the canonical J text of six members — `abi` (the ABI shape
+constant, or null), `form` = the kind's tag (`fvdep/statement/1` = part A's equation,
+`fvdep/statement/prop/1` = an obligation, `fvdep/statement/compat/1` = a compat), `impl`, `proof`,
+`shape` (`fn` | `abi`), `spec` — + `target` when given (a compat's target `<id>@<version>`), over
+the names as written. -/
 def templateLayout : Prop :=
   ∀ (x : Template),
     templateBytes x =
       FvdepCore.Json.print
         (.obj
-          [("abi", x.abi.elim .null .str), ("form", .str "fvdep/statement/1"),
-            ("impl", .str x.impl), ("proof", .str x.proof),
-            ("shape", .str (if x.shape = .fn then "fn" else "abi")), ("spec", .str x.spec)])
+          ([("abi", x.abi.elim .null .str),
+              ("form",
+                .str
+                  (if x.kind = .eq then "fvdep/statement/1"
+                  else
+                    if x.kind = .prop then "fvdep/statement/prop/1"
+                    else "fvdep/statement/compat/1")),
+              ("impl", .str x.impl), ("proof", .str x.proof),
+              ("shape", .str (if x.shape = .fn then "fn" else "abi")), ("spec", .str x.spec)] ++
+            x.target.toList.map fun t => ("target", .str t)))
 
 /-- U7 X7 + S4: `statement` reports `exhausted` only with no work unit left. -/
 def statementStop : Prop :=
@@ -4024,13 +4034,17 @@ def judgeViewRow : Row :=
 /-- U7 S: the statement step. -/
 def judgeStatementRow : Row :=
   { component := `FvdepCore.Judge.Statement
-    contract := "U7 S1–S4"
+    contract := "U7 S1–S4 + Part B B7"
     claim :=
       "`statement`: e2's proof constant vs the template over e1's trusted constants — fn " ++
         "`@Eq.{u} T impl spec` (T = the spec's type), abi `@Eq.{u} T impl (shape spec)` " ++
-        "(T = the codomain of the shape's closed nondependent arrow type), u = the proof's own " ++
-        "`Eq` level, T compared by `eqExpr`: infrastructure exactly when the trusted side lacks " ++
-        "T, `.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` " ++
+        "(T = the codomain of the shape's closed nondependent arrow type), Part B's `prop` = " ++
+        "the obligation constant itself (a safe definition of type `Prop` without level " ++
+        "parameters), `compat` = `@Eq.{u} T new old` (T = the new spec's type), u = the proof's " ++
+        "own `Eq` level, T compared by `eqExpr`: infrastructure exactly without the trusted " ++
+        "data (part A: T; part B: an absent root — a present root of another form = the " ++
+        "mismatch), " ++
+        "`.matched` ⇒ `Holds` (the memo kept sound), `Holds` ⇒ matched or `exhausted` " ++
         "(`statementExact`); `exhausted` only with no work unit left (`statementStop`); the " ++
         "causes' texts = J4's tested detail lines."
     claims :=
@@ -4048,7 +4062,8 @@ def judgeTemplateRow : Row :=
     contract := "U7 S0"
     claim :=
       "`statementDigest h x` = `h (templateBytes x)`: the template's canonical J text over the " ++
-        "request's names as written — its six members spelled in `templateLayout` — " ++
+        "request's names as written — its six members (the form tagging the kind: `eq`, `prop`, " ++
+        "`compat`) + a compat's `target` spelled in `templateLayout` — " ++
         "(`statementDigestExact`); on names within J's string bound the bytes determine the " ++
         "request (`templateInjective`); the digest's separation = SHA-256's collision " ++
         "resistance over those bytes (never premised)."

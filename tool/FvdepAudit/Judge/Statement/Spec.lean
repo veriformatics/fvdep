@@ -45,29 +45,48 @@ def Closed : Lean.Expr → Nat → Prop
 
 /-- S1 + S2, the trusted side: the template's type `T` — the spec's type (fn), or the codomain of
 the ABI shape's type, a closed nondependent arrow `A → T` (abi); the spec + the shape safe
-definitions of e1 without level parameters. -/
+definitions of e1 without level parameters. Part B: an obligation (`prop`) = the proposition `spec`
+a safe level-free definition of type `T = Prop`; a compat = `T` the new spec's (`impl`'s) type,
+both specs safe level-free definitions. -/
 def Target (t1 : Tables) (r : Request) (T : Lean.Expr) : Prop :=
-  match r.abi with
-  | none => SafeDefn t1 r.spec T
-  | some s =>
-    (∃ S, SafeDefn t1 r.spec S) ∧
-      ∃ n A bi, SafeDefn t1 s (.forallE n A T bi) ∧ Closed A 0 ∧ Closed T 0
+  if r.kind = .prop then SafeDefn t1 r.spec T ∧ T = .sort .zero
+  else
+    if r.kind = .compat then SafeDefn t1 r.impl T ∧ ∃ S, SafeDefn t1 r.spec S
+    else
+      match r.abi with
+      | none => SafeDefn t1 r.spec T
+      | some s =>
+        (∃ S, SafeDefn t1 r.spec S) ∧
+          ∃ n A bi, SafeDefn t1 s (.forallE n A T bi) ∧ Closed A 0 ∧ Closed T 0
 
-/-- S3: the template `@Eq.{u} T impl spec` (fn) / `@Eq.{u} T impl (shape spec)` (abi). -/
+/-- S3: the template `@Eq.{u} T impl spec` (fn) / `@Eq.{u} T impl (shape spec)` (abi); Part B
+(B7): an obligation's (`prop`) = the proposition constant itself, a compat's = `@Eq.{u} T new old`
+(`impl` = new, `spec` = old; no ABI shape). -/
 def template (r : Request) (T : Lean.Expr) (u : Lean.Level) : Lean.Expr :=
-  .app (.app (.app (.const `Eq [u]) T) (.const r.impl []))
-    (match r.abi with
-    | none => .const r.spec []
-    | some s => .app (.const s []) (.const r.spec []))
+  if r.kind = .prop then .const r.spec []
+  else
+    .app (.app (.app (.const `Eq [u]) T) (.const r.impl []))
+      (if r.kind = .compat then .const r.spec []
+      else
+        match r.abi with
+        | none => .const r.spec []
+        | some s => .app (.const s []) (.const r.spec []))
+
+/-- S4's trusted data, whose absence = infrastructure: part A = a target type (every trusted-side
+fault); Part B (B7) = the kind's roots present in e1 (`prop`: `spec`; `compat`: `impl` + `spec`) —
+a present root of an unsupported form is the statement's mismatch. -/
+def Trusted (t1 : Tables) (r : Request) : Prop :=
+  if r.kind = .eq then ∃ T, Target t1 r T
+  else (∃ e, Named t1 r.spec e) ∧ (r.kind = .compat → ∃ e, Named t1 r.impl e)
 
 /-- S4: the template holds — the trusted side's `T`, the implementation a safe definition of e1
-without level parameters, the proof's name no constant of e1, and e2's proof a theorem without
-level parameters whose type is the template up to U4's alpha-equivalence, for the level `u` its
-`Eq` carries. -/
+without level parameters (part A's kind `eq`), the proof's name no constant of e1, and e2's proof a
+theorem without level parameters whose type is the template up to U4's alpha-equivalence, for the
+level `u` its `Eq` carries. -/
 def Holds (t1 t2 : Tables) (r : Request) : Prop :=
   ∃ T,
     Target t1 r T ∧
-      (∃ I, SafeDefn t1 r.impl I) ∧
+      (r.kind = .eq → ∃ I, SafeDefn t1 r.impl I) ∧
       (∀ e, ¬Named t1 r.proof e) ∧
       ∃ all i ty v P u,
         Named t2 r.proof (.thm all [] i ty v) ∧

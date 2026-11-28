@@ -2593,6 +2593,22 @@ def reqFn : FvdepCore.Judge.Request :=
 
 def reqAbi : FvdepCore.Judge.Request := { reqFn with abi := some `shape }
 
+/-- Part B `prop`: the obligation `spec` a safe definition of type `Prop` (expr 4 = `Sort 0`);
+expr 5 = `spec`, the theorem's type; `impl` (name 4) undeclared — `prop` never reads it. -/
+def e1Prop : List String :=
+  sNames ++ ["{\"ie\":4,\"sort\":0}", "{\"const\":{\"name\":3,\"us\":[]},\"ie\":5}"] ++
+    [sAxiom 2 0, sDef 3 4]
+
+def e2Prop : List String := e1Prop ++ [sThm 5 5]
+
+def reqProp : FvdepCore.Judge.Request := { reqFn with kind := .prop }
+
+/-- Part B `compat`: `impl` = the new spec, `spec` = the old (`@Eq T new old` = `sTemplate`). -/
+def reqCompat : FvdepCore.Judge.Request := { reqFn with kind := .compat }
+
+/-- compat where only the new spec has type `T` (the old: `T → T`, expr 3). -/
+def e1CompatT : List String := sNames ++ sTemplate sFnRhs 8 9 ++ [sAxiom 2 0, sDef 3 3, sDef 4 1]
+
 /-- S over two hand-made exports (`none` = one refused by the reader). -/
 def stmt (a b : List String) (r : FvdepCore.Judge.Request := reqFn) (fuel : Nat := 1000) :
     Option FvdepCore.Judge.Outcome := do
@@ -2666,6 +2682,55 @@ def sCases : List (String × (Unit → Bool)) :=
           (stmt e1Fn (edit e2Fn 12 "\"name\":1" "\"name\":2")) &&
         isMismatch "the proof does not prove the required statement"
           (stmt e1Fn (edit e2Fn 14 "\"us\":[]" "\"us\":[1]"))),
+    ("judge S prop: a theorem of the obligation constant itself matches (`impl` unread); " ++
+        "another type, a level on it, a missing or trusted-named proof → mismatch",
+      fun _ =>
+      stmt e1Prop e2Prop reqProp == some .matched &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Prop (e1Prop ++ [sThm 5 1]) reqProp) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Prop (edit e2Prop 13 "\"us\":[]" "\"us\":[1]") reqProp) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Prop (e1Prop ++ [sThm 5 4]) reqProp) &&
+        isMismatch "the solution lacks proof" (stmt e1Prop e1Prop reqProp) &&
+        isMismatch "the proof's name proof is a trusted constant" (stmt e2Prop e2Prop reqProp)),
+    ("judge S prop: the obligation absent → infrastructure; present but not of type `Prop`, " ++
+        "unsafe or polymorphic → mismatch (B7: the candidate's own construction)",
+      fun _ =>
+      let notProp :=
+        "the obligation spec is not a safe definition of type Prop without level " ++ "parameters"
+      isInfra (stmt (e1Prop.dropLast) e2Prop reqProp) &&
+        isMismatch notProp (stmt (e1Prop.dropLast ++ [sDef 3 1]) e2Prop reqProp) &&
+        isMismatch notProp (stmt (e1Prop.dropLast ++ [sDef 3 4 "partial"]) e2Prop reqProp) &&
+        isMismatch notProp (stmt (e1Prop.dropLast ++ [sDef 3 4 "safe" "[7]"]) e2Prop reqProp) &&
+        isInfra (stmt (e1Prop.dropLast) e2Prop reqFn)),
+    ("judge S compat: `@Eq T new old` matches, T = the new spec's type, the ABI shape unread; " ++
+        "the reversed equation → mismatch",
+      fun _ =>
+      stmt e1Fn e2Fn reqCompat == some .matched &&
+        stmt e1Fn e2Fn { reqCompat with abi := some `shape } == some .matched &&
+        stmt e1CompatT (e1CompatT ++ [sThm 5 9]) reqCompat == some .matched &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1CompatT (e1CompatT ++ [sThm 5 9])) &&
+        isMismatch "the proof does not prove the required statement"
+          (stmt e1Fn (edit (edit e2Fn 14 "\"name\":4" "\"name\":3") 16 "\"name\":3" "\"name\":4")
+            reqCompat)),
+    ("judge S compat: a spec absent → infrastructure; present but unsafe or polymorphic → mismatch",
+      fun _ =>
+      isInfra (stmt (e1Fn.dropLast) e2Fn reqCompat) &&
+        isInfra (stmt (e1Fn.take (e1Fn.length - 2) ++ [sDef 4 1]) e2Fn reqCompat) &&
+        isMismatch "the spec impl is not a safe definition without level parameters"
+          (stmt (e1Fn.dropLast ++ [sDef 4 1 "partial"]) e2Fn reqCompat) &&
+        isMismatch "the spec spec is not a safe definition without level parameters"
+          (stmt (e1Fn.take (e1Fn.length - 2) ++ [sDef 3 1 "safe" "[7]", sDef 4 1]) e2Fn reqCompat)),
+    ("judge G1: the roots per kind — prop = the obligation, compat = `Eq` + new + old (no " ++
+        "shape), eq = part A's",
+      fun _ =>
+      FvdepCore.Judge.graphRoots reqProp == `spec :: FvdepCore.Judge.mandatory &&
+        FvdepCore.Judge.graphRoots { reqCompat with abi := some `shape } ==
+          [`Eq, `impl, `spec] ++ FvdepCore.Judge.mandatory &&
+        FvdepCore.Judge.graphRoots reqAbi ==
+          [`Eq, `impl, `spec, `shape] ++ FvdepCore.Judge.mandatory),
     ("judge S: a budget too small for the template's type = exhausted (no verdict), never a pass",
       fun _ =>
       stmt e1Fn e2Fn reqFn 0 == some .exhausted && stmt e1Fn e2Fn reqFn 3 == some .matched),
@@ -2684,7 +2749,33 @@ def sCases : List (String × (Unit → Bool)) :=
         FvdepCore.Judge.templateBytes x != FvdepCore.Judge.templateBytes y &&
         FvdepCore.Judge.templateBytes x != FvdepCore.Judge.templateBytes { x with shape := .abi } &&
         FvdepCore.Judge.templateBytes x !=
-          FvdepCore.Judge.templateBytes { x with impl := "impl2" })]
+          FvdepCore.Judge.templateBytes { x with impl := "impl2" }),
+    ("judge S0: each kind's form tag + a compat's target are framed; no two kinds share bytes",
+      fun _ =>
+      let x : FvdepCore.Judge.Template :=
+        { shape := .fn, impl := "new", spec := "old", proof := "P.p", abi := none }
+      let p :=
+        { x with
+          kind := .prop, impl := "" }
+      let c :=
+        { x with
+          kind := .compat, target := some "base64.encode@1.0.0" }
+      String.fromUTF8? (FvdepCore.Judge.templateBytes p) ==
+          some
+            ("{\"abi\":null,\"form\":\"fvdep/statement/prop/1\",\"impl\":\"\",\"proof\":" ++
+              "\"P.p\",\"shape\":\"fn\",\"spec\":\"old\"}") &&
+        String.fromUTF8? (FvdepCore.Judge.templateBytes c) ==
+          some
+            ("{\"abi\":null,\"form\":\"fvdep/statement/compat/1\",\"impl\":\"new\"," ++
+              "\"proof\":\"P.p\",\"shape\":\"fn\",\"spec\":\"old\",\"target\":" ++
+              "\"base64.encode@1.0.0\"}") &&
+        FvdepCore.Judge.templateBytes x != FvdepCore.Judge.templateBytes { x with kind := .prop } &&
+        FvdepCore.Judge.templateBytes x !=
+          FvdepCore.Judge.templateBytes { x with kind := .compat } &&
+        FvdepCore.Judge.templateBytes { x with kind := .prop } !=
+          FvdepCore.Judge.templateBytes { x with kind := .compat } &&
+        FvdepCore.Judge.templateBytes { x with kind := .compat } !=
+          FvdepCore.Judge.templateBytes c)]
 
 /-! ## G (graph) fixtures: names = the mandatory inventory + `gExtra` (prefixes first, from 1);
 level 1 = succ 0; exprs 0 = Sort 1, 1 = T, 2 = aux, 3 = op, 4 = ax, 5–10 = `@Eq.{1} T impl spec`,
@@ -3088,7 +3179,7 @@ def kCases : List (String × (Unit → Bool)) :=
         "solution's unreadable export = a statement mismatch with its line; past A the kernel " ++
         "observations in K's order, none when a stage stopped",
       fun _ =>
-      let r : Request := ⟨`I.impl, `S.spec, `P.proof, none⟩
+      let r : Request := { impl := `I.impl, spec := `S.spec, proof := `P.proof, abi := none }
       let go (e1 e2 : Read) : Pre := stages v1 "g" "v" r "d1" "d2" e1 e2
       let junk : Read := .ok (kText "x")
       (match (go (.error "gone") junk).obs with
@@ -3312,7 +3403,11 @@ def ioCases : List (String × IO Bool) :=
       let bad ← FvdepIO.Judge.readExport (dir / "e.ndjson") "00"
       let gone ← FvdepIO.Judge.readExport (dir / "none.ndjson") h
       IO.FS.removeDirAll dir
-      let r : Request := ⟨`I.impl, `S.spec, `P.proof, some `A.shape⟩
+      let r : Request :=
+        { impl := `I.impl
+          spec := `S.spec
+          proof := `P.proof
+          abi := some `A.shape }
       return (match good with
           | .ok b => b.data == "{}\n".toUTF8.data
           | .error _ => false) &&
