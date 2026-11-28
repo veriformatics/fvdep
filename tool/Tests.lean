@@ -538,6 +538,62 @@ def cases : List (String × (Unit → Bool)) :=
 
 end Registry
 
+/-! ## U7 B5: the per-walk decode budget (`withinF`) -/
+
+namespace Budget
+
+open Lean FvdepCore.Index.Registry Registry
+
+/-- `let x₀ := c; let x₁ := x₀ x₀; …; xₙ`: each `let` value names the previous one (`bvar 0`), so
+the expanded size doubles per level. -/
+def doublingGo : Nat → Expr
+  | 0 => .bvar 0
+  | k + 1 => .letE `x (.const `T []) (.app (.bvar 0) (.bvar 0)) (doublingGo k) false
+
+def doubling (n : Nat) : Expr := .letE `x (.const `T []) (.const `c []) (doublingGo n) false
+
+def fg : Expr := .app (.const `f []) (.const `g [])
+
+/-- The registry facts + a registry-module definition `x := f g`, a self-referential `loop`, and
+`Foo.y := f g` declared outside the registry module. -/
+def bF : Facts :=
+  facts okModules okNotices
+    [decl `Fvdep.Registry.x `Fvdep.Registry fg,
+      decl `Fvdep.Registry.loop `Fvdep.Registry (.const `Fvdep.Registry.loop []),
+      decl `Foo.y `Foo fg]
+
+def cases : List (String × (Unit → Bool)) :=
+  [("budget: a node = 1; a registry-module definition counted at each reference, once per " ++
+        "path; a definition outside the registry never unfolded",
+      fun _ =>
+      withinF bF 10 (.const `c []) [] [] == some 9 &&
+        withinF bF 10 (.const `Fvdep.Registry.x []) [] [] == some 6 &&
+        withinF bF 10 (.const `Fvdep.Registry.x []) [] [`Fvdep.Registry.x] == some 9 &&
+        withinF bF 10 (.app (.const `Fvdep.Registry.x []) (.const `Fvdep.Registry.x [])) [] [] ==
+          some 1 &&
+        withinF bF 10 (.const `Fvdep.Registry.loop []) [] [] == some 8 &&
+        withinF bF 10 (.const `Foo.y []) [] [] == some 9),
+    ("budget: an `<M>.entry` value counted at its reference (as C2 unfolds it)", fun _ =>
+      let v := moduleMk "base64.encode" "1.0.0"
+      withinF bF 1000 (.const entryName []) [] [] == withinF bF 999 v [] [entryName] &&
+        (withinF bF 1000 v [] [entryName]).isSome &&
+        withinF bF 1000 (.const entryName []) [] [] != some 999),
+    ("budget: a `let` value counted at each of its variables; the exact size fits, one node " ++
+        "less refuses",
+      fun _ =>
+      let e : Expr := .letE `x (.const `T []) fg (.app (.bvar 0) (.bvar 0)) false
+      withinF bF 100 e [] [] == some 90 && withinF bF 10 e [] [] == some 0 &&
+        withinF bF 9 e [] [] == none &&
+        withinF bF 0 (.const `c []) [] [] == none),
+    ("budget: a shared-`let` blowup (2^30 expanded nodes) passes 10^6 + is refused within it; a " ++
+        "small one fits",
+      fun _ =>
+      withinF bF 1000000 (doubling 30) [] [] == none &&
+        (withinF bF 1000000 (doubling 10) [] []).isSome &&
+        withinF bF 1000000 (doubling 19) [] [] == none)]
+
+end Budget
+
 /-! Compiled-code smoke for the entry rules (contract U4 C3, C4, C9): the proofs tie `validate` to
 the rows written apart; these pin the rows against C9's text — a valid one-entry registry passes,
 each plant refuses with its first failing row (flag-major order, then the least carrier; Lean's own
@@ -5498,6 +5554,7 @@ def main : IO UInt32 := do
               check "cli: generated lists reach every outcome class" fun _ =>
                 [0, 2].all fun rc => generated.any fun args => (run args).exit == rc] ++
             (Core.cases ++ Json.cases ++ Doc.cases ++ Index.cases ++ Registry.cases ++
+                  Budget.cases ++
                   Rules.cases ++
                   Statuses.cases ++
                   Assemble.cases ++

@@ -3108,6 +3108,26 @@ Step: `FvdepCore.Oracle.Driver.driverText` writes a sandbox step's program from 
 - Residue: none
 - Unproven: none
 
+## `FvdepCore.Index.Budget`
+
+- Contract: U7 Part B B5
+- Claim: `withinF F k e env p`: a walk's countdown over C2's read-through facts = `k` minus its expanded size (every node at every use: a `let` value at each variable, an `<M>.entry` value or a registry-module definition at each reference, once per path), `none` past `k` (`decodeBudget`); the admission plan runs C2's uncharged decode only after it accepts (U7-B-P).
+- Subject: `FvdepCore.Index.Registry.withinF`
+- Path: none yet (wired by U7)
+- Statement `FvdepLedger.Rows.BudgetClaims.decodeBudget` (hash 0xfc6a499b), proved by `FvdepAudit.Index.Budget.Proof.withinF_eq`:
+
+  ```lean
+  ∀ (F : FvdepCore.Index.Registry.Facts) (k : Nat) (e : Lean.Expr) (env : List Lean.Expr)
+    (p : List Lean.Name),
+    FvdepCore.Index.Registry.withinF F k e env p =
+      if FvdepAudit.Index.Budget.Spec.sizeF F e env p ≤ k then
+        some (k - FvdepAudit.Index.Budget.Spec.sizeF F e env p)
+      else none
+  ```
+- Uninterpreted: none
+- Residue: none
+- Unproven: none
+
 ## `FvdepIO.Judge`
 
 - Contract: U7 J1, K1, K4

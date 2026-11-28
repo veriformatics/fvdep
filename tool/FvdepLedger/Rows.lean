@@ -6,6 +6,7 @@ import FvdepAudit.Doc.Proof.Lock
 import FvdepAudit.Export.Proof
 import FvdepAudit.Hash.Proof.Sha256
 import FvdepAudit.Index.Assemble.Proof.Claims
+import FvdepAudit.Index.Budget.Proof
 import FvdepAudit.Index.Command.Proof.Claims
 import FvdepAudit.Index.History.Proof.Claims
 import FvdepAudit.Index.Proof.Claims
@@ -1211,6 +1212,20 @@ def registryCertificateExact : Prop :=
     decode F (.list f) (listLiteral f vs) env p = .ok (listVal vs)
 
 end FvdepLedger.Rows.RegistryClaims
+
+namespace FvdepLedger.Rows.BudgetClaims
+
+open Lean FvdepCore.Index.Registry FvdepAudit.Index.Budget.Spec
+
+/-- U7 B5 `decodeBudget`: a walk's countdown = its expanded size against the budget — every node at
+every use (a `let` value at each of its variables, an `<M>.entry` value or a registry-module
+definition at each reference, once per path as C2 unfolds): the budget left, or `none` past it (a
+refusal only with the budget spent). -/
+def decodeBudget : Prop :=
+  ∀ (F : Facts) (k : Nat) (e : Expr) (env : List Expr) (p : List Name),
+    withinF F k e env p = if sizeF F e env p ≤ k then some (k - sizeF F e env p) else none
+
+end FvdepLedger.Rows.BudgetClaims
 
 namespace FvdepLedger.Rows.RulesClaims
 
@@ -4139,6 +4154,23 @@ def judgeKernelRow : Row :=
     residue := []
     unproven := [] }
 
+/-- U7 B5: the per-walk decode budget. -/
+def decodeBudgetRow : Row :=
+  { component := `FvdepCore.Index.Budget
+    contract := "U7 Part B B5"
+    claim :=
+      "`withinF F k e env p`: a walk's countdown over C2's read-through facts = `k` minus its " ++
+        "expanded size (every node at every use: a `let` value at each variable, an " ++
+        "`<M>.entry` value or a registry-module definition at each reference, once per path), " ++
+        "`none` past `k` (`decodeBudget`); the admission plan runs C2's uncharged decode only " ++
+        "after it accepts (U7-B-P)."
+    claims := [(``BudgetClaims.decodeBudget, ``FvdepAudit.Index.Budget.Proof.withinF_eq)]
+    subject := ``FvdepCore.Index.Registry.withinF
+    path := []
+    noCaller := "U7"
+    residue := []
+    unproven := [] }
+
 /-- U7 part B K5: one command's memo of kernel answers. -/
 def judgeReuseRow : Row :=
   { component := `FvdepCore.Judge.Reuse
@@ -5338,20 +5370,21 @@ def ledger : Ledger :=
         phaseStemRow, phaseSnapRow, phaseImportRow, phaseObserveRow, phaseStepsRow, phaseArgvRow,
         exportReadRow, exportTablesRow, judgeExprRow, judgeDeclRow, judgeViewRow, judgeStatementRow,
         judgeTemplateRow, judgeGraphRow, judgeAxiomsRow, judgeKernelRow, judgePlanRow,
-        judgeReuseRow, judgeKernelStepRow, judgeProfileRow, projectSelectRow, librarySourceRow,
-        libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow, libraryStartRow,
-        libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow, wireArgsRow,
-        wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow, wireNativeUtf16Row,
-        wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow, wireNativeVersionRow,
-        wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow, wireResultServeRow, wireArgServeRow,
-        oracleMergeRow, gitRunRow, librarySnapshotRow, projectReadRow, stepFrameRow, stepFrameOfRow,
-        stepExecuteRow, stepPlanRow, spawnRow, limitsRow, runnerRow, cacheRow, headerRow,
-        toolchainRow, snapshotRow, bundleCoreRow, phaseRunRow, bundleWriteRow, oracleTargetRow,
-        oracleIndexRow, oracleCoherenceRow, oracleEntryRow, oracleSigRow, oracleCommandRow,
-        oracleDriverRow, oracleEffectsRow, toolsRow, manifestTreeRow, libraryLimitsRow,
-        versionTypeRow, profileTypesRow, profileRecordRow, profileRequestRow, profileTableRow,
-        profileGrammarRow, profileDetailRow, profileWalkRow, profileBodyRow, profileHeaderRow,
-        profileConcludeRow, profileJudgeRow, parseExecuteRow, parsePlanRow, profileStepRow]
+        judgeReuseRow, decodeBudgetRow, judgeKernelStepRow, judgeProfileRow, projectSelectRow,
+        librarySourceRow, libraryTreeRow, libraryPlanRow, libraryBatchRow, libraryHeadRow,
+        libraryStartRow, libraryPinRow, libraryHeadSelectRow, libraryToolchainRow, protocolTypesRow,
+        wireArgsRow, wireResultRow, wireNativeRow, wireNativeByteArrayRow, wireNativeTextRow,
+        wireNativeUtf16Row, wireNativeNatRow, wireNativeIntRow, wireNativeOrderingRow,
+        wireNativeVersionRow, wireAnswerRow, wirePlainAnswerRow, wireOptionAnswerRow,
+        wireResultServeRow, wireArgServeRow, oracleMergeRow, gitRunRow, librarySnapshotRow,
+        projectReadRow, stepFrameRow, stepFrameOfRow, stepExecuteRow, stepPlanRow, spawnRow,
+        limitsRow, runnerRow, cacheRow, headerRow, toolchainRow, snapshotRow, bundleCoreRow,
+        phaseRunRow, bundleWriteRow, oracleTargetRow, oracleIndexRow, oracleCoherenceRow,
+        oracleEntryRow, oracleSigRow, oracleCommandRow, oracleDriverRow, oracleEffectsRow, toolsRow,
+        manifestTreeRow, libraryLimitsRow, versionTypeRow, profileTypesRow, profileRecordRow,
+        profileRequestRow, profileTableRow, profileGrammarRow, profileDetailRow, profileWalkRow,
+        profileBodyRow, profileHeaderRow, profileConcludeRow, profileJudgeRow, parseExecuteRow,
+        parsePlanRow, profileStepRow]
     residue := residue
     extraRoots :=
       [{  main := ``FvdepIO.Step.main

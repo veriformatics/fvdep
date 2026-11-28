@@ -1,4 +1,5 @@
 import FvdepCore.Cli
+import FvdepCore.Index.Budget
 import FvdepCore.Index.History
 import FvdepCore.Judge.Axioms
 import FvdepCore.Judge.Profile
